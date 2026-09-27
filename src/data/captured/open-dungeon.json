@@ -1,0 +1,40 @@
+{
+  "prompt": "",
+  "commands": [
+    {
+      "command": "npm run test:unit",
+      "output": [
+        "> open-dungeon@1.0.0 test:unit",
+        "> vitest run",
+        "",
+        " RUN  v3.2.7 /workspaces/open-dungeon",
+        "",
+        " ✓ engine/room.test.ts (12 tests) 340ms",
+        " ✓ mcp/smoke.test.ts (8 tests) 120ms",
+        " ✓ api/gate.test.ts (16 tests) 610ms",
+        "",
+        " Test Files  3 passed (3)",
+        "      Tests  36 passed (36)",
+        "   Duration  1.11s",
+        ""
+      ],
+      "exitCode": 0,
+      "status": "ok",
+      "durationMs": 1110
+    },
+    {
+      "command": "node scripts/mcp-smoke.js",
+      "output": [
+        "connecting to MCP server...",
+        "[ok] 20 tools registered",
+        "[ok] handshake complete in 14ms",
+        "[ok] all tool schemas validate",
+        "[ok] capability list matches README",
+        "smoke test passed."
+      ],
+      "exitCode": 0,
+      "status": "ok",
+      "durationMs": 140
+    }
+  ]
+}

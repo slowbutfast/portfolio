@@ -1,0 +1,51 @@
+{
+  "prompt": "",
+  "commands": [
+    {
+      "command": "npm test",
+      "output": [
+        "> attention-max@2.0.0 test",
+        "> npm run test:unit",
+        "",
+        "",
+        "> attention-max@2.0.0 test:unit",
+        "> jest --config tests/jest.config.js",
+        "",
+        "  console.warn",
+        "    browser.tabGroups.query failed, using fallback titles: Error: API Disabled",
+        "        at Object.<anonymous> (/home/node/global-sandbox/projects/attention-max/tests/unit/tabGroups.test.js:82:47)",
+        "        at Promise.finally.completed (/home/node/global-sandbox/projects/attention-max/node_modules/jest-circus/build/jestAdapterInit.js:1561:28)",
+        "        at new Promise (<anonymous>)",
+        "        at callAsyncCircusFn (/home/node/global-sandbox/projects/attention-max/node_modules/jest-circus/build/jestAdapterInit.js:1501:10)",
+        "        at _callCircusTest (/home/node/global-sandbox/projects/attention-max/node_modules/jest-circus/build/jestAdapterInit.js:1011:40)",
+        "        at _runTest (/home/node/global-sandbox/projects/attention-max/node_modules/jest-circus/build/jestAdapterInit.js:951:3)",
+        "        at /home/node/global-sandbox/projects/attention-max/node_modules/jest-circus/build/jestAdapterInit.js:853:7",
+        "        at _runTestsForDescribeBlock (/home/node/global-sandbox/projects/attention-max/node_modules/jest-circus/build/jestAdapterInit.js:866:11)",
+        "        at _runTestsForDescribeBlock (/home/node/global-sandbox/projects/attention-max/node_modules/jest-circus/build/jestAdapterInit.js:861:11)",
+        "        at run (/home/node/global-sandbox/projects/attention-max/node_modules/jest-circus/build/jestAdapterInit.js:765:3)",
+        "        at runAndTransformResultsToJestFormat (/home/node/global-sandbox/projects/attention-max/node_modules/jest-circus/build/jestAdapterInit.js:1993:21)",
+        "        at jestAdapter (/home/node/global-sandbox/projects/attention-max/node_modules/jest-circus/build/runner.js:111:19)",
+        "        at runTestInternal (/home/node/global-sandbox/projects/attention-max/node_modules/jest-runner/build/index.js:276:16)",
+        "        at runTest (/home/node/global-sandbox/projects/attention-max/node_modules/jest-runner/build/index.js:344:7)",
+        "",
+        "      39 |           }",
+        "      40 |         } catch (e) {",
+        "    > 41 |           console.warn('browser.tabGroups.query failed, using fallback titles:', e);",
+        "         |                   ^",
+        "      42 |         }",
+        "      43 |       }",
+        "      44 |",
+        "",
+        "      at Object.warn [as getCurrentTabGroups] (../extension/tab_groups.js:41:19)",
+        "",
+        "Test Suites: 5 passed, 5 total",
+        "Tests:       58 passed, 58 total",
+        "Snapshots:   0 total",
+        "Time:        1.531 s",
+        "Ran all test suites."
+      ],
+      "exitCode": 0,
+      "status": "ok"
+    }
+  ]
+}

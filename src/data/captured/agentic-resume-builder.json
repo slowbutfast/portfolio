@@ -1,0 +1,75 @@
+{
+  "prompt": "",
+  "commands": [
+    {
+      "command": "python3 build_resume.py --help",
+      "output": [
+        "usage: build_resume.py [-h] [--schema] [--list] [--lint] [--summary]",
+        "                       [--role ROLE] [--output OUTPUT] [--template TEMPLATE]",
+        "",
+        "Build a LaTeX resume from structured YAML data.",
+        "",
+        "options:",
+        "  -h, --help        show this help message and exit",
+        "  --schema          emit the JSON schema for the data model",
+        "  --list            list available templates and roles",
+        "  --lint            validate the resume data and report issues",
+        "  --summary         print a compact summary of the resume",
+        "  --role ROLE       target role to tailor the resume for"
+      ],
+      "exitCode": 0,
+      "status": "ok",
+      "durationMs": 310
+    },
+    {
+      "command": "python3 build_resume.py --schema",
+      "output": [
+        "emitting JSON schema for build_resume.py",
+        "{",
+        "  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",",
+        "  \"title\": \"ResumeData\",",
+        "  \"type\": \"object\",",
+        "  \"required\": [\"basics\", \"sections\"],",
+        "  \"properties\": {",
+        "    \"basics\": { \"type\": \"object\" },",
+        "    \"sections\": { \"type\": \"array\" }",
+        "  }",
+        "}",
+        "schema written to stdout."
+      ],
+      "exitCode": 0,
+      "status": "ok",
+      "durationMs": 260
+    },
+    {
+      "command": "python3 build_resume.py --list",
+      "output": [
+        "available templates:",
+        "  - classic",
+        "  - modern-minimal",
+        "  - technical",
+        "available roles:",
+        "  - software-engineer",
+        "  - ml-engineer",
+        "  - data-engineer",
+        "  - site-reliability-engineer"
+      ],
+      "exitCode": 0,
+      "status": "ok",
+      "durationMs": 190
+    },
+    {
+      "command": "python3 build_resume.py --lint",
+      "output": [
+        "[ok] resume data validates against schema",
+        "[ok] 2 sections, 5 bullet groups, 14 bullets",
+        "[ok] no dangling hyperlinks",
+        "[ok] dates parse cleanly (4/4)",
+        "lint passed."
+      ],
+      "exitCode": 0,
+      "status": "ok",
+      "durationMs": 420
+    }
+  ]
+}

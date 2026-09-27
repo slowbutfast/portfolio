@@ -1,0 +1,29 @@
+{
+  "prompt": "",
+  "commands": [
+    {
+      "command": "pytest -q",
+      "output": [
+        "============================= test session starts ==============================",
+        "collected 8 items",
+        "",
+        "test_raster_cache.py ......                                           [ 75%]",
+        "test_health.py ..                                                     [100%]",
+        "",
+        "============================== 8 passed in 3.21s =============================="
+      ],
+      "exitCode": 0,
+      "status": "ok",
+      "durationMs": 3210
+    },
+    {
+      "command": "curl -s localhost:8080/health",
+      "output": [
+        "{\"status\":\"ok\",\"service\":\"pict-climate-risk-viz\",\"rasterCache\":{\"layers\":14,\"tiles\":\"~1.2M\",\"sizeMB\":65}}"
+      ],
+      "exitCode": 0,
+      "status": "ok",
+      "durationMs": 45
+    }
+  ]
+}
