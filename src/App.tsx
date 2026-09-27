@@ -62,7 +62,11 @@ export default function App() {
 
   const closeDrawer = useCallback(() => {
     setSelectedId(null);
-    if (window.location.hash) window.location.hash = '';
+    // Clear the hash without adding a history entry, so the browser Back
+    // button doesn't reopen the drawer the user just dismissed.
+    if (window.location.hash) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
     requestAnimationFrame(() => triggerRef.current?.focus());
   }, []);
 
@@ -148,7 +152,7 @@ export default function App() {
         ))}
       </nav>
 
-      {selected && <ProjectDrawer project={selected} onClose={closeDrawer} />}
+      {selected && <ProjectDrawer key={selected.id} project={selected} onClose={closeDrawer} />}
     </div>
   );
 }

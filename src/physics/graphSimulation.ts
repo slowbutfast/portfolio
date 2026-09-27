@@ -171,6 +171,15 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
       }
       return;
     }
+    // Re-hovering the already-pinned node is a no-op; without this guard every
+    // pointermove re-pins the node and re-reheats the simulation.
+    if (hoveredNode === node) return;
+    // Unpin the previous node before pinning the new one, otherwise its fx/fy
+    // stay set and it remains frozen after the pointer moves away.
+    if (hoveredNode) {
+      hoveredNode.fx = null;
+      hoveredNode.fy = null;
+    }
     hoveredNode = node;
     node.fx = node.x;
     node.fy = node.y;

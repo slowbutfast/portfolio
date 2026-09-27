@@ -5,6 +5,9 @@ import { fileURLToPath } from 'node:url';
 const OUT_URL = new URL('../public/assets/screenshots/', import.meta.url);
 const OUT_DIR = fileURLToPath(OUT_URL);
 
+// Only projects whose catalog entry declares a `screenshot` preview get a
+// generated card. Keep this list in sync with src/data/projects.ts so the
+// committed public/assets/screenshots/ tree never accumulates dead images.
 const PROJECTS = [
   {
     id: 'open-dungeon',
@@ -15,28 +18,12 @@ const PROJECTS = [
     motif: 'dungeon',
   },
   {
-    id: 'agentic-resume-builder',
-    title: 'Agentic Resume Builder',
-    summary: 'Python 3.11 CLI that renders tailored LaTeX resumes from structured YAML via argparse-driven build.',
-    tags: ['Agent Tooling', 'LaTeX'],
-    accent: '#065f46',
-    motif: 'resume',
-  },
-  {
     id: 'pict-climate-risk-viz-chatbot',
     title: 'PICT Climate Risk Viz',
     summary: 'Geospatial climate-risk chat and raster visualization built on an Express + React 19 backend.',
     tags: ['Express', 'LLM', 'Geospatial'],
     accent: '#1e40af',
     motif: 'map',
-  },
-  {
-    id: 'transcribe-plus',
-    title: 'Transcribe Plus',
-    summary: 'Local transcription workspace with a Vite + Express 5 monorepo and an offline demo video.',
-    tags: ['Express', 'Vanilla JS', 'Audio'],
-    accent: '#7c2d12',
-    motif: 'wave',
   },
   {
     id: 'sandwave-sim',
@@ -58,9 +45,7 @@ const PROJECTS = [
 
 const MOTIFS = {
   dungeon: (c) => `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><path d="M40 30h80v40h40v100H40z" fill="none" stroke="${c}" stroke-width="3"/><circle cx="120" cy="70" r="6" fill="${c}"/><path d="M80 170v-30M120 170v-60" stroke="${c}" stroke-width="3"/></svg>`,
-  resume: (c) => `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><rect x="50" y="30" width="100" height="140" rx="8" fill="none" stroke="${c}" stroke-width="3"/><path d="M70 70h60M70 95h60M70 120h40" stroke="${c}" stroke-width="3"/><circle cx="70" cy="50" r="4" fill="${c}"/></svg>`,
   map: (c) => `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><path d="M100 30l-40 25-30-15v110l30 15 40-25 40 25 30-15V60l-30 15z" fill="none" stroke="${c}" stroke-width="3"/><path d="M60 55v110M140 75v110" stroke="${c}" stroke-width="2" stroke-dasharray="4 4"/></svg>`,
-  wave: (c) => `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><path d="M20 110c20-40 40 40 60 0s40 40 60 0 40 40 40 0" fill="none" stroke="${c}" stroke-width="3"/><path d="M20 140c20-40 40 40 60 0s40 40 60 0 40 40 40 0" fill="none" stroke="${c}" stroke-width="2" opacity="0.5"/></svg>`,
   plate: (c) => `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><circle cx="100" cy="100" r="70" fill="none" stroke="${c}" stroke-width="3"/><path d="M30 100h140M100 30v140" stroke="${c}" stroke-width="2" opacity="0.7"/><circle cx="100" cy="100" r="30" fill="none" stroke="${c}" stroke-width="2" opacity="0.7"/></svg>`,
   focus: (c) => `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><circle cx="100" cy="100" r="70" fill="none" stroke="${c}" stroke-width="3"/><path d="M100 30v30M100 140v30M30 100h30M140 100h30" stroke="${c}" stroke-width="3"/><circle cx="100" cy="100" r="14" fill="${c}"/></svg>`,
 };

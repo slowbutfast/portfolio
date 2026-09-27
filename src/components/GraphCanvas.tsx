@@ -246,6 +246,15 @@ export function GraphCanvas({ nodes, edges, dimmedIds, focusedId, onSelect }: Gr
   const hitNode = (wx: number, wy: number): GraphNode | null => {
     const sim = simRef.current;
     if (!sim) return null;
+    // Reduced-motion layout is static and lives in staticPosRef; the sim's
+    // live coordinates are not advanced in that mode, so hit-test the ring.
+    if (reduceMotionRef.current) {
+      for (const n of sim.nodes) {
+        const p = staticPosRef.current.get(n.id);
+        if (p && Math.hypot(wx - p[0], wy - p[1]) <= n.radius) return n;
+      }
+      return null;
+    }
     for (const n of sim.nodes) {
       if (Math.hypot(wx - n.x, wy - n.y) <= n.radius) return n;
     }
@@ -255,10 +264,15 @@ export function GraphCanvas({ nodes, edges, dimmedIds, focusedId, onSelect }: Gr
   const onPointerMove = (e: ReactPointerEvent<HTMLCanvasElement>) => {
     const sim = simRef.current;
     if (!sim) return;
+    // Reduced motion pauses the simulation; pointer hover/drag would only
+    // mutate pinned forces that are never consumed.
+    if (reduceMotionRef.current) return;
     const p = worldPoint(e.clientX, e.clientY);
     if (sim.state === 'drag') {
       sim.dragMove(p.x, p.y);
-    } else if (sim.state === 'idle') {
+    } else if (sim.state === 'idle' || sim.state === 'hover') {
+      // Re-evaluate while already hovering so moving from one node straight
+      // onto another pins the new node and unpins the old one.
       sim.hover(hitNode(p.x, p.y));
     }
   };
@@ -271,7 +285,7 @@ export function GraphCanvas({ nodes, edges, dimmedIds, focusedId, onSelect }: Gr
     downPosRef.current = { x: p.x, y: p.y };
     if (node) {
       (e.target as HTMLCanvasElement).setPointerCapture(e.pointerId);
-      sim.dragStart(node);
+      if (!reduceMotionRef.current) sim.dragStart(node);
     }
   };
 
@@ -279,9 +293,15 @@ export function GraphCanvas({ nodes, edges, dimmedIds, focusedId, onSelect }: Gr
     const sim = simRef.current;
     if (!sim) return;
     const p = worldPoint(e.clientX, e.clientY);
-    if (sim.state === 'drag') {
-      const start = downPosRef.current;
-      const moved = start ? Math.hypot(p.x - start.x, p.y - start.y) : 10;
+    const start = downPosRef.current;
+    const moved = start ? Math.hypot(p.x - start.x, p.y - start.y) : 10;
+    if (reduceMotionRef.current) {
+      // Static layout: a tap still selects a node, but nothing is dragged.
+      if (moved < 6) {
+        const node = hitNode(p.x, p.y);
+        if (node) onSelectRef.current(node.id);
+      }
+    } else if (sim.state === 'drag') {
       const node = sim.hovered ?? hitNode(p.x, p.y);
       sim.dragEnd();
       if (moved < 6 && node) {
@@ -294,6 +314,7 @@ export function GraphCanvas({ nodes, edges, dimmedIds, focusedId, onSelect }: Gr
   const onPointerLeave = () => {
     const sim = simRef.current;
     if (!sim) return;
+    if (reduceMotionRef.current) return;
     if (sim.state === 'drag') {
       sim.dragEnd();
     } else {

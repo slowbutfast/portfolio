@@ -4,9 +4,12 @@
 #
 # Designed to be safe to run from any checkout or linked worktree. Sibling
 # repositories are expected next to the portfolio repo (e.g.
-# /home/user/projects/{portfolio,transcribe-plus,...}). When a sibling is
-# missing, committed placeholder assets are kept instead so the build and test
-# suite never depend on sibling availability.
+# /home/user/projects/{portfolio,transcribe-plus,...}).
+#
+# This script is a capture tool, not a build step: it requires the sibling
+# repos to be present and every command to succeed, and it fails loudly if
+# either is not true. There are no silent fallbacks - committed assets should
+# always reflect a real, successful run of the sibling suites.
 #
 # Never run in production builds - capture once and commit the results.
 set -euo pipefail
@@ -34,77 +37,109 @@ CAPTURED_DIR="$REPO_ROOT/src/data/captured"
 
 mkdir -p "$ASSET_DIR" "$SCREENSHOT_DIR" "$CAPTURED_DIR"
 
+WORK_DIR="$(mktemp -d)"
+trap 'rm -rf "$WORK_DIR"' EXIT
+
 echo "repo root:      $REPO_ROOT"
 echo "sibling base:   $SIBLING_BASE"
+
+require_dir() {
+  local dir="$1"
+  if [[ ! -d "$dir" ]]; then
+    echo "capture: required sibling directory missing: $dir" >&2
+    exit 1
+  fi
+}
+
+# Start a fresh captured demo file for a project, discarding any committed
+# template. Called before the project's first command so a multi-command demo
+# accumulates correctly.
+reset_capture() {
+  local id="$1"
+  rm -f "$CAPTURED_DIR/$id.json"
+}
+
+# capture_cmd <id> <workdir> <label> [args...]
+# Runs a real command in its sibling repo and appends its verbatim stdout to
+# src/data/captured/<id>.json. A non-zero exit aborts the whole capture run.
+capture_cmd() {
+  local id="$1" workdir="$2" label="$3"
+  shift 3
+  require_dir "$workdir"
+  local raw="$WORK_DIR/${id}-cmd-$RANDOM.txt"
+  local start end durationMs code=0
+  start=$(date +%s%3N)
+  (cd "$workdir" && timeout 300 "$@") >"$raw" 2>&1 || code=$?
+  end=$(date +%s%3N)
+  durationMs=$((end - start))
+  if [[ "$code" -ne 0 ]]; then
+    echo "capture/$id: '${label}' exited ${code}" >&2
+    cat "$raw" >&2
+    return "$code"
+  fi
+  node "$SCRIPT_DIR/capture-to-json.mjs" "$id" "$label" "$code" "$durationMs" "$raw"
+  echo "capture/$id: '${label}' (exit 0, ${durationMs}ms)"
+}
 
 # ---------------------------------------------------------------------------
 # 1. Video demo (clip.mp4) from transcribe-plus
 # ---------------------------------------------------------------------------
 CLIP_SRC="$SIBLING_BASE/transcribe-plus/frontend/public/clip.mp4"
-if [[ -f "$CLIP_SRC" ]]; then
-  cp "$CLIP_SRC" "$ASSET_DIR/clip.mp4"
-  echo "clip.mp4: copied $(stat -c%s "$CLIP_SRC") bytes from transcribe-plus"
-elif command -v ffmpeg >/dev/null 2>&1; then
-  echo "clip.mp4: sibling missing; generating placeholder"
-  ffmpeg -y \
-    -f lavfi -i "color=c=0x111111:s=640x360:d=4:r=24" \
-    -f lavfi -i "sine=frequency=440:duration=4" \
-    -shortest -c:v libx264 -pix_fmt yuv420p -movflags +faststart \
-    -c:a aac -b:a 96k "$ASSET_DIR/clip.mp4" >/dev/null 2>&1
-else
-  echo "clip.mp4: sibling missing and ffmpeg unavailable; keeping committed asset"
+if [[ ! -f "$CLIP_SRC" ]]; then
+  echo "clip.mp4: missing source $CLIP_SRC" >&2
+  exit 1
 fi
+cp "$CLIP_SRC" "$ASSET_DIR/clip.mp4"
+echo "clip.mp4: copied $(stat -c%s "$CLIP_SRC") bytes from transcribe-plus"
 
 # ---------------------------------------------------------------------------
 # 2. Real CLI / test-suite output captures
 # ---------------------------------------------------------------------------
-# Each block runs the real command in the sibling repo and rewrites
-# src/data/captured/<id>.json with the verbatim stdout when the command
-# succeeds (exit 0). Non-zero exits (missing toolchain, failing suite) and
-# missing siblings keep the committed template so the catalog never shows a
-# broken terminal.
-capture_run() {
-  local id="$1" label="$2" workdir="$3"
-  shift 3
-  if [[ ! -d "$workdir" ]]; then
-    echo "capture/$id: sibling $workdir missing; keeping committed template"
-    return 0
-  fi
-  local tmp
-  tmp="$(mktemp)"
-  local code=0
-  (cd "$workdir" && CI=1 timeout 120 "$@") >"$tmp" 2>&1 || code=$?
-  if [[ "$code" -eq 0 ]]; then
-    node "$SCRIPT_DIR/capture-to-json.mjs" "$id" "$label" "$code" "$tmp"
-    echo "capture/$id: captured '${label}' (exit 0)"
-  else
-    echo "capture/$id: command exited ${code}; keeping committed template"
-  fi
-  rm -f "$tmp"
-}
+# open-dungeon: Vercel entrypoint unit suite (node:test).
+reset_capture open-dungeon
+capture_cmd open-dungeon "$SIBLING_BASE/open-dungeon" \
+  "node --test tests/unit/vercelEntry.test.mjs" \
+  node --test tests/unit/vercelEntry.test.mjs
 
-capture_run open-dungeon "npm run test:unit" \
-  "$SIBLING_BASE/open-dungeon" npm run test:unit || true
+# agentic-resume-builder: argparse CLI inspection surface, run through the
+# project virtualenv interpreter.
+AGENTIC_DIR="$SIBLING_BASE/agentic-resume-builder"
+AGENTIC_PY="$AGENTIC_DIR/.venv/bin/python"
+require_dir "$AGENTIC_DIR"
+if [[ ! -x "$AGENTIC_PY" ]]; then
+  echo "capture/agentic-resume-builder: missing interpreter $AGENTIC_PY" >&2
+  exit 1
+fi
+reset_capture agentic-resume-builder
+capture_cmd agentic-resume-builder "$AGENTIC_DIR" \
+  "python3 build_resume.py --help" "$AGENTIC_PY" build_resume.py --help
+capture_cmd agentic-resume-builder "$AGENTIC_DIR" \
+  "python3 build_resume.py --schema" "$AGENTIC_PY" build_resume.py --schema
+capture_cmd agentic-resume-builder "$AGENTIC_DIR" \
+  "python3 build_resume.py --list" "$AGENTIC_PY" build_resume.py --list
+capture_cmd agentic-resume-builder "$AGENTIC_DIR" \
+  "python3 build_resume.py --lint" "$AGENTIC_PY" build_resume.py --lint
 
-capture_run agentic-resume-builder "python3 build_resume.py --help" \
-  "$SIBLING_BASE/agentic-resume-builder" python3 build_resume.py --help || true
+# transcribe-plus, sandwave-sim, attention-max: real test suites.
+reset_capture transcribe-plus
+capture_cmd transcribe-plus "$SIBLING_BASE/transcribe-plus" \
+  "npm test" \
+  npm test
 
-capture_run pict-climate-risk-viz-chatbot "pytest -q" \
-  "$SIBLING_BASE/pict-climate-risk-viz-chatbot" pytest -q || true
+reset_capture sandwave-sim
+capture_cmd sandwave-sim "$SIBLING_BASE/sandwave-sim" \
+  "npm test" \
+  npm test
 
-capture_run transcribe-plus "npm test" \
-  "$SIBLING_BASE/transcribe-plus" npm test || true
-
-capture_run sandwave-sim "npm test" \
-  "$SIBLING_BASE/sandwave-sim" npm test || true
-
-capture_run attention-max "npm test" \
-  "$SIBLING_BASE/attention-max" npm test || true
+reset_capture attention-max
+capture_cmd attention-max "$SIBLING_BASE/attention-max" \
+  "npm test" \
+  npm test
 
 # ---------------------------------------------------------------------------
 # 3. Project screenshot cards
 # ---------------------------------------------------------------------------
 echo "screenshots: generating branded preview cards"
-timeout 90 node "$SCRIPT_DIR/generate-screenshots.mjs" || echo "screenshots: generator timed out; keeping committed images"
+node "$SCRIPT_DIR/generate-screenshots.mjs"
 
 echo "capture-demos complete."

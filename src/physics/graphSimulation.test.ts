@@ -1,26 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { createSimulation } from './graphSimulation';
+import { projects } from '../data/projects';
+import { deriveEdges } from '../utils/graphTopology';
 
-const PROJECT_IDS = [
-  'open-dungeon',
-  'agentic-resume-builder',
-  'pict-climate-risk-viz-chatbot',
-  'transcribe-plus',
-  'sandwave-sim',
-  'attention-max',
-];
+const PROJECT_IDS = projects.map((p) => p.id);
 
-const LINKS: { source: string; target: string }[] = [
-  { source: 'open-dungeon', target: 'pict-climate-risk-viz-chatbot' },
-  { source: 'open-dungeon', target: 'transcribe-plus' },
-  { source: 'open-dungeon', target: 'sandwave-sim' },
-  { source: 'open-dungeon', target: 'attention-max' },
-  { source: 'open-dungeon', target: 'agentic-resume-builder' },
-  { source: 'pict-climate-risk-viz-chatbot', target: 'transcribe-plus' },
-  { source: 'transcribe-plus', target: 'sandwave-sim' },
-  { source: 'transcribe-plus', target: 'attention-max' },
-  { source: 'sandwave-sim', target: 'attention-max' },
-];
+// Derive the topology from the real catalog so this physics test exercises the
+// same edge set the graph renders, instead of a hand-maintained copy that can
+// silently drift from graphTopology's output.
+const LINKS: { source: string; target: string }[] = deriveEdges(projects).map((e) => ({
+  source: e.source,
+  target: e.target,
+}));
 
 /** Ring initial positions so the settle is deterministic and symmetric. */
 function ringPositions(width: number, height: number): Record<string, [number, number]> {
@@ -48,6 +39,89 @@ function settle(width: number, height: number) {
   }
   return sim;
 }
+
+function freshSim() {
+  return createSimulation({
+    nodes: PROJECT_IDS.map((id) => ({ id })),
+    links: LINKS,
+    width: 1200,
+    height: 800,
+    initialPositions: ringPositions(1200, 800),
+  });
+}
+
+describe('graphSimulation hover pinning', () => {
+  it('pins the hovered node and unpins it when the pointer leaves', () => {
+    const sim = freshSim();
+    const node = sim.findNode('open-dungeon')!;
+
+    sim.hover(node);
+    expect(sim.state).toBe('hover');
+    expect(sim.hovered).toBe(node);
+    expect(node.fx).toBe(node.x);
+    expect(node.fy).toBe(node.y);
+
+    sim.hover(null);
+    expect(sim.state).toBe('idle');
+    expect(sim.hovered).toBeNull();
+    expect(node.fx).toBeNull();
+    expect(node.fy).toBeNull();
+
+    sim.destroy();
+  });
+
+  it('unpins the previous node before pinning a different one', () => {
+    const sim = freshSim();
+    const first = sim.findNode('open-dungeon')!;
+    const second = sim.findNode('transcribe-plus')!;
+
+    sim.hover(first);
+    sim.hover(second);
+
+    // The old bug left these pinned, freezing node H after the pointer left it.
+    expect(first.fx).toBeNull();
+    expect(first.fy).toBeNull();
+    expect(second.fx).toBe(second.x);
+    expect(second.fy).toBe(second.y);
+    expect(sim.hovered).toBe(second);
+
+    sim.destroy();
+  });
+
+  it('keeps the existing pin when hover re-fires on the same node', () => {
+    const sim = freshSim();
+    const node = sim.findNode('open-dungeon')!;
+
+    sim.hover(node);
+    const pinnedFx = node.fx;
+    const pinnedFy = node.fy;
+    // Simulate a physics tick nudging the node; a repeated hover must not chase
+    // it and re-pin to the new coordinates.
+    node.x += 40;
+    node.y += 40;
+    sim.hover(node);
+
+    expect(node.fx).toBe(pinnedFx);
+    expect(node.fy).toBe(pinnedFy);
+
+    sim.destroy();
+  });
+
+  it('does not re-pin a node while it is coasting after a fling', () => {
+    const sim = freshSim();
+    const node = sim.findNode('open-dungeon')!;
+
+    sim.dragStart(node);
+    sim.dragMove(node.x + 60, node.y + 10);
+    sim.dragEnd();
+    expect(sim.state).toBe('coasting');
+
+    sim.hover(node);
+    expect(sim.hovered).toBeNull();
+
+    sim.destroy();
+  });
+});
 
 describe('graphSimulation headless physics', () => {
   it.each([
