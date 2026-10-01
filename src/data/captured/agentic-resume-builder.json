@@ -58,7 +58,7 @@
       ],
       "exitCode": 0,
       "status": "ok",
-      "durationMs": 136
+      "durationMs": 138
     },
     {
       "command": "python3 build_resume.py --schema",
@@ -90,7 +90,7 @@
       ],
       "exitCode": 0,
       "status": "ok",
-      "durationMs": 126
+      "durationMs": 136
     },
     {
       "command": "python3 build_resume.py --list",
@@ -115,7 +115,7 @@
       ],
       "exitCode": 0,
       "status": "ok",
-      "durationMs": 144
+      "durationMs": 158
     },
     {
       "command": "python3 build_resume.py --lint",
@@ -139,7 +139,7 @@
       ],
       "exitCode": 0,
       "status": "ok",
-      "durationMs": 135
+      "durationMs": 140
     }
   ]
 }

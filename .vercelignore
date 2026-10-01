@@ -1,0 +1,14 @@
+.git/
+.agent/
+.claude/
+.codex/
+.opencode/
+openspec/
+e2e/
+test-results/
+playwright-report/
+scripts/
+dist/
+node_modules/
+*.log
+.DS_Store

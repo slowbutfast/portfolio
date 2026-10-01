@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# Capture demo assets (video, CLI/test outputs, screenshots) from local sibling
-# repositories into the committed public/ and src/data/captured/ directories.
+# Capture demo assets (video, CLI/test outputs, authentic screenshots) from
+# local sibling repositories into the committed src/assets/ and
+# src/data/captured/ directories.
 #
 # Designed to be safe to run from any checkout or linked worktree. Sibling
 # repositories are expected next to the portfolio repo (e.g.
-# /home/user/projects/{portfolio,transcribe-plus,...}).
+# /home/user/projects/{portfolio,transcribe-plus,...}) or provided via
+# PORTFOLIO_SIBLINGS.
 #
 # This script is a capture tool, not a build step: it requires the sibling
 # repos to be present and every command to succeed, and it fails loudly if
@@ -31,7 +33,9 @@ fi
 # Sibling repos live beside the portfolio repo. Overridable (CI, sandbox).
 SIBLING_BASE="${PORTFOLIO_SIBLINGS:-$(dirname "$REPO_ROOT")}"
 
-ASSET_DIR="$REPO_ROOT/public/assets"
+# Media lives in src/assets/ so Vite imports them through the bundler and
+# emits content-hashed URLs under dist/assets/*-[hash].[ext].
+ASSET_DIR="$REPO_ROOT/src/assets"
 SCREENSHOT_DIR="$ASSET_DIR/screenshots"
 CAPTURED_DIR="$REPO_ROOT/src/data/captured"
 
@@ -47,6 +51,14 @@ require_dir() {
   local dir="$1"
   if [[ ! -d "$dir" ]]; then
     echo "capture: required sibling directory missing: $dir" >&2
+    exit 1
+  fi
+}
+
+require_file() {
+  local file="$1"
+  if [[ ! -f "$file" ]]; then
+    echo "capture: required sibling asset missing: $file" >&2
     exit 1
   fi
 }
@@ -85,10 +97,7 @@ capture_cmd() {
 # 1. Video demo (clip.mp4) from transcribe-plus
 # ---------------------------------------------------------------------------
 CLIP_SRC="$SIBLING_BASE/transcribe-plus/frontend/public/clip.mp4"
-if [[ ! -f "$CLIP_SRC" ]]; then
-  echo "clip.mp4: missing source $CLIP_SRC" >&2
-  exit 1
-fi
+require_file "$CLIP_SRC"
 cp "$CLIP_SRC" "$ASSET_DIR/clip.mp4"
 echo "clip.mp4: copied $(stat -c%s "$CLIP_SRC") bytes from transcribe-plus"
 
@@ -137,9 +146,28 @@ capture_cmd attention-max "$SIBLING_BASE/attention-max" \
   npm test
 
 # ---------------------------------------------------------------------------
-# 3. Project screenshot cards
+# 3. Authentic project screenshot cards from sibling captures
 # ---------------------------------------------------------------------------
-echo "screenshots: generating branded preview cards"
-node "$SCRIPT_DIR/generate-screenshots.mjs"
+# open-dungeon: real 1280x720 canvas capture from the Playwright MCP session.
+OD_SHOT="$SIBLING_BASE/open-dungeon/.playwright-mcp/page-2026-09-16T13-50-27-307Z.png"
+# pict-climate-risk-viz-chatbot: real 1920x1080 bivariate risk map from repo docs.
+PICT_SHOT="$SIBLING_BASE/pict-climate-risk-viz-chatbot/docs/images/fiji_bivariate_map.png"
+# attention-max: real Firefox MV3 extension popup UI screenshot.
+ATTN_SHOT="$SIBLING_BASE/attention-max/.refs/image.png"
+
+echo "screenshots: ingesting authentic sibling captures"
+require_file "$OD_SHOT"
+require_file "$PICT_SHOT"
+require_file "$ATTN_SHOT"
+cp "$OD_SHOT" "$SCREENSHOT_DIR/open-dungeon.png"
+cp "$PICT_SHOT" "$SCREENSHOT_DIR/pict-climate-risk-viz-chatbot.png"
+cp "$ATTN_SHOT" "$SCREENSHOT_DIR/attention-max.png"
+echo "screenshots: copied open-dungeon, pict-climate-risk-viz-chatbot, attention-max"
+
+# sandwave-sim: headless 1280x720 Playwright capture of the live Chladni app.
+require_file "$SIBLING_BASE/sandwave-sim/index.html"
+node "$SCRIPT_DIR/capture-sandwave.mjs" \
+  "$SIBLING_BASE/sandwave-sim/index.html" \
+  "$SCREENSHOT_DIR/sandwave-sim.png"
 
 echo "capture-demos complete."

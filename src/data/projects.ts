@@ -4,6 +4,11 @@ import resumeBuilderCapturedJson from './captured/agentic-resume-builder.json';
 import transcribePlusCapturedJson from './captured/transcribe-plus.json';
 import sandwaveSimCapturedJson from './captured/sandwave-sim.json';
 import attentionMaxCapturedJson from './captured/attention-max.json';
+import openDungeonScreenshot from '../assets/screenshots/open-dungeon.png';
+import pictClimateScreenshot from '../assets/screenshots/pict-climate-risk-viz-chatbot.png';
+import transcribeClip from '../assets/clip.mp4';
+import sandwaveScreenshot from '../assets/screenshots/sandwave-sim.png';
+import attentionMaxScreenshot from '../assets/screenshots/attention-max.png';
 
 interface CapturedDemo {
   prompt: string;
@@ -31,7 +36,7 @@ export const projects = [
     liveUrl: 'https://open-dungeon-three.vercel.app/',
     previews: [
       { kind: 'terminal', label: 'Terminal' },
-      { kind: 'screenshot', src: '/assets/screenshots/open-dungeon.png', caption: 'OpenDungeon web canvas' },
+      { kind: 'screenshot', src: openDungeonScreenshot, caption: 'OpenDungeon web canvas' },
       { kind: 'linkout', url: 'https://open-dungeon-three.vercel.app/', label: 'Launch live app' },
     ],
     terminalDemo: demo(openDungeonCaptured, '$ node'),
@@ -56,7 +61,7 @@ export const projects = [
     previews: [
       {
         kind: 'screenshot',
-        src: '/assets/screenshots/pict-climate-risk-viz-chatbot.png',
+        src: pictClimateScreenshot,
         caption: 'PICT Climate Risk raster dashboard',
       },
       {
@@ -74,7 +79,7 @@ export const projects = [
     tags: ['Express', 'Vanilla JS', 'Audio'],
     repo: 'https://github.com/slowbutfast/transcribe-plus',
     previews: [
-      { kind: 'video', src: '/assets/clip.mp4', caption: 'Transcribe Plus product walkthrough' },
+      { kind: 'video', src: transcribeClip, caption: 'Transcribe Plus product walkthrough' },
       { kind: 'terminal', label: 'Terminal' },
       { kind: 'linkout', url: 'https://github.com/slowbutfast/transcribe-plus', label: 'View repository' },
     ],
@@ -88,7 +93,7 @@ export const projects = [
     tags: ['Vanilla JS', 'Audio'],
     repo: 'https://github.com/slowbutfast/sandwave-sim',
     previews: [
-      { kind: 'screenshot', src: '/assets/screenshots/sandwave-sim.png', caption: 'Sandwave Chladni plate view' },
+      { kind: 'screenshot', src: sandwaveScreenshot, caption: 'Sandwave Chladni plate view' },
       { kind: 'terminal', label: 'Terminal' },
       { kind: 'linkout', url: 'https://github.com/slowbutfast/sandwave-sim', label: 'View repository' },
     ],
@@ -102,7 +107,7 @@ export const projects = [
     tags: ['Vanilla JS', 'WebExtension'],
     repo: 'https://github.com/slowbutfast/attention-max-public',
     previews: [
-      { kind: 'screenshot', src: '/assets/screenshots/attention-max.png', caption: 'Attention Max popup UI' },
+      { kind: 'screenshot', src: attentionMaxScreenshot, caption: 'Attention Max popup UI' },
       { kind: 'terminal', label: 'Terminal' },
       { kind: 'linkout', url: 'https://github.com/slowbutfast/attention-max-public', label: 'View repository' },
     ],

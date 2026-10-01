@@ -7,11 +7,11 @@ import { deriveEdges } from '../utils/graphTopology';
 import { resolveCommand } from '../utils/terminalCommandResolver';
 import type { Preview } from '../types/portfolio';
 
-const publicDir = fileURLToPath(new URL('../../public/', import.meta.url));
+const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
 
 function assetExists(src: string): boolean {
   const clean = src.replace(/^\/+/, '');
-  return existsSync(resolve(publicDir, clean));
+  return existsSync(resolve(repoRoot, clean));
 }
 
 describe('project catalog contract', () => {
@@ -37,7 +37,7 @@ describe('project catalog contract', () => {
     }
   });
 
-  it('points every video/screenshot src at a file that exists under public/', () => {
+  it('points every video/screenshot src at a bundler-imported asset under src/assets/', () => {
     for (const p of projects) {
       for (const preview of p.previews) {
         if (preview.kind === 'video' || preview.kind === 'screenshot') {

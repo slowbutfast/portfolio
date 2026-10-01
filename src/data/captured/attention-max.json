@@ -41,12 +41,12 @@
         "Test Suites: 5 passed, 5 total",
         "Tests:       58 passed, 58 total",
         "Snapshots:   0 total",
-        "Time:        1.767 s",
+        "Time:        1.648 s",
         "Ran all test suites."
       ],
       "exitCode": 0,
       "status": "ok",
-      "durationMs": 2610
+      "durationMs": 2472
     }
   ]
 }
