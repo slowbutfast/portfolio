@@ -1,4 +1,5 @@
 import { List, Network, RotateCcw, Search } from 'lucide-react';
+import type { RefObject } from 'react';
 import type { ParadigmTag } from '../types/portfolio';
 
 type ViewMode = 'graph' | 'list';
@@ -12,7 +13,11 @@ interface ControlsOverlayProps {
   search: string;
   onSearchChange: (query: string) => void;
   onReset: () => void;
+  coordTickerRef: RefObject<HTMLSpanElement | null>;
 }
+
+const safe = (side: 'top' | 'right' | 'bottom' | 'left', offset: string) =>
+  `calc(env(safe-area-inset-${side}) + ${offset})`;
 
 export function ControlsOverlay({
   view,
@@ -23,94 +28,157 @@ export function ControlsOverlay({
   search,
   onSearchChange,
   onReset,
+  coordTickerRef,
 }: ControlsOverlayProps) {
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col gap-2 p-3 md:p-4">
-      <div className="pointer-events-auto flex flex-wrap items-center gap-2 rounded-xl border border-stone-200 bg-white/85 p-2 shadow-sm backdrop-blur md:gap-3">
-        <div className="flex items-center gap-2 px-1">
-          <span className="h-3 w-3 rounded-full bg-stone-900" aria-hidden="true" />
-          <h1 className="text-sm font-semibold tracking-tight text-stone-900">Node Portfolio Graph</h1>
+    <div className="pointer-events-none absolute inset-0 z-30">
+      {/* Peripheral margin HUD: identity, view toggle, tag matrix, search. */}
+      <div
+        className="absolute inset-x-0 top-0 flex flex-col gap-2"
+        style={{
+          paddingTop: safe('top', '0.75rem'),
+          paddingLeft: safe('left', '0.75rem'),
+          paddingRight: safe('right', '0.75rem'),
+        }}
+      >
+        <div className="pointer-events-auto flex flex-wrap items-start gap-2 md:gap-3">
+          <div className="flex min-h-11 items-center gap-2 px-1 md:min-h-0">
+            <span className="h-2 w-2 shrink-0 rounded-full bg-[#00f0ff]" aria-hidden="true" />
+            <div>
+              <h1 className="text-base font-bold leading-none tracking-tight text-[#f4f4f5] md:text-[28px]">
+                SYS.PORTFOLIO
+              </h1>
+              <p className="mt-1 font-mono text-[9px] uppercase leading-none tracking-[0.14em] text-[#a1a1aa] md:text-[10px] md:tracking-[0.18em]">
+                NODE GRAPH SPECIMEN // 06 NODES
+              </p>
+            </div>
+          </div>
+
+          <div
+            className="ml-auto flex items-center gap-1 rounded-none"
+            role="group"
+            aria-label="View mode"
+          >
+            <button
+              type="button"
+              data-testid="view-toggle-graph"
+              aria-label="Graph"
+              aria-pressed={view === 'graph'}
+              onClick={() => onViewChange('graph')}
+              className={`flex min-h-11 items-center gap-1.5 rounded-none px-1 py-1 text-sm transition-colors md:min-h-0 ${
+                view === 'graph'
+                  ? 'bg-[#18191e] text-[#f4f4f5]'
+                  : 'text-[#a1a1aa] hover:text-[#f4f4f5]'
+              }`}
+            >
+              <Network className="h-4 w-4" aria-hidden="true" />
+              <span className={`bracket-tag ${view === 'graph' ? 'bracket-tag-active' : ''}`}>
+                Graph
+              </span>
+            </button>
+            <button
+              type="button"
+              data-testid="view-toggle-list"
+              aria-label="List"
+              aria-pressed={view === 'list'}
+              onClick={() => onViewChange('list')}
+              className={`flex min-h-11 items-center gap-1.5 rounded-none px-1 py-1 text-sm transition-colors md:min-h-0 ${
+                view === 'list'
+                  ? 'bg-[#18191e] text-[#f4f4f5]'
+                  : 'text-[#a1a1aa] hover:text-[#f4f4f5]'
+              }`}
+            >
+              <List className="h-4 w-4" aria-hidden="true" />
+              <span className={`bracket-tag ${view === 'list' ? 'bracket-tag-active' : ''}`}>
+                List
+              </span>
+            </button>
+          </div>
         </div>
 
-        <div
-          className="ml-auto flex items-center gap-0.5 rounded-lg border border-stone-200 bg-white p-0.5"
-          role="group"
-          aria-label="View mode"
-        >
-          <button
-            type="button"
-            data-testid="view-toggle-graph"
-            aria-pressed={view === 'graph'}
-            onClick={() => onViewChange('graph')}
-            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm transition ${
-              view === 'graph'
-                ? 'bg-stone-900 text-white'
-                : 'text-stone-600 hover:bg-stone-100'
-            }`}
-          >
-            <Network className="h-4 w-4" /> Graph
-          </button>
-          <button
-            type="button"
-            data-testid="view-toggle-list"
-            aria-pressed={view === 'list'}
-            onClick={() => onViewChange('list')}
-            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm transition ${
-              view === 'list'
-                ? 'bg-stone-900 text-white'
-                : 'text-stone-600 hover:bg-stone-100'
-            }`}
-          >
-            <List className="h-4 w-4" /> List
-          </button>
+        <div className="pointer-events-auto flex flex-col gap-2 rounded-none border border-[#27272a] bg-[#111215]/90 p-2 backdrop-blur md:flex-row md:flex-wrap md:items-center">
+          <div className="flex items-center gap-2 overflow-x-auto md:flex-wrap md:overflow-visible">
+            {availableTags.map((tag) => {
+              const active = activeTags.has(tag);
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  data-testid={`tag-pill-${tag}`}
+                  aria-label={tag}
+                  aria-pressed={active}
+                  onClick={() => onToggleTag(tag)}
+                  className={`flex min-h-11 shrink-0 items-center rounded-none p-0 md:min-h-0 ${
+                    active ? 'text-[#00f0ff]' : 'text-[#a1a1aa] hover:text-[#f4f4f5]'
+                  }`}
+                >
+                  <span className={`bracket-tag ${active ? 'bracket-tag-active' : ''}`}>{tag}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center gap-2 md:ml-auto">
+            <label className="relative flex flex-1 items-center md:flex-none">
+              <Search
+                className="pointer-events-none absolute left-2.5 h-4 w-4 text-[#71717a]"
+                aria-hidden="true"
+              />
+              <input
+                type="search"
+                data-testid="search-input"
+                value={search}
+                onChange={(e) => onSearchChange(e.target.value)}
+                placeholder="Search projects…"
+                aria-label="Search projects"
+                className="min-h-11 w-full rounded-none border border-[#71717a] bg-[#0a0a0c] py-1.5 pl-8 pr-3 font-mono text-xs text-[#f4f4f5] outline-none transition-colors placeholder:text-[#71717a] focus:border-[#00f0ff] focus-visible:outline-[#00f0ff] md:min-h-9 md:w-44"
+              />
+            </label>
+            <button
+              type="button"
+              data-testid="reset-filters"
+              onClick={onReset}
+              aria-label="Reset filters"
+              title="Reset filters"
+              className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-none border border-[#71717a] p-1.5 text-[#a1a1aa] transition-colors hover:border-[#00f0ff] hover:text-[#00f0ff] md:min-h-9 md:min-w-9"
+            >
+              <RotateCcw className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="pointer-events-auto flex flex-wrap items-center gap-2 rounded-xl border border-stone-200 bg-white/85 p-2 shadow-sm backdrop-blur">
-        {availableTags.map((tag) => {
-          const active = activeTags.has(tag);
-          return (
-            <button
-              key={tag}
-              type="button"
-              data-testid={`tag-pill-${tag}`}
-              aria-pressed={active}
-              onClick={() => onToggleTag(tag)}
-              className={`rounded-full border px-2.5 py-1 text-xs transition ${
-                active
-                  ? 'border-stone-900 bg-stone-900 text-white'
-                  : 'border-stone-300 text-stone-600 hover:border-stone-500 hover:text-stone-900'
-              }`}
-            >
-              {tag}
-            </button>
-          );
-        })}
+      {/* Four DOM corner registration crop marks. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute h-4 w-4 border-l border-t border-[#71717a]"
+        style={{ top: safe('top', '8px'), left: safe('left', '8px') }}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute h-4 w-4 border-r border-t border-[#71717a]"
+        style={{ top: safe('top', '8px'), right: safe('right', '8px') }}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute h-4 w-4 border-b border-l border-[#71717a]"
+        style={{ bottom: safe('bottom', '8px'), left: safe('left', '8px') }}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute h-4 w-4 border-b border-r border-[#71717a]"
+        style={{ bottom: safe('bottom', '8px'), right: safe('right', '8px') }}
+      />
 
-        <div className="ml-auto flex items-center gap-2">
-          <label className="relative flex items-center">
-            <Search className="pointer-events-none absolute left-2.5 h-4 w-4 text-stone-400" />
-            <input
-              type="search"
-              data-testid="search-input"
-              value={search}
-              onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search projects…"
-              aria-label="Search projects"
-              className="w-44 rounded-lg border border-stone-300 bg-white py-1.5 pl-8 pr-3 text-sm text-stone-800 outline-none transition focus:border-stone-500"
-            />
-          </label>
-          <button
-            type="button"
-            data-testid="reset-filters"
-            onClick={onReset}
-            aria-label="Reset filters"
-            title="Reset filters"
-            className="rounded-lg border border-stone-300 p-1.5 text-stone-500 transition hover:border-stone-500 hover:text-stone-800"
-          >
-            <RotateCcw className="h-4 w-4" />
-          </button>
-        </div>
+      {/* Margin coordinate ticker: mutated imperatively by GraphCanvas' rAF. */}
+      <div
+        className="pointer-events-none absolute flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#a1a1aa]"
+        style={{ left: safe('left', '1rem'), bottom: safe('bottom', '2rem') }}
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-[#71717a]" aria-hidden="true" />
+        <span ref={coordTickerRef} data-testid="coord-ticker" aria-hidden="true">
+          X: --- Y: ---
+        </span>
       </div>
     </div>
   );

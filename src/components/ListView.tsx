@@ -1,5 +1,6 @@
 import { MonitorPlay, Terminal, Image as ImageIcon, ExternalLink } from 'lucide-react';
 import type { ProjectData } from '../types/portfolio';
+import { formatIndex, formatPlate } from '../utils/drafting';
 
 interface ListViewProps {
   projects: ProjectData[];
@@ -21,39 +22,68 @@ function previewIcons(project: ProjectData) {
 
 export function ListView({ projects, dimmedIds, onSelect }: ListViewProps) {
   return (
-    <div className="h-full overflow-y-auto px-4 pb-8 pt-48 md:px-8 md:pt-36">
-      <div className="mx-auto grid max-w-6xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {projects.map((project) => {
-          const dimmed = dimmedIds.has(project.id);
-          return (
-            <button
-              key={project.id}
-              type="button"
-              data-testid={`card-${project.id}`}
-              data-dimmed={dimmed ? 'true' : 'false'}
-              onClick={() => onSelect(project.id)}
-              className={`group flex flex-col rounded-xl border border-stone-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-stone-400 hover:shadow-md ${
-                dimmed ? 'opacity-30' : 'opacity-100'
-              }`}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="text-base font-semibold text-stone-900">{project.title}</h2>
-                <span className="flex items-center gap-1.5 text-stone-400">{previewIcons(project)}</span>
-              </div>
-              <p className="mt-2 flex-1 text-sm leading-relaxed text-stone-500">{project.summary}</p>
-              <div className="mt-4 flex flex-wrap gap-1.5">
-                {project.tags.map((tag) => (
+    <div className="drafting-grid h-full overflow-y-auto px-4 pb-8 pt-60 md:px-8 md:pt-44">
+      <div className="mx-auto max-w-6xl">
+        <div className="mb-3 flex items-baseline justify-between gap-4 font-mono text-[10px] uppercase tracking-[0.18em] text-[#a1a1aa]">
+          <span>PROJECT INDEX // 06 ENTRIES</span>
+          <span>ASYMMETRIC PUBLICATION</span>
+        </div>
+
+        <div className="grid gap-px border border-[#27272a] bg-[#27272a] md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+          {projects.map((project, i) => {
+            const dimmed = dimmedIds.has(project.id);
+            const index = formatIndex(i);
+            const plate = formatPlate(i);
+            // Every third entry stretches across both columns to create the
+            // asymmetric Swiss rhythm while keeping a strict two-column grid.
+            const wide = i % 3 === 0;
+            return (
+              <button
+                key={project.id}
+                type="button"
+                data-testid={`card-${project.id}`}
+                data-dimmed={dimmed ? 'true' : 'false'}
+                onClick={() => onSelect(project.id)}
+                className={`group relative flex min-h-11 flex-col rounded-none bg-[#0a0a0c] p-6 text-left transition-colors hover:bg-[#111215] md:p-8 ${
+                  wide ? 'md:col-span-2' : ''
+                } ${dimmed ? 'opacity-30' : 'opacity-100'}`}
+              >
+                <div className="flex items-start justify-between gap-4">
                   <span
-                    key={tag}
-                    className="rounded-full border border-stone-300 px-2 py-0.5 text-[11px] text-stone-500"
+                    aria-hidden="true"
+                    className="select-none font-sans text-[64px] font-extrabold leading-none tracking-tighter text-[#27272a] transition-colors group-hover:text-[#3f3f46] md:text-[96px]"
                   >
-                    {tag}
+                    {index}
                   </span>
-                ))}
-              </div>
-            </button>
-          );
-        })}
+                  <span className="flex items-center gap-1.5 text-[#a1a1aa]">
+                    {previewIcons(project)}
+                  </span>
+                </div>
+
+                <p className="mt-4 font-mono text-[10px] uppercase leading-none tracking-[0.18em] text-[#a1a1aa]">
+                  {plate} // {project.classification}
+                </p>
+                <h2 className="mt-2 text-xl font-semibold leading-tight text-[#f4f4f5]">
+                  {project.title}
+                </h2>
+                <p className="mt-2 flex-1 text-sm leading-relaxed text-[#a1a1aa]">
+                  {project.summary}
+                </p>
+
+                <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-[#27272a] pt-3">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#a1a1aa]">
+                    {plate}
+                  </span>
+                  {project.tags.map((tag) => (
+                    <span key={tag} className="bracket-tag text-[#a1a1aa]">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

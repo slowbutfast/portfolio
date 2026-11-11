@@ -1,4 +1,9 @@
-import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  type PointerEvent as ReactPointerEvent,
+  type RefObject,
+} from 'react';
 import type { GraphEdge } from '../utils/graphTopology';
 import type { GraphNode } from '../types/portfolio';
 import { createSimulation, type GraphSimulation } from '../physics/graphSimulation';
@@ -8,6 +13,7 @@ interface GraphCanvasProps {
   edges: GraphEdge[];
   dimmedIds: Set<string>;
   focusedId: string | null;
+  coordTickerRef: RefObject<HTMLSpanElement | null>;
   onSelect: (id: string) => void;
 }
 
@@ -17,13 +23,63 @@ interface Size {
   dpr: number;
 }
 
-const RING_COLOR = '#1c1917';
-const LINK_COLOR = '#d6d3d1';
-const LABEL_COLOR = '#78716c';
-const FOCUS_COLOR = '#0e7490';
-const HOVER_COLOR = '#a8a29e';
+interface DraftingTokens {
+  bg: string;
+  surfaceContainer: string;
+  text: string;
+  muted: string;
+  outline: string;
+  grid: string;
+  cyan: string;
+  amber: string;
+}
 
-export function GraphCanvas({ nodes, edges, dimmedIds, focusedId, onSelect }: GraphCanvasProps) {
+const DEFAULT_TOKENS: DraftingTokens = {
+  bg: '#0a0a0c',
+  surfaceContainer: '#18191e',
+  text: '#f4f4f5',
+  muted: '#a1a1aa',
+  outline: '#71717a',
+  grid: '#27272a',
+  cyan: '#00f0ff',
+  amber: '#eab308',
+};
+
+const WRITE_IN_MS = 400;
+const TICKER_IDLE = 'X: --- Y: ---';
+const MONO_FONT = '12px "JetBrains Mono Variable", monospace';
+
+function easeOutCubic(t: number): number {
+  return 1 - (1 - t) ** 3;
+}
+
+function readToken(name: string, fallback: string): string {
+  if (typeof window === 'undefined') return fallback;
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value || fallback;
+}
+
+function cacheTokens(): DraftingTokens {
+  return {
+    bg: readToken('--color-bg', DEFAULT_TOKENS.bg),
+    surfaceContainer: readToken('--color-surface-container', DEFAULT_TOKENS.surfaceContainer),
+    text: readToken('--color-text', DEFAULT_TOKENS.text),
+    muted: readToken('--color-muted', DEFAULT_TOKENS.muted),
+    outline: readToken('--color-outline', DEFAULT_TOKENS.outline),
+    grid: readToken('--color-grid', DEFAULT_TOKENS.grid),
+    cyan: readToken('--color-cyan', DEFAULT_TOKENS.cyan),
+    amber: readToken('--color-amber', DEFAULT_TOKENS.amber),
+  };
+}
+
+export function GraphCanvas({
+  nodes,
+  edges,
+  dimmedIds,
+  focusedId,
+  coordTickerRef,
+  onSelect,
+}: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const simRef = useRef<GraphSimulation | null>(null);
@@ -31,8 +87,11 @@ export function GraphCanvas({ nodes, edges, dimmedIds, focusedId, onSelect }: Gr
   const transformRef = useRef({ x: 0, y: 0, scale: 1 });
   const targetRef = useRef({ x: 0, y: 0 });
   const reduceMotionRef = useRef(false);
+  const fontsReadyRef = useRef(false);
+  const tokensRef = useRef<DraftingTokens>(DEFAULT_TOKENS);
   const staticPosRef = useRef<Map<string, [number, number]>>(new Map());
   const downPosRef = useRef<{ x: number; y: number } | null>(null);
+  const pointerPosRef = useRef<{ x: number; y: number } | null>(null);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
   const dimmedRef = useRef(dimmedIds);
@@ -44,6 +103,8 @@ export function GraphCanvas({ nodes, edges, dimmedIds, focusedId, onSelect }: Gr
     const container = containerRef.current;
     const canvas = canvasRef.current;
     if (!container || !canvas) return;
+
+    tokensRef.current = cacheTokens();
 
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     reduceMotionRef.current = reduceMotion;
@@ -70,11 +131,23 @@ export function GraphCanvas({ nodes, edges, dimmedIds, focusedId, onSelect }: Gr
 
     const ctx = canvas.getContext('2d');
 
+    const mountTime = performance.now();
     let raf = 0;
     let disposed = false;
 
+    const writeTicker = () => {
+      const ticker = coordTickerRef.current;
+      if (!ticker) return;
+      const pointer = pointerPosRef.current;
+      if (!pointer) return;
+      const x = Math.round(pointer.x).toString().padStart(3, '0');
+      const y = Math.round(pointer.y).toString().padStart(3, '0');
+      ticker.textContent = `X: ${x} Y: ${y}`;
+    };
+
     const render = () => {
       if (!ctx || disposed) return;
+      const tokens = tokensRef.current;
       const { width: w, height: h, dpr: d } = sizeRef.current;
       ctx.setTransform(d, 0, 0, d, 0, 0);
       ctx.clearRect(0, 0, w, h);
@@ -89,55 +162,108 @@ export function GraphCanvas({ nodes, edges, dimmedIds, focusedId, onSelect }: Gr
 
       const dimmed = dimmedRef.current;
       const focused = focusedRef.current;
+      const focalId = focused ?? sim.hovered?.id ?? null;
 
+      const progress = reduceMotionRef.current
+        ? 1
+        : Math.min(1, (performance.now() - mountTime) / WRITE_IN_MS);
+      const ringProgress = easeOutCubic(progress);
+
+      // Relational vectors: idle links are 1px hairlines; only edges incident
+      // to the focal node become dashed cyan projection vectors with callouts.
       for (const edge of edges) {
         const a = active.get(edge.source);
         const b = active.get(edge.target);
         if (!a || !b) continue;
         const isDim = dimmed.has(edge.source) && dimmed.has(edge.target);
+        const isFocal = focalId !== null && (edge.source === focalId || edge.target === focalId);
         ctx.beginPath();
         ctx.moveTo(a[0], a[1]);
         ctx.lineTo(b[0], b[1]);
-        ctx.strokeStyle = LINK_COLOR;
-        ctx.globalAlpha = isDim ? 0.18 : 0.75;
+        ctx.strokeStyle = isFocal ? tokens.cyan : tokens.grid;
+        ctx.globalAlpha = isDim ? (isFocal ? 0.35 : 0.18) : isFocal ? 0.95 : 1;
         ctx.lineWidth = 1;
+        if (isFocal) ctx.setLineDash([4, 4]);
+        else ctx.setLineDash([]);
         ctx.stroke();
+        ctx.setLineDash([]);
+
+        if (isFocal && fontsReadyRef.current) {
+          const mx = (a[0] + b[0]) / 2;
+          const my = (a[1] + b[1]) / 2;
+          const dist = Math.hypot(b[0] - a[0], b[1] - a[1]);
+          ctx.font = MONO_FONT;
+          ctx.fillStyle = tokens.cyan;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.globalAlpha = isDim ? 0.5 : 1;
+          ctx.fillText(`d: ${Math.round(dist)}px`, mx, my - 7);
+        }
       }
 
+      // Node anatomy: filled physics circle, center crosshair, one outer guide
+      // ring (r + 6) with four cardinal ticks. Hit testing stays at r = 18.
       for (const n of sim.nodes) {
         const pos = active.get(n.id);
         if (!pos) continue;
+        const [x, y] = pos;
         const isDim = dimmed.has(n.id);
+        const isFocused = focused === n.id;
+        const isHovered = !isFocused && sim.hovered?.id === n.id;
+
         ctx.globalAlpha = isDim ? 0.2 : 1;
 
         ctx.beginPath();
-        ctx.arc(pos[0], pos[1], n.radius, 0, Math.PI * 2);
-        ctx.fillStyle = RING_COLOR;
+        ctx.arc(x, y, n.radius, 0, Math.PI * 2);
+        ctx.fillStyle = tokens.surfaceContainer;
         ctx.fill();
+        ctx.strokeStyle = isFocused ? tokens.cyan : isHovered ? tokens.text : tokens.outline;
+        ctx.lineWidth = 1;
+        ctx.stroke();
 
-        if (focused === n.id) {
+        // Center crosshair, 4px arms.
+        ctx.beginPath();
+        ctx.moveTo(x - 4, y);
+        ctx.lineTo(x + 4, y);
+        ctx.moveTo(x, y - 4);
+        ctx.lineTo(x, y + 4);
+        ctx.strokeStyle = isFocused ? tokens.cyan : isHovered ? tokens.text : tokens.muted;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Single outer guide ring, optionally traced during the write-in.
+        const ringRadius = n.radius + 6;
+        if (ringProgress > 0) {
           ctx.beginPath();
-          ctx.arc(pos[0], pos[1], n.radius + 7, 0, Math.PI * 2);
-          ctx.strokeStyle = FOCUS_COLOR;
-          ctx.lineWidth = 3;
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.arc(pos[0], pos[1], n.radius + 12, 0, Math.PI * 2);
-          ctx.lineWidth = 1.5;
-          ctx.stroke();
-        } else if (sim.hovered?.id === n.id) {
-          ctx.beginPath();
-          ctx.arc(pos[0], pos[1], n.radius + 5, 0, Math.PI * 2);
-          ctx.strokeStyle = HOVER_COLOR;
-          ctx.lineWidth = 1.5;
+          ctx.arc(x, y, ringRadius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ringProgress);
+          ctx.strokeStyle = isFocused ? tokens.cyan : tokens.outline;
+          ctx.lineWidth = 1;
           ctx.stroke();
         }
 
-        ctx.fillStyle = LABEL_COLOR;
-        ctx.font = '12px ui-sans-serif, system-ui, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(n.label, pos[0], pos[1] + n.radius + 16);
+        // Four cardinal ticks at 0 / 90 / 180 / 270 degrees.
+        if (ringProgress >= 1) {
+          ctx.beginPath();
+          for (const angle of [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]) {
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            ctx.moveTo(x + cos * ringRadius, y + sin * ringRadius);
+            ctx.lineTo(x + cos * (ringRadius + 4), y + sin * (ringRadius + 4));
+          }
+          ctx.strokeStyle = isFocused ? tokens.cyan : tokens.outline;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+
+        if (fontsReadyRef.current) {
+          ctx.font = MONO_FONT;
+          ctx.fillStyle = isFocused ? tokens.cyan : tokens.muted;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'alphabetic';
+          ctx.fillText(n.label, x, y + n.radius + 18);
+        }
       }
+
       ctx.restore();
       ctx.globalAlpha = 1;
     };
@@ -149,8 +275,9 @@ export function GraphCanvas({ nodes, edges, dimmedIds, focusedId, onSelect }: Gr
         const goal = targetRef.current;
         t.x += (goal.x - t.x) * 0.12;
         t.y += (goal.y - t.y) * 0.12;
+        render();
       }
-      render();
+      writeTicker();
       raf = requestAnimationFrame(loop);
     };
 
@@ -167,13 +294,26 @@ export function GraphCanvas({ nodes, edges, dimmedIds, focusedId, onSelect }: Gr
       render();
     } else {
       sim.sim.alpha(1).restart();
-      raf = requestAnimationFrame(loop);
     }
+    raf = requestAnimationFrame(loop);
 
     sim.sim.on('tick', () => {
       sim.poll();
       render();
     });
+
+    // Gate canvas typography on the actual variable font file. Physics and
+    // vector geometry animate immediately; text paints on resolution.
+    document.fonts
+      .load(MONO_FONT)
+      .then(() => {
+        fontsReadyRef.current = true;
+        render();
+      })
+      .catch(() => {
+        fontsReadyRef.current = true;
+        render();
+      });
 
     const resize = () => {
       const rect = container.getBoundingClientRect();
@@ -212,6 +352,8 @@ export function GraphCanvas({ nodes, edges, dimmedIds, focusedId, onSelect }: Gr
       sim.sim.on('tick', null);
       sim.destroy();
       simRef.current = null;
+      pointerPosRef.current = null;
+      if (coordTickerRef.current) coordTickerRef.current.textContent = TICKER_IDLE;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -262,6 +404,11 @@ export function GraphCanvas({ nodes, edges, dimmedIds, focusedId, onSelect }: Gr
   };
 
   const onPointerMove = (e: ReactPointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const rect = canvas.getBoundingClientRect();
+      pointerPosRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    }
     const sim = simRef.current;
     if (!sim) return;
     // Reduced motion pauses the simulation; pointer hover/drag would only
@@ -312,6 +459,8 @@ export function GraphCanvas({ nodes, edges, dimmedIds, focusedId, onSelect }: Gr
   };
 
   const onPointerLeave = () => {
+    pointerPosRef.current = null;
+    if (coordTickerRef.current) coordTickerRef.current.textContent = TICKER_IDLE;
     const sim = simRef.current;
     if (!sim) return;
     if (reduceMotionRef.current) return;
@@ -323,7 +472,7 @@ export function GraphCanvas({ nodes, edges, dimmedIds, focusedId, onSelect }: Gr
   };
 
   return (
-    <div ref={containerRef} className="absolute inset-0">
+    <div ref={containerRef} className="drafting-grid absolute inset-0">
       <canvas
         ref={canvasRef}
         data-testid="graph-canvas"

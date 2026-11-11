@@ -1,0 +1,425 @@
+
+Running 6 tests using 1 worker
+
+  ✓  1 [desktop] › e2e/portfolio.spec.ts:96:3 › portfolio graph SPA › accessibility: graph view has zero WCAG A/AA violations (8.0s)
+  ✓  2 [desktop] › e2e/portfolio.spec.ts:108:3 › portfolio graph SPA › accessibility: list view has zero WCAG A/AA violations (1.3s)
+  ✘  3 [desktop] › e2e/portfolio.spec.ts:121:3 › portfolio graph SPA › accessibility: open drawer has zero WCAG A/AA violations (1.4s)
+  ✓  4 [mobile] › e2e/portfolio.spec.ts:96:3 › portfolio graph SPA › accessibility: graph view has zero WCAG A/AA violations (1.3s)
+  ✓  5 [mobile] › e2e/portfolio.spec.ts:108:3 › portfolio graph SPA › accessibility: list view has zero WCAG A/AA violations (1.3s)
+  ✘  6 [mobile] › e2e/portfolio.spec.ts:121:3 › portfolio graph SPA › accessibility: open drawer has zero WCAG A/AA violations (1.4s)
+
+
+  1) [desktop] › e2e/portfolio.spec.ts:121:3 › portfolio graph SPA › accessibility: open drawer has zero WCAG A/AA violations 
+
+    Error: Drawer violations:
+    [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "tags": [
+          "cat.color",
+          "wcag2aa",
+          "wcag143",
+          "TTv5",
+          "TT13.c",
+          "EN-301-549",
+          "EN-9.1.4.3",
+          "ACT",
+          "RGAAv4",
+          "RGAA-3.2.1"
+        ],
+        "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=playwright",
+        "nodes": [
+          {
+            "any": [
+              {
+                "id": "color-contrast",
+                "data": {
+                  "fgColor": "#79716b",
+                  "bgColor": "#0c0a09",
+                  "contrastRatio": 4.12,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                },
+                "relatedNodes": [
+                  {
+                    "html": "<div class=\"overflow-hidden rounded-lg border border-stone-800 bg-stone-950 text-[13px] leading-relaxed\" data-testid=\"terminal\">",
+                    "target": [
+                      ".bg-stone-950"
+                    ]
+                  }
+                ],
+                "impact": "serious",
+                "message": "Element has insufficient color contrast of 4.12 (foreground color: #79716b, background color: #0c0a09, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+              }
+            ],
+            "all": [],
+            "none": [],
+            "impact": "serious",
+            "html": "<span class=\"ml-2 text-xs text-stone-500\">terminal — $ node</span>",
+            "target": [
+              ".ml-2"
+            ],
+            "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.12 (foreground color: #79716b, background color: #0c0a09, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+          },
+          {
+            "any": [
+              {
+                "id": "color-contrast",
+                "data": {
+                  "fgColor": "#57534d",
+                  "bgColor": "#0c0a09",
+                  "contrastRatio": 2.58,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                },
+                "relatedNodes": [
+                  {
+                    "html": "<div class=\"overflow-hidden rounded-lg border border-stone-800 bg-stone-950 text-[13px] leading-relaxed\" data-testid=\"terminal\">",
+                    "target": [
+                      ".bg-stone-950"
+                    ]
+                  }
+                ],
+                "impact": "serious",
+                "message": "Element has insufficient color contrast of 2.58 (foreground color: #57534d, background color: #0c0a09, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+              }
+            ],
+            "all": [],
+            "none": [],
+            "impact": "serious",
+            "html": "<p class=\"text-stone-600\">Run a command chip above, or type one and press Enter.</p>",
+            "target": [
+              ".h-56 > p"
+            ],
+            "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 2.58 (foreground color: #57534d, background color: #0c0a09, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+          }
+        ]
+      }
+    ]
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 93
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+    +     "help": "Elements must meet minimum color contrast ratio thresholds",
+    +     "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=playwright",
+    +     "id": "color-contrast",
+    +     "impact": "serious",
+    +     "nodes": Array [
+    +       Object {
+    +         "all": Array [],
+    +         "any": Array [
+    +           Object {
+    +             "data": Object {
+    +               "bgColor": "#0c0a09",
+    +               "contrastRatio": 4.12,
+    +               "expectedContrastRatio": "4.5:1",
+    +               "fgColor": "#79716b",
+    +               "fontSize": "9.0pt (12px)",
+    +               "fontWeight": "normal",
+    +               "messageKey": null,
+    +             },
+    +             "id": "color-contrast",
+    +             "impact": "serious",
+    +             "message": "Element has insufficient color contrast of 4.12 (foreground color: #79716b, background color: #0c0a09, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+    +             "relatedNodes": Array [
+    +               Object {
+    +                 "html": "<div class=\"overflow-hidden rounded-lg border border-stone-800 bg-stone-950 text-[13px] leading-relaxed\" data-testid=\"terminal\">",
+    +                 "target": Array [
+    +                   ".bg-stone-950",
+    +                 ],
+    +               },
+    +             ],
+    +           },
+    +         ],
+    +         "failureSummary": "Fix any of the following:
+    +   Element has insufficient color contrast of 4.12 (foreground color: #79716b, background color: #0c0a09, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+    +         "html": "<span class=\"ml-2 text-xs text-stone-500\">terminal — $ node</span>",
+    +         "impact": "serious",
+    +         "none": Array [],
+    +         "target": Array [
+    +           ".ml-2",
+    +         ],
+    +       },
+    +       Object {
+    +         "all": Array [],
+    +         "any": Array [
+    +           Object {
+    +             "data": Object {
+    +               "bgColor": "#0c0a09",
+    +               "contrastRatio": 2.58,
+    +               "expectedContrastRatio": "4.5:1",
+    +               "fgColor": "#57534d",
+    +               "fontSize": "9.0pt (12px)",
+    +               "fontWeight": "normal",
+    +               "messageKey": null,
+    +             },
+    +             "id": "color-contrast",
+    +             "impact": "serious",
+    +             "message": "Element has insufficient color contrast of 2.58 (foreground color: #57534d, background color: #0c0a09, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+    +             "relatedNodes": Array [
+    +               Object {
+    +                 "html": "<div class=\"overflow-hidden rounded-lg border border-stone-800 bg-stone-950 text-[13px] leading-relaxed\" data-testid=\"terminal\">",
+    +                 "target": Array [
+    +                   ".bg-stone-950",
+    +                 ],
+    +               },
+    +             ],
+    +           },
+    +         ],
+    +         "failureSummary": "Fix any of the following:
+    +   Element has insufficient color contrast of 2.58 (foreground color: #57534d, background color: #0c0a09, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+    +         "html": "<p class=\"text-stone-600\">Run a command chip above, or type one and press Enter.</p>",
+    +         "impact": "serious",
+    +         "none": Array [],
+    +         "target": Array [
+    +           ".h-56 > p",
+    +         ],
+    +       },
+    +     ],
+    +     "tags": Array [
+    +       "cat.color",
+    +       "wcag2aa",
+    +       "wcag143",
+    +       "TTv5",
+    +       "TT13.c",
+    +       "EN-301-549",
+    +       "EN-9.1.4.3",
+    +       "ACT",
+    +       "RGAAv4",
+    +       "RGAA-3.2.1",
+    +     ],
+    +   },
+    + ]
+
+      128 |       results.violations,
+      129 |       `Drawer violations:\n${JSON.stringify(results.violations, null, 2)}`,
+    > 130 |     ).toEqual([]);
+          |       ^
+      131 |   });
+      132 | });
+        at /home/node/.local/share/opencode/worktree/af7796ae2766c7d7b6e4521206d2a14998dc77de/lucid-gopher/e2e/portfolio.spec.ts:130:7
+
+    Error Context: test-results/portfolio-portfolio-graph--08c8f-s-zero-WCAG-A-AA-violations-desktop/error-context.md
+
+  2) [mobile] › e2e/portfolio.spec.ts:121:3 › portfolio graph SPA › accessibility: open drawer has zero WCAG A/AA violations 
+
+    Error: Drawer violations:
+    [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "tags": [
+          "cat.color",
+          "wcag2aa",
+          "wcag143",
+          "TTv5",
+          "TT13.c",
+          "EN-301-549",
+          "EN-9.1.4.3",
+          "ACT",
+          "RGAAv4",
+          "RGAA-3.2.1"
+        ],
+        "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=playwright",
+        "nodes": [
+          {
+            "any": [
+              {
+                "id": "color-contrast",
+                "data": {
+                  "fgColor": "#79716b",
+                  "bgColor": "#0c0a09",
+                  "contrastRatio": 4.12,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                },
+                "relatedNodes": [
+                  {
+                    "html": "<div class=\"overflow-hidden rounded-lg border border-stone-800 bg-stone-950 text-[13px] leading-relaxed\" data-testid=\"terminal\">",
+                    "target": [
+                      ".bg-stone-950"
+                    ]
+                  }
+                ],
+                "impact": "serious",
+                "message": "Element has insufficient color contrast of 4.12 (foreground color: #79716b, background color: #0c0a09, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+              }
+            ],
+            "all": [],
+            "none": [],
+            "impact": "serious",
+            "html": "<span class=\"ml-2 text-xs text-stone-500\">terminal — $ node</span>",
+            "target": [
+              ".ml-2"
+            ],
+            "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.12 (foreground color: #79716b, background color: #0c0a09, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+          },
+          {
+            "any": [
+              {
+                "id": "color-contrast",
+                "data": {
+                  "fgColor": "#57534d",
+                  "bgColor": "#0c0a09",
+                  "contrastRatio": 2.58,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                },
+                "relatedNodes": [
+                  {
+                    "html": "<div class=\"overflow-hidden rounded-lg border border-stone-800 bg-stone-950 text-[13px] leading-relaxed\" data-testid=\"terminal\">",
+                    "target": [
+                      ".bg-stone-950"
+                    ]
+                  }
+                ],
+                "impact": "serious",
+                "message": "Element has insufficient color contrast of 2.58 (foreground color: #57534d, background color: #0c0a09, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+              }
+            ],
+            "all": [],
+            "none": [],
+            "impact": "serious",
+            "html": "<p class=\"text-stone-600\">Run a command chip above, or type one and press Enter.</p>",
+            "target": [
+              ".h-56 > p"
+            ],
+            "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 2.58 (foreground color: #57534d, background color: #0c0a09, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+          }
+        ]
+      }
+    ]
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 93
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+    +     "help": "Elements must meet minimum color contrast ratio thresholds",
+    +     "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=playwright",
+    +     "id": "color-contrast",
+    +     "impact": "serious",
+    +     "nodes": Array [
+    +       Object {
+    +         "all": Array [],
+    +         "any": Array [
+    +           Object {
+    +             "data": Object {
+    +               "bgColor": "#0c0a09",
+    +               "contrastRatio": 4.12,
+    +               "expectedContrastRatio": "4.5:1",
+    +               "fgColor": "#79716b",
+    +               "fontSize": "9.0pt (12px)",
+    +               "fontWeight": "normal",
+    +               "messageKey": null,
+    +             },
+    +             "id": "color-contrast",
+    +             "impact": "serious",
+    +             "message": "Element has insufficient color contrast of 4.12 (foreground color: #79716b, background color: #0c0a09, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+    +             "relatedNodes": Array [
+    +               Object {
+    +                 "html": "<div class=\"overflow-hidden rounded-lg border border-stone-800 bg-stone-950 text-[13px] leading-relaxed\" data-testid=\"terminal\">",
+    +                 "target": Array [
+    +                   ".bg-stone-950",
+    +                 ],
+    +               },
+    +             ],
+    +           },
+    +         ],
+    +         "failureSummary": "Fix any of the following:
+    +   Element has insufficient color contrast of 4.12 (foreground color: #79716b, background color: #0c0a09, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+    +         "html": "<span class=\"ml-2 text-xs text-stone-500\">terminal — $ node</span>",
+    +         "impact": "serious",
+    +         "none": Array [],
+    +         "target": Array [
+    +           ".ml-2",
+    +         ],
+    +       },
+    +       Object {
+    +         "all": Array [],
+    +         "any": Array [
+    +           Object {
+    +             "data": Object {
+    +               "bgColor": "#0c0a09",
+    +               "contrastRatio": 2.58,
+    +               "expectedContrastRatio": "4.5:1",
+    +               "fgColor": "#57534d",
+    +               "fontSize": "9.0pt (12px)",
+    +               "fontWeight": "normal",
+    +               "messageKey": null,
+    +             },
+    +             "id": "color-contrast",
+    +             "impact": "serious",
+    +             "message": "Element has insufficient color contrast of 2.58 (foreground color: #57534d, background color: #0c0a09, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+    +             "relatedNodes": Array [
+    +               Object {
+    +                 "html": "<div class=\"overflow-hidden rounded-lg border border-stone-800 bg-stone-950 text-[13px] leading-relaxed\" data-testid=\"terminal\">",
+    +                 "target": Array [
+    +                   ".bg-stone-950",
+    +                 ],
+    +               },
+    +             ],
+    +           },
+    +         ],
+    +         "failureSummary": "Fix any of the following:
+    +   Element has insufficient color contrast of 2.58 (foreground color: #57534d, background color: #0c0a09, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+    +         "html": "<p class=\"text-stone-600\">Run a command chip above, or type one and press Enter.</p>",
+    +         "impact": "serious",
+    +         "none": Array [],
+    +         "target": Array [
+    +           ".h-56 > p",
+    +         ],
+    +       },
+    +     ],
+    +     "tags": Array [
+    +       "cat.color",
+    +       "wcag2aa",
+    +       "wcag143",
+    +       "TTv5",
+    +       "TT13.c",
+    +       "EN-301-549",
+    +       "EN-9.1.4.3",
+    +       "ACT",
+    +       "RGAAv4",
+    +       "RGAA-3.2.1",
+    +     ],
+    +   },
+    + ]
+
+      128 |       results.violations,
+      129 |       `Drawer violations:\n${JSON.stringify(results.violations, null, 2)}`,
+    > 130 |     ).toEqual([]);
+          |       ^
+      131 |   });
+      132 | });
+        at /home/node/.local/share/opencode/worktree/af7796ae2766c7d7b6e4521206d2a14998dc77de/lucid-gopher/e2e/portfolio.spec.ts:130:7
+
+    Error Context: test-results/portfolio-portfolio-graph--08c8f-s-zero-WCAG-A-AA-violations-mobile/error-context.md
+
+  2 failed
+    [desktop] › e2e/portfolio.spec.ts:121:3 › portfolio graph SPA › accessibility: open drawer has zero WCAG A/AA violations 
+    [mobile] › e2e/portfolio.spec.ts:121:3 › portfolio graph SPA › accessibility: open drawer has zero WCAG A/AA violations 
+  4 passed (19.3s)

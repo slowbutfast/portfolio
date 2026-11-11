@@ -18,6 +18,15 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
+  const coordTickerRef = useRef<HTMLSpanElement>(null);
+
+  // The canvas owns the live ticker while mounted. In list view the canvas is
+  // unmounted, so guarantee the drafting idle readout here as well.
+  useEffect(() => {
+    if (view === 'list' && coordTickerRef.current) {
+      coordTickerRef.current.textContent = 'X: --- Y: ---';
+    }
+  }, [view]);
 
   const selected = selectedId ? getProjectById(selectedId) ?? null : null;
 
@@ -100,7 +109,7 @@ export default function App() {
   }, []);
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-[#fafaf8] text-stone-900">
+    <div className="relative h-full w-full overflow-hidden bg-[#0a0a0c] text-[#f4f4f5]">
       <ControlsOverlay
         view={view}
         onViewChange={setView}
@@ -110,6 +119,7 @@ export default function App() {
         search={search}
         onSearchChange={setSearch}
         onReset={resetFilters}
+        coordTickerRef={coordTickerRef}
       />
 
       <main className="absolute inset-0">
@@ -119,6 +129,7 @@ export default function App() {
             edges={edges}
             dimmedIds={dimmedIds}
             focusedId={view === 'graph' ? focusedId : null}
+            coordTickerRef={coordTickerRef}
             onSelect={openProject}
           />
         ) : (

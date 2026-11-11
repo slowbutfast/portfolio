@@ -33,6 +33,8 @@ export interface ProjectData {
   id: string;
   title: string;
   summary: string;
+  /** Curated uppercase engineering classification, e.g. "AGENTIC ... // ...". */
+  classification: string;
   tags: ParadigmTag[];
   repo: string;
   liveUrl?: string;
