@@ -34,16 +34,12 @@ body {
   font-family: var(--font-sans);
 }
 
-/* 40px drafting grid used behind the graph canvas and publication list. */
+/* Pure obsidian void: no grid wallpaper or construction lines. */
 .drafting-grid {
-  background-image:
-    linear-gradient(to right, rgb(39 39 42 / 0.45) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(39 39 42 / 0.45) 1px, transparent 1px);
-  background-size: 40px 40px;
-  background-position: -1px -1px;
+  background-color: var(--color-bg);
 }
 
-/* Swiss bracket ornamentation via pseudo-elements keeps accessible names clean. */
+/* Quiet typographic labels: a thin boundary and no ornamental glyphs. */
 .bracket-tag {
   display: inline-flex;
   align-items: center;
@@ -61,25 +57,8 @@ body {
     background-color 120ms linear;
 }
 
-.bracket-tag::before {
-  content: '[';
-  margin-right: 0.4em;
-  color: var(--color-muted);
-}
-
-.bracket-tag::after {
-  content: ']';
-  margin-left: 0.4em;
-  color: var(--color-muted);
-}
-
 .bracket-tag-active {
   border-color: var(--color-cyan);
-  color: var(--color-cyan);
-}
-
-.bracket-tag-active::before,
-.bracket-tag-active::after {
   color: var(--color-cyan);
 }
 

@@ -14,4 +14,4 @@
   - `e2e/portfolio.spec.ts`: Update any assertions checking for crop marks or bracket tags while preserving all functional selectors.
 - **Expected Resolution**:
   The interface presents a deep, vast, unadorned black void where pure circular node primitives interact with organic magnetic fluid cohesion (ferrofluid behavior), framed by quiet, uncluttered Swiss typography. All unit, e2e, and lint tests pass.
-- **Status**: PENDING
+- **Status**: RESOLVED

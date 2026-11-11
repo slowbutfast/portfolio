@@ -22,7 +22,7 @@ function previewIcons(project: ProjectData) {
 
 export function ListView({ projects, dimmedIds, onSelect }: ListViewProps) {
   return (
-    <div className="drafting-grid h-full overflow-y-auto px-4 pb-8 pt-60 md:px-8 md:pt-44">
+    <div className="h-full overflow-y-auto px-4 pb-8 pt-60 md:px-8 md:pt-44">
       <div className="mx-auto max-w-6xl">
         <div className="mb-3 flex items-baseline justify-between gap-4 font-mono text-[10px] uppercase tracking-[0.18em] text-[#a1a1aa]">
           <span>PROJECT INDEX // 06 ENTRIES</span>

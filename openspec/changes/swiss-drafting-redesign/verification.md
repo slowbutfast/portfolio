@@ -231,3 +231,20 @@ The orchestration agent re-ran the full verification suite after the implementat
 | Data preservation | PASS — 6 projects, pinned order, 9 derived edges |
 
 The pre-redesign axe baseline is preserved at `openspec/changes/swiss-drafting-redesign/accessibility-baseline.txt` (renamed from `.log` so it is not excluded by the repository's `*.log` ignore rule).
+
+## PATCH-01 — Ferrofluid Minimalist Refinement (2026-11-11)
+
+PATCH-01 supersedes the ornamental rows of the matrix above: background drafting grid, center crosshairs, concentric tick rings, corner registration crop marks, bracket pseudo-elements, and mechanical distance callouts are intentionally removed. The nodes now render as pure flat circular primitives with organic meniscus bridges between connected nodes within 160px proximity.
+
+| Check | Result |
+| :--- | :--- |
+| `npm run typecheck` | PASS — exit 0, 0 diagnostics |
+| `npm run test:unit` | PASS — 27/27 |
+| `npx @google/design.md lint DESIGN.md` | PASS — 0 errors, 0 warnings |
+| `npm run build` | PASS — 0 `data:font` occurrences |
+| `npm run test:e2e` (rebuilt `dist`, preview server) | PASS — 33 passed, 1 intentional desktop-only skip |
+| Axe WCAG 2.0 A/AA | 0 violations in Graph, List, Drawer |
+| Clean accessible names | `Graph`, `List`, `LLM` resolve without bracket glyphs |
+| Visual capture | Confirmed pure void, no grid/crosshairs/crop marks, cyan focal node with ferrofluid bridges |
+
+Patch tasks `P01.1`–`P01.6` are marked complete in `tasks.md`; `patch.md` status is `RESOLVED`.

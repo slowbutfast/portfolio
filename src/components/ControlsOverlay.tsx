@@ -1,4 +1,4 @@
-import { List, Network, RotateCcw, Search } from 'lucide-react';
+import { RotateCcw, Search } from 'lucide-react';
 import type { RefObject } from 'react';
 import type { ParadigmTag } from '../types/portfolio';
 
@@ -42,16 +42,10 @@ export function ControlsOverlay({
         }}
       >
         <div className="pointer-events-auto flex flex-wrap items-start gap-2 md:gap-3">
-          <div className="flex min-h-11 items-center gap-2 px-1 md:min-h-0">
-            <span className="h-2 w-2 shrink-0 rounded-full bg-[#00f0ff]" aria-hidden="true" />
-            <div>
-              <h1 className="text-base font-bold leading-none tracking-tight text-[#f4f4f5] md:text-[28px]">
-                SYS.PORTFOLIO
-              </h1>
-              <p className="mt-1 font-mono text-[9px] uppercase leading-none tracking-[0.14em] text-[#a1a1aa] md:text-[10px] md:tracking-[0.18em]">
-                NODE GRAPH SPECIMEN // 06 NODES
-              </p>
-            </div>
+          <div className="flex min-h-11 items-center px-1 md:min-h-0">
+            <h1 className="text-base font-bold leading-none tracking-tight text-[#f4f4f5] md:text-[28px]">
+              SYS.PORTFOLIO
+            </h1>
           </div>
 
           <div
@@ -71,7 +65,6 @@ export function ControlsOverlay({
                   : 'text-[#a1a1aa] hover:text-[#f4f4f5]'
               }`}
             >
-              <Network className="h-4 w-4" aria-hidden="true" />
               <span className={`bracket-tag ${view === 'graph' ? 'bracket-tag-active' : ''}`}>
                 Graph
               </span>
@@ -88,7 +81,6 @@ export function ControlsOverlay({
                   : 'text-[#a1a1aa] hover:text-[#f4f4f5]'
               }`}
             >
-              <List className="h-4 w-4" aria-hidden="true" />
               <span className={`bracket-tag ${view === 'list' ? 'bracket-tag-active' : ''}`}>
                 List
               </span>
@@ -147,28 +139,6 @@ export function ControlsOverlay({
           </div>
         </div>
       </div>
-
-      {/* Four DOM corner registration crop marks. */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute h-4 w-4 border-l border-t border-[#71717a]"
-        style={{ top: safe('top', '8px'), left: safe('left', '8px') }}
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute h-4 w-4 border-r border-t border-[#71717a]"
-        style={{ top: safe('top', '8px'), right: safe('right', '8px') }}
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute h-4 w-4 border-b border-l border-[#71717a]"
-        style={{ bottom: safe('bottom', '8px'), left: safe('left', '8px') }}
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute h-4 w-4 border-b border-r border-[#71717a]"
-        style={{ bottom: safe('bottom', '8px'), right: safe('right', '8px') }}
-      />
 
       {/* Margin coordinate ticker: mutated imperatively by GraphCanvas' rAF. */}
       <div

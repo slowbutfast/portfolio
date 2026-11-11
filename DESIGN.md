@@ -124,20 +124,19 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 ### 1. Swiss Modernism & Editorial Rigor
 - Strict invisible coordinate grid with asymmetrical balance and generous negative space.
 - Disciplined margin annotations: running headers, edge coordinates (`X: 042.8 Y: 310.2`), index numbers (`[01/06]`), and classification tags at the periphery.
-- Zero border radius on all architectural containers, dialogs, media cards, and buttons (`rounded: 0px`), structured with crisp 1px hairline borders (`#27272a` for decorative grid lines; `#71717a` for interactive boundaries). Circular geometry (`rounded: 9999px`) is reserved exclusively for canvas graph node anchors and status indicator dots.
+- Zero border radius on all architectural containers, dialogs, media cards, and buttons (`rounded: 0px`), structured with quiet 1px hairline dividers (`#27272a` for separation; `#71717a` for interactive boundaries). Circular geometry (`rounded: 9999px`) is reserved exclusively for canvas graph node anchors and status indicator dots.
 
 ### 2. Binary Monochrome with Surgical Color Accents
 - The palette is overwhelmingly binary black (`#0a0a0c`) and crisp ink (`#f4f4f5`), maximizing optical contrast.
 - Color appears strictly as a surgical conceptual punctuation mark:
-  - **Surgical Cyan (`#00f0ff`):** Interactive focal points, active projection vectors, and terminal cursor states.
+  - **Surgical Cyan (`#00f0ff`):** Interactive focal points, active fluid bridges, and terminal cursor states.
   - **Surgical Amber (`#eab308`):** Warning flags and non-zero terminal exit codes.
 
-### 3. Deconstructed Technical Drafting
-- Construction mechanics are elevated to visual art:
-  - Center crosshairs (`+`) marking coordinate anchors.
-  - Concentric drafting rings with 4 cardinal tick marks (0°, 90°, 180°, 270°).
-  - Perpendicular vector distance callouts (`d: 142.6px`) restricted strictly to the active/hovered node.
-  - 4 DOM corner registration crop marks framing the viewport.
+### 3. Ferrofluid Minimalism & Magnetic Tension
+- The graph is a pure, unadorned black void. No background grid wallpaper, center crosshairs, concentric tick rings, corner crop marks, or mechanical distance callouts.
+- Nodes render as flat, solid circular primitives with crisp edges — no shadows, bevels, or contour lines.
+- Connected nodes in proximity fuse through organic meniscus bridges that narrow at the waist as distance grows, evoking ferrofluid pulled by a magnet beneath the plane.
+- Focal interaction is conveyed through surgical cyan: the active node and its incident fluid bridges glow, while distance text is omitted entirely.
 
 ### 4. Scale Juxtaposition
 - Contrast between **micro-elements** (tiny 10–12px monospaced coordinates, SHA hashes, plate numbers) and **monumental macro-elements** (oversized display numerals `01`–`06` spanning edge-to-edge as architectural background watermarks).
@@ -147,12 +146,12 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 ## Typography System
 
 - **Space Grotesk Variable:** Primary editorial and display font. Geometric, high-density sans-serif with subtle technical quirks. Used for monumental numerals, project titles, and section headers.
-- **JetBrains Mono Variable:** Computational and drafting font. Monospaced clarity for coordinates, dimensional callouts, terminal simulations, tag matrix buttons, and margin tickers.
+- **JetBrains Mono Variable:** Computational and drafting font. Monospaced clarity for coordinates, terminal simulations, tag labels, and margin tickers.
 
 ---
 
 ## Motion & Interaction Logic
 
-- **Make the Process the Asset:** Expose tools of creation—vector nodes, coordinates, and bounding frames.
-- **Contrast Smooth Interpolation with Hard Cuts:** Combine silky `d3-force` spatial physics with instantaneous, non-interpolated stepped frame cuts (step-time glyph decoding at 12fps for $\le 350\text{ms}$ on drawer open).
-- **Respect Reduced Motion:** Bypasses canvas write-in and title scramble completely, rendering static circle layouts and resolved text immediately.
+- **Let the Physics Speak:** The composition is pure circular primitives and the organic tension between them. Avoid decorative frames, grids, and annotation furniture.
+- **Contrast Smooth Interpolation with Hard Cuts:** Combine silky `d3-force` spatial physics and ferrofluid cohesion with instantaneous, non-interpolated stepped frame cuts (step-time glyph decoding at 12fps for $\le 350\text{ms}$ on drawer open).
+- **Respect Reduced Motion:** Bypasses title scramble completely, rendering static circle layouts and resolved text immediately.

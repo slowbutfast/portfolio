@@ -130,18 +130,30 @@ test.describe('portfolio graph SPA', () => {
     ).toEqual([]);
   });
 
-  test('controls expose clean accessible names with bracket pseudo-elements', async ({ page }) => {
+  test('controls expose clean accessible names without bracket ornamentation', async ({ page }) => {
     await page.goto('/');
     const graphToggle = page.getByRole('button', { name: 'Graph' });
     const listToggle = page.getByRole('button', { name: 'List' });
     await expect(graphToggle).toBeVisible();
     await expect(listToggle).toBeVisible();
-    await expect(graphToggle.locator('.bracket-tag')).toHaveCount(1);
-    await expect(listToggle.locator('.bracket-tag')).toHaveCount(1);
+    await expect(graphToggle).toHaveAccessibleName('Graph');
+    await expect(listToggle).toHaveAccessibleName('List');
 
     const llmPill = page.getByRole('button', { name: 'LLM', exact: true });
     await expect(llmPill).toHaveCount(1);
-    await expect(llmPill.locator('.bracket-tag')).toHaveCount(1);
+    await expect(llmPill).toHaveAccessibleName('LLM');
+    await expect(llmPill).toHaveText('LLM');
+
+    // Tags are quiet typographic pills: no generated bracket glyphs remain.
+    const tag = graphToggle.locator('.bracket-tag');
+    await expect(tag).toHaveCount(1);
+    const generatedContent = await tag.evaluate((el) => ({
+      before: getComputedStyle(el, '::before').content,
+      after: getComputedStyle(el, '::after').content,
+    }));
+    for (const content of [generatedContent.before, generatedContent.after]) {
+      expect(['none', 'normal', '""']).toContain(content);
+    }
   });
 
   test('drawer keeps exactly one h1 and an accessible h2 heading', async ({ page }) => {

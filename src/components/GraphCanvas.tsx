@@ -45,13 +45,9 @@ const DEFAULT_TOKENS: DraftingTokens = {
   amber: '#eab308',
 };
 
-const WRITE_IN_MS = 400;
+const BRIDGE_PROXIMITY = 160;
 const TICKER_IDLE = 'X: --- Y: ---';
 const MONO_FONT = '12px "JetBrains Mono Variable", monospace';
-
-function easeOutCubic(t: number): number {
-  return 1 - (1 - t) ** 3;
-}
 
 function readToken(name: string, fallback: string): string {
   if (typeof window === 'undefined') return fallback;
@@ -70,6 +66,73 @@ function cacheTokens(): DraftingTokens {
     cyan: readToken('--color-cyan', DEFAULT_TOKENS.cyan),
     amber: readToken('--color-amber', DEFAULT_TOKENS.amber),
   };
+}
+
+/**
+ * Fuse two nearby circles with an organic meniscus bridge. The bridge meets
+ * each circle tangentially and narrows toward a waist at the midpoint,
+ * mimicking magnetic ferrofluid pulled by a field beneath the plane.
+ */
+function drawFluidBridge(
+  ctx: CanvasRenderingContext2D,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  radius: number,
+  fillStyle: string,
+  alpha: number,
+): void {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const distance = Math.hypot(dx, dy);
+  if (distance <= 0 || distance >= BRIDGE_PROXIMITY) return;
+
+  const ux = dx / distance;
+  const uy = dy / distance;
+  const px = -uy;
+  const py = ux;
+
+  const proximity = 1 - distance / BRIDGE_PROXIMITY;
+  const halfWidth = Math.min(radius * 0.98, radius * 0.95 * Math.sqrt(proximity));
+  if (halfWidth < 0.5) return;
+
+  const reach = Math.sqrt(Math.max(0, radius * radius - halfWidth * halfWidth));
+  const waist = halfWidth * 0.35;
+  const third = distance / 3;
+
+  const aTopX = ax + ux * reach + px * halfWidth;
+  const aTopY = ay + uy * reach + py * halfWidth;
+  const bTopX = bx - ux * reach + px * halfWidth;
+  const bTopY = by - uy * reach + py * halfWidth;
+  const aBottomX = ax + ux * reach - px * halfWidth;
+  const aBottomY = ay + uy * reach - py * halfWidth;
+  const bBottomX = bx - ux * reach - px * halfWidth;
+  const bBottomY = by - uy * reach - py * halfWidth;
+
+  ctx.beginPath();
+  ctx.moveTo(aTopX, aTopY);
+  ctx.bezierCurveTo(
+    ax + ux * third + px * waist,
+    ay + uy * third + py * waist,
+    bx - ux * third + px * waist,
+    by - uy * third + py * waist,
+    bTopX,
+    bTopY,
+  );
+  ctx.lineTo(bBottomX, bBottomY);
+  ctx.bezierCurveTo(
+    bx - ux * third - px * waist,
+    by - uy * third - py * waist,
+    ax + ux * third - px * waist,
+    ay + uy * third - py * waist,
+    aBottomX,
+    aBottomY,
+  );
+  ctx.closePath();
+  ctx.fillStyle = fillStyle;
+  ctx.globalAlpha = alpha;
+  ctx.fill();
 }
 
 export function GraphCanvas({
@@ -131,7 +194,6 @@ export function GraphCanvas({
 
     const ctx = canvas.getContext('2d');
 
-    const mountTime = performance.now();
     let raf = 0;
     let disposed = false;
 
@@ -164,45 +226,31 @@ export function GraphCanvas({
       const focused = focusedRef.current;
       const focalId = focused ?? sim.hovered?.id ?? null;
 
-      const progress = reduceMotionRef.current
-        ? 1
-        : Math.min(1, (performance.now() - mountTime) / WRITE_IN_MS);
-      const ringProgress = easeOutCubic(progress);
-
-      // Relational vectors: idle links are 1px hairlines; only edges incident
-      // to the focal node become dashed cyan projection vectors with callouts.
+      // Ferrofluid meniscus bridges: connected nodes in proximity fuse into a
+      // single organic fluid mass. No straight hairlines, casts, or contours.
+      const nodesById = new Map(sim.nodes.map((n) => [n.id, n]));
       for (const edge of edges) {
         const a = active.get(edge.source);
         const b = active.get(edge.target);
         if (!a || !b) continue;
+        const ra = nodesById.get(edge.source)?.radius ?? 18;
+        const rb = nodesById.get(edge.target)?.radius ?? 18;
         const isDim = dimmed.has(edge.source) && dimmed.has(edge.target);
         const isFocal = focalId !== null && (edge.source === focalId || edge.target === focalId);
-        ctx.beginPath();
-        ctx.moveTo(a[0], a[1]);
-        ctx.lineTo(b[0], b[1]);
-        ctx.strokeStyle = isFocal ? tokens.cyan : tokens.grid;
-        ctx.globalAlpha = isDim ? (isFocal ? 0.35 : 0.18) : isFocal ? 0.95 : 1;
-        ctx.lineWidth = 1;
-        if (isFocal) ctx.setLineDash([4, 4]);
-        else ctx.setLineDash([]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        if (isFocal && fontsReadyRef.current) {
-          const mx = (a[0] + b[0]) / 2;
-          const my = (a[1] + b[1]) / 2;
-          const dist = Math.hypot(b[0] - a[0], b[1] - a[1]);
-          ctx.font = MONO_FONT;
-          ctx.fillStyle = tokens.cyan;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.globalAlpha = isDim ? 0.5 : 1;
-          ctx.fillText(`d: ${Math.round(dist)}px`, mx, my - 7);
-        }
+        drawFluidBridge(
+          ctx,
+          a[0],
+          a[1],
+          b[0],
+          b[1],
+          Math.min(ra, rb),
+          isFocal ? tokens.cyan : tokens.text,
+          isDim ? (isFocal ? 0.3 : 0.16) : isFocal ? 0.95 : 0.8,
+        );
       }
 
-      // Node anatomy: filled physics circle, center crosshair, one outer guide
-      // ring (r + 6) with four cardinal ticks. Hit testing stays at r = 18.
+      // Pure circular primitives: flat filled discs with crisp edges. Hit
+      // testing remains invariant at the canonical radius (r = 18px).
       for (const n of sim.nodes) {
         const pos = active.get(n.id);
         if (!pos) continue;
@@ -210,54 +258,17 @@ export function GraphCanvas({
         const isDim = dimmed.has(n.id);
         const isFocused = focused === n.id;
         const isHovered = !isFocused && sim.hovered?.id === n.id;
+        const isActive = isFocused || isHovered;
 
         ctx.globalAlpha = isDim ? 0.2 : 1;
-
         ctx.beginPath();
         ctx.arc(x, y, n.radius, 0, Math.PI * 2);
-        ctx.fillStyle = tokens.surfaceContainer;
+        ctx.fillStyle = isActive ? tokens.cyan : tokens.text;
         ctx.fill();
-        ctx.strokeStyle = isFocused ? tokens.cyan : isHovered ? tokens.text : tokens.outline;
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        // Center crosshair, 4px arms.
-        ctx.beginPath();
-        ctx.moveTo(x - 4, y);
-        ctx.lineTo(x + 4, y);
-        ctx.moveTo(x, y - 4);
-        ctx.lineTo(x, y + 4);
-        ctx.strokeStyle = isFocused ? tokens.cyan : isHovered ? tokens.text : tokens.muted;
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        // Single outer guide ring, optionally traced during the write-in.
-        const ringRadius = n.radius + 6;
-        if (ringProgress > 0) {
-          ctx.beginPath();
-          ctx.arc(x, y, ringRadius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ringProgress);
-          ctx.strokeStyle = isFocused ? tokens.cyan : tokens.outline;
-          ctx.lineWidth = 1;
-          ctx.stroke();
-        }
-
-        // Four cardinal ticks at 0 / 90 / 180 / 270 degrees.
-        if (ringProgress >= 1) {
-          ctx.beginPath();
-          for (const angle of [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]) {
-            const cos = Math.cos(angle);
-            const sin = Math.sin(angle);
-            ctx.moveTo(x + cos * ringRadius, y + sin * ringRadius);
-            ctx.lineTo(x + cos * (ringRadius + 4), y + sin * (ringRadius + 4));
-          }
-          ctx.strokeStyle = isFocused ? tokens.cyan : tokens.outline;
-          ctx.lineWidth = 1;
-          ctx.stroke();
-        }
 
         if (fontsReadyRef.current) {
           ctx.font = MONO_FONT;
-          ctx.fillStyle = isFocused ? tokens.cyan : tokens.muted;
+          ctx.fillStyle = isActive ? tokens.cyan : tokens.muted;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'alphabetic';
           ctx.fillText(n.label, x, y + n.radius + 18);

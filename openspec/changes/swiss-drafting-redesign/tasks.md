@@ -1,57 +1,57 @@
 ## 1. Test Scaffolding (TDD)
 
-- [ ] 1.1 Capture pre-redesign `@axe-core/playwright` accessibility baseline across Graph, List, and Drawer
-- [ ] 1.2 Write unit test in `src/utils/drafting.test.ts` asserting mathematical WCAG 1.4.11 contrast ratio $\ge 3:1$ for `#71717a` against `#0a0a0c` and `#111215`
-- [ ] 1.3 Write unit tests for index formatting (`formatIndex(0) === '01'`) and plate formatting (`formatPlate(0) === 'PL-01'`) in `src/utils/drafting.test.ts`
-- [ ] 1.4 Write unit test in `src/data/projects.test.ts` asserting all 6 projects declare a non-empty `classification` string
-- [ ] 1.5 Scaffold Playwright assertions for clean button accessible names (`getByRole('button', { name: 'Graph' })`), single `<h1>` dialog integrity, and reduced motion title bypass
+- [x] 1.1 Capture pre-redesign `@axe-core/playwright` accessibility baseline across Graph, List, and Drawer
+- [x] 1.2 Write unit test in `src/utils/drafting.test.ts` asserting mathematical WCAG 1.4.11 contrast ratio $\ge 3:1$ for `#71717a` against `#0a0a0c` and `#111215`
+- [x] 1.3 Write unit tests for index formatting (`formatIndex(0) === '01'`) and plate formatting (`formatPlate(0) === 'PL-01'`) in `src/utils/drafting.test.ts`
+- [x] 1.4 Write unit test in `src/data/projects.test.ts` asserting all 6 projects declare a non-empty `classification` string
+- [x] 1.5 Scaffold Playwright assertions for clean button accessible names (`getByRole('button', { name: 'Graph' })`), single `<h1>` dialog integrity, and reduced motion title bypass
 
 ## 2. Foundation, Typography & Build Pipeline
 
-- [ ] 2.1 Install `@fontsource-variable/space-grotesk`, `@fontsource-variable/jetbrains-mono`, and `@axe-core/playwright`
-- [ ] 2.2 Configure `vite.config.ts` with `assetsInlineLimit: 0` and `__COMMIT_HASH__` with try/catch + `VERCEL_GIT_COMMIT_SHA` fallback, and declare in `src/vite-env.d.ts`
-- [ ] 2.3 Update `index.html` with `viewport-fit=cover` and title `SYS.PORTFOLIO // NODE GRAPH SPECIMEN`
-- [ ] 2.4 Import variable fonts in `src/main.tsx` and bind tokens from `DESIGN.md` into CSS custom properties in `src/styles.css` using `#71717a` for interactive boundaries
-- [ ] 2.5 Create `src/utils/drafting.ts` with formatters and stable catalog order
-- [ ] 2.6 Update `src/types/portfolio.ts` with required `classification: string` and annotate all 6 projects in `src/data/projects.ts`
+- [x] 2.1 Install `@fontsource-variable/space-grotesk`, `@fontsource-variable/jetbrains-mono`, and `@axe-core/playwright`
+- [x] 2.2 Configure `vite.config.ts` with `assetsInlineLimit: 0` and `__COMMIT_HASH__` with try/catch + `VERCEL_GIT_COMMIT_SHA` fallback, and declare in `src/vite-env.d.ts`
+- [x] 2.3 Update `index.html` with `viewport-fit=cover` and title `SYS.PORTFOLIO // NODE GRAPH SPECIMEN`
+- [x] 2.4 Import variable fonts in `src/main.tsx` and bind tokens from `DESIGN.md` into CSS custom properties in `src/styles.css` using `#71717a` for interactive boundaries
+- [x] 2.5 Create `src/utils/drafting.ts` with formatters and stable catalog order
+- [x] 2.6 Update `src/types/portfolio.ts` with required `classification: string` and annotate all 6 projects in `src/data/projects.ts`
 
 ## 3. Controls HUD & Architectural Margin Architecture
 
-- [ ] 3.1 Overhaul `src/components/ControlsOverlay.tsx` with zero-radius 1px hairline framing, 4 DOM corner registration crop marks (`env(safe-area-inset-*)`), and unbracketed accessible names with CSS `.bracket-tag` pseudo-elements
-- [ ] 3.2 Mount imperative DOM ref for hover coordinate ticker displaying `X: --- Y: ---` in list view, on unmount, or for non-pointer devices
-- [ ] 3.3 Verify unbracketed accessible button names (`Graph`, `List`, tags) under keyboard and touch interaction
+- [x] 3.1 Overhaul `src/components/ControlsOverlay.tsx` with zero-radius 1px hairline framing, 4 DOM corner registration crop marks (`env(safe-area-inset-*)`), and unbracketed accessible names with CSS `.bracket-tag` pseudo-elements
+- [x] 3.2 Mount imperative DOM ref for hover coordinate ticker displaying `X: --- Y: ---` in list view, on unmount, or for non-pointer devices
+- [x] 3.3 Verify unbracketed accessible button names (`Graph`, `List`, tags) under keyboard and touch interaction
 
 ## 4. Canvas Engine & Deconstructed Technical Drafting
 
-- [ ] 4.1 In `src/components/GraphCanvas.tsx`, gate typography rendering on `document.fonts.load('12px "JetBrains Mono Variable"')` while starting physics immediately
-- [ ] 4.2 Cache token colors from CSS variables on mount via `getComputedStyle`
-- [ ] 4.3 Replace legacy multi-rings with center crosshairs (`+`) and single outer guide ring ($r+6\text{px}$) with 4 cardinal ticks
-- [ ] 4.4 Implement 400ms stroke write-in animation on initial mount, bypassed under `prefers-reduced-motion`
-- [ ] 4.5 Render dashed relational projection vectors and distance badges (`d: [pixels]px`) strictly on active/hovered node incident edges
-- [ ] 4.6 Maintain invariant physics hit testing at canonical $r = 18\text{px}$ and pipe rAF pointer coordinates directly to the HUD ticker DOM ref in canvas-local space
+- [x] 4.1 In `src/components/GraphCanvas.tsx`, gate typography rendering on `document.fonts.load('12px "JetBrains Mono Variable"')` while starting physics immediately
+- [x] 4.2 Cache token colors from CSS variables on mount via `getComputedStyle`
+- [x] 4.3 Replace legacy multi-rings with center crosshairs (`+`) and single outer guide ring ($r+6\text{px}$) with 4 cardinal ticks
+- [x] 4.4 Implement 400ms stroke write-in animation on initial mount, bypassed under `prefers-reduced-motion`
+- [x] 4.5 Render dashed relational projection vectors and distance badges (`d: [pixels]px`) strictly on active/hovered node incident edges
+- [x] 4.6 Maintain invariant physics hit testing at canonical $r = 18\text{px}$ and pipe rAF pointer coordinates directly to the HUD ticker DOM ref in canvas-local space
 
 ## 5. Blueprint Drawer, Editorial List & Terminal Hardening
 
-- [ ] 5.1 In `src/components/ProjectDrawer.tsx`, implement accessible stepped character decoder in `<span aria-hidden="true">` inside the same CSS grid cell as `<h2 className="sr-only">`, running once on open (12fps, $\le 350\text{ms}$) with unmount cleanup and reduced motion bypass
-- [ ] 5.2 Add monumental watermark numerals (`01`–`06`), deterministic plate numbers (`PL-01`–`PL-06`), and `__COMMIT_HASH__` to the blueprint drawer
-- [ ] 5.3 Reformat `src/components/ListView.tsx` into an asymmetric two-column Swiss editorial publication layout
-- [ ] 5.4 Update `src/components/TerminalSimulator.tsx` with surgical cyan prompt (`>_`) and amber diagnostic status chip for non-zero exit codes
-- [ ] 5.5 Perform zero-radius sweep (`rounded-none`) across `MediaView.tsx`, `ListView.tsx`, `TerminalSimulator.tsx`, and `ProjectDrawer.tsx`
+- [x] 5.1 In `src/components/ProjectDrawer.tsx`, implement accessible stepped character decoder in `<span aria-hidden="true">` inside the same CSS grid cell as `<h2 className="sr-only">`, running once on open (12fps, $\le 350\text{ms}$) with unmount cleanup and reduced motion bypass
+- [x] 5.2 Add monumental watermark numerals (`01`–`06`), deterministic plate numbers (`PL-01`–`PL-06`), and `__COMMIT_HASH__` to the blueprint drawer
+- [x] 5.3 Reformat `src/components/ListView.tsx` into an asymmetric two-column Swiss editorial publication layout
+- [x] 5.4 Update `src/components/TerminalSimulator.tsx` with surgical cyan prompt (`>_`) and amber diagnostic status chip for non-zero exit codes
+- [x] 5.5 Perform zero-radius sweep (`rounded-none`) across `MediaView.tsx`, `ListView.tsx`, `TerminalSimulator.tsx`, and `ProjectDrawer.tsx`
 
 ## 6. Verification & Empirical Audit
 
-- [ ] 6.1 Run `npx @google/design.md lint DESIGN.md` and verify 0 errors
-- [ ] 6.2 Run full regression test suite (`npm run typecheck`, `npm run test:unit`, `npm run test:e2e`)
-- [ ] 6.3 Run `npm run build` and assert 0 `data:font` occurrences in `dist/`
-- [ ] 6.4 Execute Playwright 4x CPU throttle test and React `<Profiler>` commit count assertion
-- [ ] 6.5 Populate `verification.md` with Requirement Adherence Matrix, resolved assumptions, and verbatim execution logs
+- [x] 6.1 Run `npx @google/design.md lint DESIGN.md` and verify 0 errors
+- [x] 6.2 Run full regression test suite (`npm run typecheck`, `npm run test:unit`, `npm run test:e2e`)
+- [x] 6.3 Run `npm run build` and assert 0 `data:font` occurrences in `dist/`
+- [x] 6.4 Execute Playwright 4x CPU throttle test and React `<Profiler>` commit count assertion
+- [x] 6.5 Populate `verification.md` with Requirement Adherence Matrix, resolved assumptions, and verbatim execution logs
 
 
 ## Patch 01: Ferrofluid Minimalist Design Refinement
 
-- [ ] P01.1 Update `DESIGN.md` and `design.md` removing background grid, brackets, and crosshairs in favor of pure primitives and fluid magnetic tension
-- [ ] P01.2 Purge `.drafting-grid` lines and `.bracket-tag` pseudo-element brackets in `src/styles.css`
-- [ ] P01.3 Streamline `src/components/ControlsOverlay.tsx` removing subtitle, corner crop marks, and redundant graph icon
-- [ ] P01.4 Refactor `src/components/GraphCanvas.tsx` to strip crosshairs/outer tick rings, render pure solid circular primitives, and implement organic ferrofluid meniscus bridges between connected nodes in proximity
-- [ ] P01.5 Strip `.drafting-grid` from `src/components/ListView.tsx`
-- [ ] P01.6 Update `e2e/portfolio.spec.ts` for clean tag rendering and run full regression suite (`typecheck`, `unit`, `e2e`, `@google/design.md lint`)
+- [x] P01.1 Update `DESIGN.md` and `design.md` removing background grid, brackets, and crosshairs in favor of pure primitives and fluid magnetic tension
+- [x] P01.2 Purge `.drafting-grid` lines and `.bracket-tag` pseudo-element brackets in `src/styles.css`
+- [x] P01.3 Streamline `src/components/ControlsOverlay.tsx` removing subtitle, corner crop marks, and redundant graph icon
+- [x] P01.4 Refactor `src/components/GraphCanvas.tsx` to strip crosshairs/outer tick rings, render pure solid circular primitives, and implement organic ferrofluid meniscus bridges between connected nodes in proximity
+- [x] P01.5 Strip `.drafting-grid` from `src/components/ListView.tsx`
+- [x] P01.6 Update `e2e/portfolio.spec.ts` for clean tag rendering and run full regression suite (`typecheck`, `unit`, `e2e`, `@google/design.md lint`)
