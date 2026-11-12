@@ -65,7 +65,28 @@ Verified: 2026-11-12
 | Missing-secret runs would fail confusingly | They abort once with a message naming the secret |
 | `.vercelignore` affects Git-integration builds | Not relevant; resolver lives under `src/` regardless |
 
-## Open (needs Vercel access, secrets, or settings changes)
+## Deployment Findings (2026-11-12)
+
+| Finding | Evidence |
+| :--- | :--- |
+| The Vercel project is `portfolio` (`prj_W6EpbJ3ZH6cxKxsQIhhGC45WFX8a`), linked to `slowbutfast/portfolio`, production branch `master` | Vercel MCP `get_project`, `list_deployments` |
+| Deployment Protection is `all_except_custom_domains`: the production alias is public (200), per-deployment and branch URLs return 302 to Vercel SSO, including production deployment URLs | `get_project`; anonymous `fetch` |
+| **Real production edge passes the header spec 5/5 and the full suite 62/62 with zero console errors** under the actual strict CSP | `PREVIEW_URL=https://portfolio-two-dusky-55.vercel.app npx playwright test` |
+| **`deployment_status` never fires for this project**: Vercel creates no GitHub Deployments (`gh api .../deployments` empty after four deployments; no `deployment-gate` run started). Vercel's documented trigger is `repository_dispatch` (`vercel.deployment.success`) | `gh api`, `gh run list`, Vercel docs via MCP |
+| `ci` passed on its first real run (PR #3, 1m23s) | `gh pr checks 3` |
+| `ci` is now a required check on `master`; admins are not restricted | `gh api -X PUT .../branches/master/protection` |
+| **Rollback drill passed**: rollback to `dpl_5yUJ…` moved all three production aliases and the header spec passed (5/5); promoting `dpl_3XnSJi83…` restored them and the header spec passed again | `request_rollback`, `request_promote`, `get_deployment`, Playwright |
+| Project Node setting is `26.x` while `package.json` `engines.node` is `22.x` and CI uses 22 | `get_project`; `package.json` |
+
+## Still Open
+
+- **`preview.yml` must be replaced on `master`.** The merged version listens for `deployment_status`, which never fires. The corrected `repository_dispatch` version is staged in `openspec/changes/vercel-preview-gating/workflows/preview.yml`; `.github/` is write-denied in this session, so it needs to be copied to `.github/workflows/preview.yml` and merged to `master`.
+- **Bypass secret in GitHub.** Created in Vercel (`isEnvVar: true`); `gh secret set` was denied. Until `VERCEL_AUTOMATION_BYPASS_SECRET` exists as a repository secret, every gate run fails fast by design.
+- **Real gate proof** (tasks 3.4, 3.5, 6.2, 6.3): a dispatch-triggered run, the recorded payload shape, a commit status, and the artifact secret scan.
+- **`preview-e2e` as a required check** (after it has reported once).
+- **Node version**: decide whether the project's `26.x` setting should match `engines` (`22.x`).
+
+## Open (superseded by *Still Open* above where noted)
 
 - **Vercel project state** (task 4.4): link to `slowbutfast/portfolio`, production branch, Deployment Protection, system-env exposure. The Vercel MCP returns 403 for team scope `joeshmo` until team access is approved via the one-time link.
 - **`repository_dispatch` payload shape**: environment values, `git.sha`/`git.ref`, whether `url` has a scheme. Recorded in the first run's summary.

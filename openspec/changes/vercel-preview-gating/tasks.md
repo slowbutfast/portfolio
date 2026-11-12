@@ -27,9 +27,9 @@
 - [x] 4.1 Add `ci.yml` (staged in `openspec/changes/vercel-preview-gating/workflows/` because writes to `.github/` are denied here; copy to `.github/workflows/`): on `pull_request`, Node 22, `npm ci`, `typecheck`, `test:unit`, Playwright browser install, `test:e2e`, upload report on failure
 - [x] 4.2 Add `preview.yml` (staged alongside `ci.yml`): on `repository_dispatch` `vercel.deployment.success`; branch on the payload environment; checkout the payload SHA; run the preview suite (Preview) or header + load test (Production); post `preview-e2e` / `production-smoke` commit status; least-privilege permissions; per-SHA concurrency; no secret echo; no trace artifacts
 - [x] 4.3 Validate both workflows (actionlint if available, otherwise YAML parse) and grep for secret echoes
-- [ ] 4.4 Read Vercel project state through the Vercel MCP (project link, production branch, Deployment Protection, system-env exposure) and record findings (MCP access works; the Vercel project does not exist yet, waiting for the user to import it in the dashboard)
-- [ ] 4.5 Add the `VERCEL_AUTOMATION_BYPASS_SECRET` repository secret and land `ci.yml` and `preview.yml` on the default branch (user-owned: needs repository and Vercel dashboard access)
-- [ ] 4.6 After each context has reported once, mark `ci` and `preview-e2e` as required checks in branch protection (user-owned)
+- [x] 4.4 Read Vercel project state through the Vercel MCP (project link, production branch, Deployment Protection, system-env exposure) and record findings (done: project `portfolio`, production branch `master`, SSO protection `all_except_custom_domains`, only the production alias is public; system-env exposure is not shown by `get_project`, so `VERCEL_GIT_COMMIT_SHA` availability in builds remains unverified)
+- [ ] 4.5 Add the `VERCEL_AUTOMATION_BYPASS_SECRET` repository secret and land `ci.yml` and `preview.yml` on the default branch (workflows landed via PR #3; `preview.yml` needs a `repository_dispatch` rewrite via `.github/` which is write-denied here; the bypass secret exists in Vercel but `gh secret set` was denied, so storing it in GitHub is user-owned)
+- [ ] 4.6 After each context has reported once, mark `ci` and `preview-e2e` as required checks in branch protection (partial: `ci` is required on `master`; `preview-e2e` is added once the gate has reported, otherwise it would block every merge)
 
 ## 5. Documentation
 
@@ -41,5 +41,5 @@
 - [x] 6.1 Run `npm run typecheck`, `npm run test:unit`, `npm run test:e2e`, and `npm run build`; record pass counts
 - [ ] 6.2 Push the branch, confirm the preview deployment triggers the gate, and record the run URL, commit status, and header assertion results (blocked on 4.4 and 4.5)
 - [ ] 6.3 Run the secret-leak scan over the preview run's logs and artifacts (blocked on 6.2)
-- [ ] 6.4 Perform an Instant Rollback drill on a non-critical deployment with the user's explicit approval (blocked on 4.4)
+- [x] 6.4 Perform an Instant Rollback drill on a non-critical deployment with the user's explicit approval (done: rolled back to `dpl_5yUJ…`, header spec 5/5, promoted `dpl_3XnSJi83…` back, header spec 5/5; user approved)
 - [ ] 6.5 Populate `verification.md` with the Requirement Adherence Matrix for both specs, the resolved unverified assumptions from `research.md`, and verbatim execution logs
