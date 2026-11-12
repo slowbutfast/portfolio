@@ -424,6 +424,30 @@ export function GraphCanvas({
     };
     renderRef.current = render;
 
+    // A live reduced-motion transition cancels any pending dwell and dismisses
+    // the card immediately, even if the page has already mounted.
+    const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const hoverCapabilityQuery = window.matchMedia('(hover: hover) and (pointer: fine)');
+    const handleMotionChange = () => {
+      reduceMotionRef.current = motionQuery.matches;
+      canHoverRef.current = !motionQuery.matches && hoverCapabilityQuery.matches;
+      if (!motionQuery.matches) return;
+      if (hoverDwellTimerRef.current !== null) {
+        window.clearTimeout(hoverDwellTimerRef.current);
+        hoverDwellTimerRef.current = null;
+      }
+      hoverCandidateRef.current = null;
+      if (hoveredProjectIdRef.current !== null) {
+        hoveredProjectIdRef.current = null;
+        synthRef.current?.onNodeHover(false);
+        onHoverNodeRef.current?.(null, null);
+      }
+      simRef.current?.hover(null);
+      render();
+      wakeRef.current();
+    };
+    motionQuery.addEventListener('change', handleMotionChange);
+
     // Theme switches re-read the CSS custom properties without restarting the
     // simulation or losing node positions.
     const themeObserver = new MutationObserver(() => {
@@ -532,6 +556,7 @@ export function GraphCanvas({
       disposed = true;
       observer.disconnect();
       themeObserver.disconnect();
+      motionQuery.removeEventListener('change', handleMotionChange);
       cancelAnimationFrame(raf);
       if (hoverDwellTimerRef.current !== null) {
         window.clearTimeout(hoverDwellTimerRef.current);

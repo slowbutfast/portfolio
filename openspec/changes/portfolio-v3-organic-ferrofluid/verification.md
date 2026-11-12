@@ -16,7 +16,7 @@
 | :--- | :--- | :--- | :--- |
 | graph-simulation | `### Requirement: Decentralized equal mass node distribution`<br>`#### Scenario: Graph initialization without central clump or corner pinning` | `src/physics/graphSimulation.test.ts::maintains >= 44px clearance, bounds containment, OD centroid freedom, and stabilizes` on desktop and mobile | **PASS** |
 | graph-simulation | `### Requirement: Dynamic hover gravitation wave`<br>`#### Scenario: Pointer sweeps across a node without dwelling` | `e2e/portfolio.spec.ts::hover dwell suppresses fast sweeps and opens after 200ms` (canvas sweep exits before 200ms and asserts no card) | **PASS** |
-| graph-simulation | `#### Scenario: Pointer dwells on a stationary node for 200ms` | Same e2e test dwells on the centered node and asserts the card opens; `src/physics/graphSimulation.test.ts::is zero inside 110px and ramps to 0.025 outside it` verifies the drift curve | **PASS** |
+| graph-simulation | `#### Scenario: Pointer dwells on a stationary node for 200ms` | Same e2e test dwells on the centered node and asserts the card opens; `src/physics/graphSimulation.test.ts::is zero inside 110px and ramps to 0.025 outside it` verifies the drift curve; `e2e/portfolio.spec.ts::reduced-motion transition dismisses an open hover card` verifies transition cancellation | **PASS** |
 | graph-simulation | `#### Scenario: Pointer leaves or clicks a hovered node` | `e2e/portfolio.spec.ts::hover card survives a 150ms pointer transfer and dismisses on drag`; `GraphCanvas.onPointerDown` / `onPointerLeave` clear `hoverDwellTimer` synchronously | **PASS** |
 | graph-simulation | `### Requirement: Authoritative planar graph seed embedding and homing force`<br>`#### Scenario: Canvas graph initializes on first load` | `src/utils/graphPlanarity.test.ts::has zero segment crossings on desktop 1440x900 / mobile 393x852 / wide 1920x1080 / narrow 320x900`; `GraphCanvas` seeds initial and static layouts from `scaleSeeds(PLANAR_NODE_SEEDS, ...)` | **PASS** |
 | graph-simulation | `#### Scenario: User drags and places a node` | `src/physics/graphSimulation.test.ts::keeps a non-dragged neighbor within <15px over a 160px drag`; `persists the user-placed fx/fy anchor after dragEnd`; `scales and clamps pinned coordinates proportionally on resize` | **PASS** |
@@ -117,14 +117,14 @@ vite v7.3.6 building client environment for production...
 ✓ 1959 modules transformed.
 dist/index.html                    1.86 kB │ gzip:   0.71 kB
 dist/assets/index-DGOoXDbq.css    28.30 kB │ gzip:   6.11 kB
-dist/assets/index-nlTWn_YN.js    324.79 kB │ gzip: 103.45 kB
+dist/assets/index-CqW-WayV.js    325.27 kB │ gzip: 103.52 kB
 ✓ built in 3.20s
 ```
 
 ```text
 $ npm run test:e2e
-  21 skipped
-  87 passed (2.1m)
+  22 skipped
+  88 passed (2.2m)
 ```
 
 Skipped tests are the five live-preview header tests requiring `PREVIEW_URL`, desktop-only/mobile-only interaction guards, and hover tests on coarse-pointer mobile.
@@ -160,7 +160,7 @@ Main specs were synced from the delta: `graph-simulation` received the rest-wais
 | Tag-derived permanent edges | 13 | 13 | 0 edges lost |
 | Unit test files | 16 | 16 | 0 files removed |
 | Unit tests | 144 passed / 2 skipped | 164 passed | +20 net assertions/tests |
-| E2E tests | `75 passed / 17 skipped` (prior archived report) | `87 passed / 21 skipped` | +12 passing scenarios; new hover/menu/viewport coverage |
+| E2E tests | `75 passed / 17 skipped` (prior archived report) | `88 passed / 22 skipped` | +13 passing scenarios; new hover/menu/viewport/reduced-motion coverage |
 | Snap multiplier | `2.0` | `1.6` | Snappier break point |
 | Reconnect multiplier | `1.4` | `1.25` | Tighter recovery hysteresis |
 | Rest waist | `baseWidth` (straight) | `0.58 × 2 × averageHalf` | Genuine concave hourglass |
@@ -193,4 +193,4 @@ npm run dev -- --port 5199
 npx playwright test e2e/portfolio.spec.ts --project=desktop
 ```
 
-Expected: `87 passed` across both projects with expected mobile/desktop skips, zero console errors, thick concave rest fillets, a peripheral hover card, and a 3-dot menu containing `Filters` + `Reset layout`.
+Expected: `88 passed` across both projects with expected mobile/desktop skips, zero console errors, thick concave rest fillets, a peripheral hover card, and a 3-dot menu containing `Filters` + `Reset layout`.

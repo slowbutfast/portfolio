@@ -592,6 +592,16 @@ test.describe('portfolio graph SPA', () => {
     await expect(page.getByTestId('node-hover-card')).toBeVisible();
   });
 
+  test('reduced-motion transition dismisses an open hover card', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'hover previews are desktop-only');
+    await page.goto('/');
+    await hoverCenteredNode(page);
+    await expect(page.getByTestId('node-hover-card')).toBeVisible();
+
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect(page.getByTestId('node-hover-card')).toHaveCount(0);
+  });
+
   for (const viewport of [
     { label: 'desktop', width: 1440, height: 900 },
     { label: 'narrow mobile', width: 393, height: 852 },
