@@ -2,7 +2,6 @@ import {
   useEffect,
   useRef,
   type PointerEvent as ReactPointerEvent,
-  type RefObject,
 } from 'react';
 import type { GraphEdge } from '../utils/graphTopology';
 import type { GraphNode } from '../types/portfolio';
@@ -13,8 +12,8 @@ interface GraphCanvasProps {
   edges: GraphEdge[];
   dimmedIds: Set<string>;
   focusedId: string | null;
-  coordTickerRef: RefObject<HTMLSpanElement | null>;
-  onSelect: (id: string) => void;
+  visitedIds: Set<string>;
+  onSelect: (id: string, anchor?: { x: number; y: number }) => void;
 }
 
 interface Size {
@@ -23,31 +22,33 @@ interface Size {
   dpr: number;
 }
 
-interface DraftingTokens {
+interface FluidTokens {
   bg: string;
   surfaceContainer: string;
   text: string;
   muted: string;
   outline: string;
-  grid: string;
-  cyan: string;
-  amber: string;
+  accent: string;
+  nodeUnvisited: string;
+  nodeVisited: string;
+  connection: string;
 }
 
-const DEFAULT_TOKENS: DraftingTokens = {
+const DEFAULT_TOKENS: FluidTokens = {
   bg: '#0a0a0c',
   surfaceContainer: '#18191e',
-  text: '#f4f4f5',
-  muted: '#a1a1aa',
+  text: '#ffffff',
+  muted: '#8e8e93',
   outline: '#71717a',
-  grid: '#27272a',
-  cyan: '#00f0ff',
-  amber: '#eab308',
+  accent: '#3d7fff',
+  nodeUnvisited: '#ffffff',
+  nodeVisited: '#3d7fff',
+  connection: '#ffffff',
 };
 
-const BRIDGE_PROXIMITY = 160;
-const TICKER_IDLE = 'X: --- Y: ---';
 const MONO_FONT = '12px "JetBrains Mono Variable", monospace';
+const BRIDGE_MAX_DISTANCE = 480;
+const BRIDGE_MIN_HALF_WIDTH = 1.1;
 
 function readToken(name: string, fallback: string): string {
   if (typeof window === 'undefined') return fallback;
@@ -55,23 +56,24 @@ function readToken(name: string, fallback: string): string {
   return value || fallback;
 }
 
-function cacheTokens(): DraftingTokens {
+function cacheTokens(): FluidTokens {
   return {
     bg: readToken('--color-bg', DEFAULT_TOKENS.bg),
     surfaceContainer: readToken('--color-surface-container', DEFAULT_TOKENS.surfaceContainer),
     text: readToken('--color-text', DEFAULT_TOKENS.text),
     muted: readToken('--color-muted', DEFAULT_TOKENS.muted),
     outline: readToken('--color-outline', DEFAULT_TOKENS.outline),
-    grid: readToken('--color-grid', DEFAULT_TOKENS.grid),
-    cyan: readToken('--color-cyan', DEFAULT_TOKENS.cyan),
-    amber: readToken('--color-amber', DEFAULT_TOKENS.amber),
+    accent: readToken('--color-accent', DEFAULT_TOKENS.accent),
+    nodeUnvisited: readToken('--color-node-unvisited', DEFAULT_TOKENS.nodeUnvisited),
+    nodeVisited: readToken('--color-node-visited', DEFAULT_TOKENS.nodeVisited),
+    connection: readToken('--color-connection', DEFAULT_TOKENS.connection),
   };
 }
 
 /**
- * Fuse two nearby circles with an organic meniscus bridge. The bridge meets
- * each circle tangentially and narrows toward a waist at the midpoint,
- * mimicking magnetic ferrofluid pulled by a field beneath the plane.
+ * Fuse two nearby circles with an organic meniscus bridge. The cubic fillets
+ * attach flush to each circumference, flare at the contact tangent, and pinch
+ * toward a waist under distance tension — ferrofluid under a magnetic field.
  */
 function drawFluidBridge(
   ctx: CanvasRenderingContext2D,
@@ -86,19 +88,18 @@ function drawFluidBridge(
   const dx = bx - ax;
   const dy = by - ay;
   const distance = Math.hypot(dx, dy);
-  if (distance <= 0 || distance >= BRIDGE_PROXIMITY) return;
+  if (distance <= 0.001) return;
 
   const ux = dx / distance;
   const uy = dy / distance;
   const px = -uy;
   const py = ux;
 
-  const proximity = 1 - distance / BRIDGE_PROXIMITY;
-  const halfWidth = Math.min(radius * 0.98, radius * 0.95 * Math.sqrt(proximity));
-  if (halfWidth < 0.5) return;
-
-  const reach = Math.sqrt(Math.max(0, radius * radius - halfWidth * halfWidth));
-  const waist = halfWidth * 0.35;
+  const tension = Math.max(0.12, 1 - distance / BRIDGE_MAX_DISTANCE);
+  const halfWidth = Math.max(BRIDGE_MIN_HALF_WIDTH, radius * 0.92 * tension);
+  const waist = halfWidth * tension;
+  const theta = Math.asin(Math.min(1, halfWidth / radius));
+  const reach = radius * Math.cos(theta);
   const third = distance / 3;
 
   const aTopX = ax + ux * reach + px * halfWidth;
@@ -140,7 +141,7 @@ export function GraphCanvas({
   edges,
   dimmedIds,
   focusedId,
-  coordTickerRef,
+  visitedIds,
   onSelect,
 }: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -151,16 +152,17 @@ export function GraphCanvas({
   const targetRef = useRef({ x: 0, y: 0 });
   const reduceMotionRef = useRef(false);
   const fontsReadyRef = useRef(false);
-  const tokensRef = useRef<DraftingTokens>(DEFAULT_TOKENS);
+  const tokensRef = useRef<FluidTokens>(DEFAULT_TOKENS);
   const staticPosRef = useRef<Map<string, [number, number]>>(new Map());
   const downPosRef = useRef<{ x: number; y: number } | null>(null);
-  const pointerPosRef = useRef<{ x: number; y: number } | null>(null);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
   const dimmedRef = useRef(dimmedIds);
   dimmedRef.current = dimmedIds;
   const focusedRef = useRef(focusedId);
   focusedRef.current = focusedId;
+  const visitedRef = useRef(visitedIds);
+  visitedRef.current = visitedIds;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -193,19 +195,8 @@ export function GraphCanvas({
     simRef.current = sim;
 
     const ctx = canvas.getContext('2d');
-
     let raf = 0;
     let disposed = false;
-
-    const writeTicker = () => {
-      const ticker = coordTickerRef.current;
-      if (!ticker) return;
-      const pointer = pointerPosRef.current;
-      if (!pointer) return;
-      const x = Math.round(pointer.x).toString().padStart(3, '0');
-      const y = Math.round(pointer.y).toString().padStart(3, '0');
-      ticker.textContent = `X: ${x} Y: ${y}`;
-    };
 
     const render = () => {
       if (!ctx || disposed) return;
@@ -224,17 +215,18 @@ export function GraphCanvas({
 
       const dimmed = dimmedRef.current;
       const focused = focusedRef.current;
+      const visited = visitedRef.current;
       const focalId = focused ?? sim.hovered?.id ?? null;
 
-      // Ferrofluid meniscus bridges: connected nodes in proximity fuse into a
-      // single organic fluid mass. No straight hairlines, casts, or contours.
+      // Pure binary connections. No grayscale, no alpha fade on live edges;
+      // only filtered-out pairs recede to 0.12.
       const nodesById = new Map(sim.nodes.map((n) => [n.id, n]));
       for (const edge of edges) {
         const a = active.get(edge.source);
         const b = active.get(edge.target);
         if (!a || !b) continue;
-        const ra = nodesById.get(edge.source)?.radius ?? 18;
-        const rb = nodesById.get(edge.target)?.radius ?? 18;
+        const ra = nodesById.get(edge.source)?.radius ?? 22;
+        const rb = nodesById.get(edge.target)?.radius ?? 22;
         const isDim = dimmed.has(edge.source) && dimmed.has(edge.target);
         const isFocal = focalId !== null && (edge.source === focalId || edge.target === focalId);
         drawFluidBridge(
@@ -244,13 +236,13 @@ export function GraphCanvas({
           b[0],
           b[1],
           Math.min(ra, rb),
-          isFocal ? tokens.cyan : tokens.text,
-          isDim ? (isFocal ? 0.3 : 0.16) : isFocal ? 0.95 : 0.8,
+          isFocal ? tokens.accent : tokens.connection,
+          isDim ? 0.12 : 1,
         );
       }
 
-      // Pure circular primitives: flat filled discs with crisp edges. Hit
-      // testing remains invariant at the canonical radius (r = 18px).
+      // Pure circular primitives, with a background-matched pill behind each
+      // title so connections can never obstruct the label.
       for (const n of sim.nodes) {
         const pos = active.get(n.id);
         if (!pos) continue;
@@ -259,25 +251,55 @@ export function GraphCanvas({
         const isFocused = focused === n.id;
         const isHovered = !isFocused && sim.hovered?.id === n.id;
         const isActive = isFocused || isHovered;
+        const isVisited = visited.has(n.id) || n.visited === true;
 
         ctx.globalAlpha = isDim ? 0.2 : 1;
         ctx.beginPath();
         ctx.arc(x, y, n.radius, 0, Math.PI * 2);
-        ctx.fillStyle = isActive ? tokens.cyan : tokens.text;
+        ctx.fillStyle = isActive
+          ? tokens.accent
+          : isVisited
+            ? tokens.nodeVisited
+            : tokens.nodeUnvisited;
         ctx.fill();
 
         if (fontsReadyRef.current) {
           ctx.font = MONO_FONT;
-          ctx.fillStyle = isActive ? tokens.cyan : tokens.muted;
+          const labelWidth = ctx.measureText(n.label).width;
+          const pillWidth = labelWidth + 16;
+          const pillHeight = 20;
+          const pillX = x - pillWidth / 2;
+          const pillY = y + n.radius + 8;
+
+          ctx.beginPath();
+          ctx.roundRect(pillX, pillY, pillWidth, pillHeight, pillHeight / 2);
+          ctx.fillStyle = tokens.bg;
+          ctx.fill();
+          ctx.strokeStyle = tokens.outline;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+
+          ctx.fillStyle = isActive ? tokens.accent : tokens.text;
           ctx.textAlign = 'center';
-          ctx.textBaseline = 'alphabetic';
-          ctx.fillText(n.label, x, y + n.radius + 18);
+          ctx.textBaseline = 'middle';
+          ctx.fillText(n.label, x, pillY + pillHeight / 2);
         }
       }
 
       ctx.restore();
       ctx.globalAlpha = 1;
     };
+
+    // Theme switches re-read the CSS custom properties without restarting the
+    // simulation or losing node positions.
+    const themeObserver = new MutationObserver(() => {
+      tokensRef.current = cacheTokens();
+      render();
+    });
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
 
     const loop = () => {
       if (disposed) return;
@@ -288,7 +310,6 @@ export function GraphCanvas({
         t.y += (goal.y - t.y) * 0.12;
         render();
       }
-      writeTicker();
       raf = requestAnimationFrame(loop);
     };
 
@@ -313,8 +334,8 @@ export function GraphCanvas({
       render();
     });
 
-    // Gate canvas typography on the actual variable font file. Physics and
-    // vector geometry animate immediately; text paints on resolution.
+    // Canvas typography waits for the variable mono font; physics and bridges
+    // start immediately and repaint the moment the face resolves.
     document.fonts
       .load(MONO_FONT)
       .then(() => {
@@ -359,12 +380,11 @@ export function GraphCanvas({
     return () => {
       disposed = true;
       observer.disconnect();
+      themeObserver.disconnect();
       cancelAnimationFrame(raf);
       sim.sim.on('tick', null);
       sim.destroy();
       simRef.current = null;
-      pointerPosRef.current = null;
-      if (coordTickerRef.current) coordTickerRef.current.textContent = TICKER_IDLE;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -396,11 +416,24 @@ export function GraphCanvas({
     };
   };
 
+  const nodeScreenPoint = (node: GraphNode): { x: number; y: number } | undefined => {
+    const canvas = canvasRef.current;
+    if (!canvas) return undefined;
+    const pos = reduceMotionRef.current
+      ? staticPosRef.current.get(node.id)
+      : ([node.x, node.y] as [number, number]);
+    if (!pos) return undefined;
+    const rect = canvas.getBoundingClientRect();
+    const t = transformRef.current;
+    return {
+      x: rect.left + pos[0] * t.scale + t.x,
+      y: rect.top + pos[1] * t.scale + t.y,
+    };
+  };
+
   const hitNode = (wx: number, wy: number): GraphNode | null => {
     const sim = simRef.current;
     if (!sim) return null;
-    // Reduced-motion layout is static and lives in staticPosRef; the sim's
-    // live coordinates are not advanced in that mode, so hit-test the ring.
     if (reduceMotionRef.current) {
       for (const n of sim.nodes) {
         const p = staticPosRef.current.get(n.id);
@@ -415,22 +448,13 @@ export function GraphCanvas({
   };
 
   const onPointerMove = (e: ReactPointerEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const rect = canvas.getBoundingClientRect();
-      pointerPosRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-    }
     const sim = simRef.current;
     if (!sim) return;
-    // Reduced motion pauses the simulation; pointer hover/drag would only
-    // mutate pinned forces that are never consumed.
     if (reduceMotionRef.current) return;
     const p = worldPoint(e.clientX, e.clientY);
     if (sim.state === 'drag') {
       sim.dragMove(p.x, p.y);
     } else if (sim.state === 'idle' || sim.state === 'hover') {
-      // Re-evaluate while already hovering so moving from one node straight
-      // onto another pins the new node and unpins the old one.
       sim.hover(hitNode(p.x, p.y));
     }
   };
@@ -454,24 +478,21 @@ export function GraphCanvas({
     const start = downPosRef.current;
     const moved = start ? Math.hypot(p.x - start.x, p.y - start.y) : 10;
     if (reduceMotionRef.current) {
-      // Static layout: a tap still selects a node, but nothing is dragged.
       if (moved < 6) {
         const node = hitNode(p.x, p.y);
-        if (node) onSelectRef.current(node.id);
+        if (node) onSelectRef.current(node.id, nodeScreenPoint(node));
       }
     } else if (sim.state === 'drag') {
       const node = sim.hovered ?? hitNode(p.x, p.y);
       sim.dragEnd();
       if (moved < 6 && node) {
-        onSelectRef.current(node.id);
+        onSelectRef.current(node.id, nodeScreenPoint(node));
       }
     }
     downPosRef.current = null;
   };
 
   const onPointerLeave = () => {
-    pointerPosRef.current = null;
-    if (coordTickerRef.current) coordTickerRef.current.textContent = TICKER_IDLE;
     const sim = simRef.current;
     if (!sim) return;
     if (reduceMotionRef.current) return;
@@ -487,7 +508,7 @@ export function GraphCanvas({
       <canvas
         ref={canvasRef}
         data-testid="graph-canvas"
-        className="block h-full w-full touch-none"
+        className="canvas-interactive block h-full w-full touch-none"
         aria-label="Interactive project force graph. Each node represents a project."
         onPointerMove={onPointerMove}
         onPointerDown={onPointerDown}

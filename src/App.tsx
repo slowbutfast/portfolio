@@ -1,15 +1,36 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { getProjectById, projects } from './data/projects';
 import { deriveEdges } from './utils/graphTopology';
-import type { GraphNode, ParadigmTag, ProjectData } from './types/portfolio';
+import type { GraphNode, ParadigmTag, ProjectData, ThemeMode } from './types/portfolio';
 import { GraphCanvas } from './components/GraphCanvas';
 import { ListView } from './components/ListView';
 import { ControlsOverlay } from './components/ControlsOverlay';
 import { ProjectDrawer } from './components/ProjectDrawer';
 
 type ViewMode = 'graph' | 'list';
+type CanvasAnchor = { x: number; y: number };
 
 const ALL_TAGS = Array.from(new Set<ParadigmTag>(projects.flatMap((p) => p.tags)));
+
+function readStoredTheme(): ThemeMode {
+  try {
+    return localStorage.getItem('portfolio_theme') === 'light' ? 'light' : 'dark';
+  } catch {
+    return 'dark';
+  }
+}
+
+function readStoredVisited(): Set<string> {
+  try {
+    const raw = localStorage.getItem('portfolio_visited');
+    if (!raw) return new Set();
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((value): value is string => typeof value === 'string'));
+  } catch {
+    return new Set();
+  }
+}
 
 export default function App() {
   const [view, setView] = useState<ViewMode>('graph');
@@ -17,24 +38,43 @@ export default function App() {
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [focusedId, setFocusedId] = useState<string | null>(null);
+  const [theme, setTheme] = useState<ThemeMode>(readStoredTheme);
+  const [visitedIds, setVisitedIds] = useState<Set<string>>(readStoredVisited);
+  const [drawerAnchor, setDrawerAnchor] = useState<CanvasAnchor | null>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
-  const coordTickerRef = useRef<HTMLSpanElement>(null);
-
-  // The canvas owns the live ticker while mounted. In list view the canvas is
-  // unmounted, so guarantee the drafting idle readout here as well.
-  useEffect(() => {
-    if (view === 'list' && coordTickerRef.current) {
-      coordTickerRef.current.textContent = 'X: --- Y: ---';
-    }
-  }, [view]);
+  const selectedIdRef = useRef<string | null>(null);
 
   const selected = selectedId ? getProjectById(selectedId) ?? null : null;
 
   const edges = useMemo(() => deriveEdges(projects), []);
   const graphNodes: GraphNode[] = useMemo(
-    () => projects.map((p) => ({ id: p.id, label: p.title, radius: 18, x: 0, y: 0 })),
+    () =>
+      projects.map((project) => ({
+        id: project.id,
+        label: project.title,
+        radius: 22,
+        x: 0,
+        y: 0,
+      })),
     [],
   );
+
+  useLayoutEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    try {
+      localStorage.setItem('portfolio_theme', theme);
+    } catch {
+      // Private browsing / storage denial: the in-memory theme still applies.
+    }
+  }, [theme]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('portfolio_visited', JSON.stringify([...visitedIds]));
+    } catch {
+      // Non-fatal: visited styling still works for this session.
+    }
+  }, [visitedIds]);
 
   const matchesFilters = useCallback(
     (project: ProjectData): boolean => {
@@ -58,19 +98,29 @@ export default function App() {
     return dimmed;
   }, [matchesFilters]);
 
-  const openProject = useCallback((id: string) => {
+  const openProject = useCallback((id: string, anchor?: CanvasAnchor) => {
     if (!getProjectById(id)) return;
     if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) {
       triggerRef.current = document.activeElement;
     }
+    setVisitedIds((previous) => {
+      if (previous.has(id)) return previous;
+      const next = new Set(previous);
+      next.add(id);
+      return next;
+    });
+    selectedIdRef.current = id;
     setSelectedId(id);
+    setDrawerAnchor(anchor ?? null);
     if (window.location.hash !== `#/p/${id}`) {
       window.location.hash = `#/p/${id}`;
     }
   }, []);
 
   const closeDrawer = useCallback(() => {
+    selectedIdRef.current = null;
     setSelectedId(null);
+    setDrawerAnchor(null);
     // Clear the hash without adding a history entry, so the browser Back
     // button doesn't reopen the drawer the user just dismissed.
     if (window.location.hash) {
@@ -84,9 +134,13 @@ export default function App() {
       const match = window.location.hash.match(/^#\/p\/(.+)$/);
       const id = match ? decodeURIComponent(match[1]) : null;
       if (id && getProjectById(id)) {
+        if (selectedIdRef.current !== id) setDrawerAnchor(null);
+        selectedIdRef.current = id;
         setSelectedId(id);
       } else {
+        selectedIdRef.current = null;
         setSelectedId(null);
+        setDrawerAnchor(null);
       }
     };
     parseHash();
@@ -108,8 +162,14 @@ export default function App() {
     setSearch('');
   }, []);
 
+  const toggleTheme = useCallback(() => {
+    setTheme((current) => (current === 'dark' ? 'light' : 'dark'));
+  }, []);
+
   return (
-    <div className="relative h-full w-full overflow-hidden bg-[#0a0a0c] text-[#f4f4f5]">
+    <div className="relative h-full w-full overflow-hidden bg-[var(--color-bg)] text-[var(--color-text)]">
+      <h1 className="sr-only">Portfolio</h1>
+
       <ControlsOverlay
         view={view}
         onViewChange={setView}
@@ -119,7 +179,8 @@ export default function App() {
         search={search}
         onSearchChange={setSearch}
         onReset={resetFilters}
-        coordTickerRef={coordTickerRef}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
 
       <main className="absolute inset-0">
@@ -129,24 +190,30 @@ export default function App() {
             edges={edges}
             dimmedIds={dimmedIds}
             focusedId={view === 'graph' ? focusedId : null}
-            coordTickerRef={coordTickerRef}
+            visitedIds={visitedIds}
             onSelect={openProject}
           />
         ) : (
-          <ListView projects={projects} dimmedIds={dimmedIds} onSelect={openProject} />
+          <ListView
+            projects={projects}
+            dimmedIds={dimmedIds}
+            onSelect={(id) => openProject(id)}
+          />
         )}
       </main>
 
       <nav
         aria-label="Projects"
         className="sr-only"
-        onFocus={(e) => {
+        onFocus={(event) => {
           if (view !== 'graph') return;
-          const id = (e.target as HTMLElement).dataset.projectId;
+          const id = (event.target as HTMLElement).dataset.projectId;
           setFocusedId(id ?? null);
         }}
-        onBlur={(e) => {
-          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocusedId(null);
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            setFocusedId(null);
+          }
         }}
       >
         {projects.map((project) => (
@@ -163,7 +230,14 @@ export default function App() {
         ))}
       </nav>
 
-      {selected && <ProjectDrawer key={selected.id} project={selected} onClose={closeDrawer} />}
+      {selected && (
+        <ProjectDrawer
+          key={selected.id}
+          project={selected}
+          anchor={drawerAnchor}
+          onClose={closeDrawer}
+        />
+      )}
     </div>
   );
 }

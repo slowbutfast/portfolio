@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, GitBranch, Link2, X } from 'lucide-react';
 import type { Preview, ProjectData } from '../types/portfolio';
 import { projects } from '../data/projects';
-import { formatIndex, formatPlate } from '../utils/drafting';
+import { formatIndex } from '../utils/drafting';
 import { TerminalSimulator } from './TerminalSimulator';
 import { MediaView } from './MediaView';
 
@@ -15,6 +15,7 @@ interface DrawerTab {
 
 interface ProjectDrawerProps {
   project: ProjectData;
+  anchor?: { x: number; y: number } | null;
   onClose: () => void;
 }
 
@@ -36,19 +37,22 @@ function scrambleTitle(target: string, progress: number): string {
   return out;
 }
 
-export function ProjectDrawer({ project, onClose }: ProjectDrawerProps) {
+export function ProjectDrawer({ project, anchor, onClose }: ProjectDrawerProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<TabKind | null>(null);
   const [displayTitle, setDisplayTitle] = useState(project.title);
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
 
   const catalogIndex = projects.findIndex((p) => p.id === project.id);
   const safeIndex = catalogIndex >= 0 ? catalogIndex : 0;
   const indexLabel = formatIndex(safeIndex);
-  const plateLabel = formatPlate(safeIndex);
 
   const tabs = useMemo<DrawerTab[]>(() => {
     const list: DrawerTab[] = [];
-    if (project.terminalDemo) list.push({ kind: 'terminal', label: 'Terminal' });
+    // Terminal is a curated inspector for the Resume Builder only.
+    if (project.id === 'agentic-resume-builder' && project.terminalDemo) {
+      list.push({ kind: 'terminal', label: 'Terminal' });
+    }
     if (project.previews.some((p) => p.kind === 'video' || p.kind === 'screenshot')) {
       list.push({ kind: 'media', label: 'Media' });
     }
@@ -63,8 +67,7 @@ export function ProjectDrawer({ project, onClose }: ProjectDrawerProps) {
   }, [tabs, activeTab]);
 
   // Stepped 12fps character decode, bounded to 350ms. Reduced motion renders
-  // the final string immediately. All timers are cleared on unmount/project
-  // switch (App keys this component by project id).
+  // the final string immediately. All timers clear on unmount/project switch.
   useEffect(() => {
     const reduced =
       typeof window !== 'undefined' &&
@@ -93,6 +96,34 @@ export function ProjectDrawer({ project, onClose }: ProjectDrawerProps) {
       window.clearTimeout(timeout);
     };
   }, [project.id, project.title]);
+
+  // Anchor the HUD card just beside the clicked node and clamp it to the
+  // viewport. Deep links and list selections fall back to a centered card.
+  useLayoutEffect(() => {
+    const place = () => {
+      const panel = panelRef.current;
+      if (!panel) return;
+      const margin = 16;
+      const width = panel.offsetWidth;
+      const height = panel.offsetHeight;
+      const preferredLeft = anchor ? anchor.x + 32 : window.innerWidth / 2 - width / 2;
+      const preferredTop = anchor ? anchor.y - 40 : window.innerHeight / 2 - height / 2;
+      const maxLeft = Math.max(margin, window.innerWidth - width - margin);
+      const maxTop = Math.max(margin, window.innerHeight - height - margin);
+      setPosition({
+        left: Math.min(Math.max(margin, preferredLeft), maxLeft),
+        top: Math.min(Math.max(margin, preferredTop), maxTop),
+      });
+    };
+    place();
+    window.addEventListener('resize', place);
+    const resizeObserver = new ResizeObserver(place);
+    if (panelRef.current) resizeObserver.observe(panelRef.current);
+    return () => {
+      window.removeEventListener('resize', place);
+      resizeObserver.disconnect();
+    };
+  }, [anchor]);
 
   useLayoutEffect(() => {
     const el = panelRef.current;
@@ -144,7 +175,7 @@ export function ProjectDrawer({ project, onClose }: ProjectDrawerProps) {
   return (
     <div className="fixed inset-0 z-40">
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-transparent"
         onClick={onClose}
         aria-hidden="true"
         data-testid="drawer-backdrop"
@@ -155,25 +186,21 @@ export function ProjectDrawer({ project, onClose }: ProjectDrawerProps) {
         aria-modal="true"
         aria-label={`${project.title} project details`}
         data-testid="project-drawer"
-        className="absolute inset-x-0 bottom-0 top-24 overflow-y-auto overflow-x-hidden rounded-none border border-[#27272a] bg-[#111215] text-[#f4f4f5] shadow-2xl md:inset-y-0 md:left-auto md:right-0 md:top-0 md:w-[520px] md:border-y-0 md:border-l"
+        style={
+          position
+            ? { left: position.left, top: position.top }
+            : { left: 0, top: 0, visibility: 'hidden' }
+        }
+        className="fixed z-50 flex max-h-[85vh] w-[min(420px,calc(100vw-2rem))] flex-col overflow-y-auto rounded-2xl border border-[var(--color-outline)] bg-[var(--color-surface)]/95 text-[var(--color-text)] shadow-2xl backdrop-blur-md"
       >
-        <header className="sticky top-0 z-20 overflow-hidden border-b border-[#27272a] bg-[#111215]/95 px-5 py-4 backdrop-blur">
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute -right-1 top-0 select-none font-sans text-[96px] font-extrabold leading-none tracking-tighter text-[#f4f4f5] opacity-[0.08] md:text-[132px]"
-          >
-            {indexLabel}
-          </div>
-          <div className="relative z-10 flex items-start justify-between gap-4">
+        <header className="sticky top-0 z-10 border-b border-[var(--color-divider)] bg-[var(--color-surface)]/95 px-5 py-4 backdrop-blur-md">
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <p className="font-mono text-[10px] uppercase leading-none tracking-[0.18em] text-[#a1a1aa]">
-                {plateLabel} // BUILD // {__COMMIT_HASH__}
-              </p>
-              <p className="mt-1 font-mono text-[10px] uppercase leading-none tracking-[0.18em] text-[#a1a1aa]">
-                {project.classification}
-              </p>
+              <span className="inline-flex items-center rounded-full border border-[var(--color-outline)] px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted)]">
+                {indexLabel}
+              </span>
 
-              <div className="mt-3 grid [grid-template-areas:'title']">
+              <div className="mt-2 grid [grid-template-areas:'title']">
                 <h2 data-testid="drawer-heading" className="sr-only">
                   {project.title}
                 </h2>
@@ -192,24 +219,26 @@ export function ProjectDrawer({ project, onClose }: ProjectDrawerProps) {
                 </span>
               </div>
 
-              <p className="mt-2 text-sm leading-relaxed text-[#a1a1aa]">{project.summary}</p>
+              <p className="mt-2 text-sm leading-relaxed text-[var(--color-muted)]">
+                {project.summary}
+              </p>
             </div>
             <button
               type="button"
               data-testid="drawer-close"
               onClick={onClose}
               aria-label="Close project drawer"
-              className="flex min-h-11 min-w-11 items-center justify-center rounded-none border border-[#71717a] p-2 text-[#a1a1aa] transition-colors hover:border-[#00f0ff] hover:text-[#00f0ff]"
+              className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-[var(--color-outline)] p-2 text-[var(--color-muted)] transition-colors hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
             >
               <X className="h-5 w-5" aria-hidden="true" />
             </button>
           </div>
         </header>
 
-        <div className="relative z-10 px-5 py-4">
+        <div className="px-5 py-4">
           <div className="flex flex-wrap gap-2">
             {project.tags.map((tag) => (
-              <span key={tag} className="bracket-tag text-[#a1a1aa]">
+              <span key={tag} className="fluid-pill">
                 {tag}
               </span>
             ))}
@@ -219,7 +248,7 @@ export function ProjectDrawer({ project, onClose }: ProjectDrawerProps) {
             <div
               role="tablist"
               aria-label="Preview tabs"
-              className="mt-4 flex gap-1 border-b border-[#27272a]"
+              className="mt-4 flex flex-wrap gap-1 border-b border-[var(--color-divider)] pb-2"
             >
               {tabs.map((tab) => (
                 <button
@@ -229,11 +258,9 @@ export function ProjectDrawer({ project, onClose }: ProjectDrawerProps) {
                   aria-selected={activeTab === tab.kind}
                   data-testid={`preview-tab-${tab.kind}`}
                   onClick={() => setActiveTab(tab.kind)}
-                  className={
-                    activeTab === tab.kind
-                      ? 'min-h-11 rounded-none border-b-2 border-[#00f0ff] px-3 py-2 font-mono text-xs uppercase tracking-wider text-[#00f0ff] md:min-h-0'
-                      : 'min-h-11 rounded-none border-b-2 border-transparent px-3 py-2 font-mono text-xs uppercase tracking-wider text-[#a1a1aa] transition-colors hover:text-[#f4f4f5] md:min-h-0'
-                  }
+                  className={`fluid-pill min-h-11 md:min-h-0 ${
+                    activeTab === tab.kind ? 'fluid-pill-active' : ''
+                  }`}
                 >
                   {tab.label}
                 </button>
@@ -255,7 +282,7 @@ export function ProjectDrawer({ project, onClose }: ProjectDrawerProps) {
                     href={project.repo}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex min-h-11 items-center gap-2 rounded-none border border-[#71717a] px-3 py-2 font-mono text-xs text-[#a1a1aa] transition-colors hover:border-[#00f0ff] hover:text-[#00f0ff] md:min-h-0"
+                    className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--color-outline)] px-3 py-2 font-mono text-xs text-[var(--color-muted)] transition-colors hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] md:min-h-0"
                   >
                     <GitBranch className="h-4 w-4" aria-hidden="true" /> {project.repo}
                   </a>
@@ -266,7 +293,7 @@ export function ProjectDrawer({ project, onClose }: ProjectDrawerProps) {
                       href={project.liveUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex min-h-11 items-center gap-2 rounded-none border border-[#71717a] px-3 py-2 font-mono text-xs text-[#a1a1aa] transition-colors hover:border-[#00f0ff] hover:text-[#00f0ff] md:min-h-0"
+                      className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--color-outline)] px-3 py-2 font-mono text-xs text-[var(--color-muted)] transition-colors hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] md:min-h-0"
                     >
                       <ExternalLink className="h-4 w-4" aria-hidden="true" /> Launch live app
                     </a>
@@ -278,7 +305,7 @@ export function ProjectDrawer({ project, onClose }: ProjectDrawerProps) {
                       href={p.url}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex min-h-11 items-center gap-2 rounded-none border border-[#71717a] px-3 py-2 font-mono text-xs text-[#a1a1aa] transition-colors hover:border-[#00f0ff] hover:text-[#00f0ff] md:min-h-0"
+                      className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--color-outline)] px-3 py-2 font-mono text-xs text-[var(--color-muted)] transition-colors hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] md:min-h-0"
                     >
                       <Link2 className="h-4 w-4" aria-hidden="true" /> {p.label}
                     </a>

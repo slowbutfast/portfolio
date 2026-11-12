@@ -42,13 +42,13 @@ export interface GraphSimulation {
   destroy(): void;
 }
 
-const NODE_RADIUS = 18;
-const BOUNDARY_MARGIN = 40;
-const COLLIDE_RADIUS = 30;
-const LINK_DISTANCE = 180;
+const NODE_RADIUS = 22;
+const BOUNDARY_MARGIN = 48;
+const COLLIDE_RADIUS = 36;
+const LINK_DISTANCE = 210;
 const LINK_STRENGTH = 0.05;
 const CENTER_STRENGTH = 0.035;
-const CHARGE_SCALE = 0.55;
+const CHARGE_SCALE = 0.65;
 const MAX_FLING = 15;
 const VELOCITY_DECAY_IDLE = 0.4;
 const VELOCITY_DECAY_COAST = 0.18;

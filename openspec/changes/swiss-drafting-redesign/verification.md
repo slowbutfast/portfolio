@@ -248,3 +248,29 @@ PATCH-01 supersedes the ornamental rows of the matrix above: background drafting
 | Visual capture | Confirmed pure void, no grid/crosshairs/crop marks, cyan focal node with ferrofluid bridges |
 
 Patch tasks `P01.1`–`P01.6` are marked complete in `tasks.md`; `patch.md` status is `RESOLVED`.
+
+## PATCH-02 — Fluid Minimalist & Organic Constructivist Refinement (2026-11-12)
+
+PATCH-02 supersedes the remaining PATCH-01 ornamental rows: the top banner, visible `SYS.PORTFOLIO` title, coordinate ticker, and cyan accent are gone. The interface now uses Helvetica, a floating `Filters ▾` popover, pure binary connections, larger ferrofluid nodes, a node-anchored HUD inspector, and persistent dark/light themes.
+
+| Check | Result |
+| :--- | :--- |
+| `npm run typecheck` | PASS — exit 0, 0 diagnostics |
+| `npm run test:unit` | PASS — 27/27 |
+| `npx @google/design.md lint DESIGN.md` | PASS — 0 errors, 0 warnings |
+| `npm run build` | PASS — 0 `data:font` occurrences |
+| `npm run test:e2e` | PASS — 44 passed, 2 intentional mobile skips |
+| Axe WCAG 2.0 A/AA — dark | 0 violations in Graph, List, Drawer |
+| Axe WCAG 2.0 A/AA — light | 0 violations in Graph, List, Drawer |
+| Anchored inspector | Canvas selection positions the card beside the clicked node and clamps it to the viewport |
+| Visited persistence | Opening a project writes its id to `localStorage.portfolio_visited` |
+| Theme persistence | Theme survives reload via `localStorage.portfolio_theme` |
+| Data preservation | 6 projects, pinned order, 9 derived edges, previews and terminal commands untouched |
+
+### Resolved design assumptions
+
+1. **Light interactive boundary.** The PATCH-02 brief listed `#c7c7cc`, but that fails WCAG 1.4.11 (≈1.6:1 on `#f6f6f4`). Interactive outlines use `#8e8e93` (≈3:1); `#c7c7cc` is retained as the decorative divider token.
+2. **Connection width.** Bridges are drawn for every connected pair with a minimum half-width so the topology stays legible; width tapers toward a pinched waist with distance tension.
+3. **Anchored tooltip regression.** The initial implementation lost the anchor when `openProject` wrote the hash and the `hashchange` handler reset it. The handler now preserves the anchor for the same project id; an e2e regression test covers the anchored offset.
+4. **Terminal scope.** Only `agentic-resume-builder` exposes the Terminal tab; all other projects render Media/Link only.
+5. **Font imports.** `main.tsx` still imports the PATCH-01 Space Grotesk font package (outside the PATCH-02 target map); the active UI font is Helvetica, and removing the unused import can be a follow-up cleanup.

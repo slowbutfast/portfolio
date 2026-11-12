@@ -10,6 +10,9 @@ export type ParadigmTag =
 
 export type TerminalStatus = 'ok' | 'warn' | 'error';
 
+/** Light and dark presentation modes for the portfolio shell. */
+export type ThemeMode = 'dark' | 'light';
+
 export interface TerminalCommand {
   command: string;
   output: string[];
@@ -53,4 +56,6 @@ export interface GraphNode {
   fx?: number | null;
   fy?: number | null;
   radius: number;
+  /** True once the project has been opened, persisted across visits. */
+  visited?: boolean;
 }

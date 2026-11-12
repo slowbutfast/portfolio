@@ -50,4 +50,4 @@
   - `e2e/portfolio.spec.ts`
 - **Expected Resolution**:
   The portfolio operates in pure Fluid Minimalist mode with a clean void canvas, crosshair cursor, 20% larger circular nodes, pure binary connections, floating carat dropdown for filters/views/theme, floating video-game HUD inspector tooltip, background knockout title pills, Helvetica typography, and dual light/dark themes. All unit, e2e, and lint tests pass.
-- **Status**: PENDING
+- **Status**: RESOLVED
