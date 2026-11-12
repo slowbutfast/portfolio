@@ -83,7 +83,7 @@ The application is configured for the Vercel Edge CDN. Because navigation is ful
    - **Framework Preset**: `Vite`
    - **Build Command**: `npm run build`
    - **Output Directory**: `dist`
-5. Click **Deploy**. Vercel builds and serves the app on the global edge network, with preview deployments for every pull request and automatic production updates on push to `master`.
+5. Click **Deploy**. Vercel builds and serves the app on the global edge network, with preview deployments for every pull request and automatic production updates on push to the project's configured production branch (see [Promotion and Rollback](#promotion-and-rollback)).
 
 ### Option B: Vercel CLI
 
@@ -107,10 +107,48 @@ npx vercel --prod
 
 ### Validating a Live Preview Deployment
 
-Run all 16 Playwright E2E tests against a Vercel preview deployment to verify zero CSP console violations:
+Run the Playwright E2E suite against a Vercel preview deployment to verify zero CSP console violations and the served headers:
 
 ```bash
 PREVIEW_URL=https://portfolio-git-<branch>.vercel.app npm run test:e2e
 ```
 
-When `PREVIEW_URL` is set, Playwright targets the live edge deployment and skips booting a local dev server.
+When `PREVIEW_URL` is set, Playwright targets the live edge deployment, skips booting a local dev server, and also runs `e2e/preview-headers.spec.ts`, which compares the served CSP, security headers, font cache headers, and 404 behavior against the `edge-deployment` spec.
+
+Previews are normally behind Vercel Deployment Protection. Set the project's **Protection Bypass for Automation** secret so requests are authorised; the suite fails fast with a clear message if it hits the Vercel login page instead of the app:
+
+```bash
+PREVIEW_URL=https://portfolio-git-<branch>.vercel.app \
+VERCEL_AUTOMATION_BYPASS_SECRET=<secret> \
+npm run test:e2e
+```
+
+With the secret set, Playwright tracing is forced off because traces record request headers and would leak the secret into any uploaded report. Two tests are skipped against a deployment because they depend on a development build (the React Profiler zero-commit check).
+
+### Checking Headers Locally Before Deploying
+
+`vite dev` and `vite preview` do not apply the headers from `vercel.json`, so the strict CSP is otherwise only exercised on a real deployment. To approximate it locally:
+
+```bash
+npm run build
+node scripts/serve-with-vercel-headers.mjs          # serves dist/ on :5198 with vercel.json headers
+PREVIEW_URL=http://localhost:5198 npx playwright test
+```
+
+This is an approximation of the Vercel edge (it applies the `vercel.json` header rules and returns real 404s, but does not reproduce anything else Vercel adds), so a preview deployment remains the authoritative check.
+
+### Release Gating (CI)
+
+- **`ci` (pull requests)**: `npm run typecheck`, `npm run build`, `npm run test:unit` (with `REQUIRE_DIST=1` so the build-output guards run), then `npm run test:e2e` against the local server. Mark it as a required check in branch protection.
+- **`deployment-gate` (Vercel deployments)**: when Vercel dispatches a `vercel.deployment.success` `repository_dispatch` event, runs the E2E suite and header assertions against the preview (using the bypass secret), or the header assertions and load check against production, then posts a `preview-e2e` or `production-smoke` commit status. Mark `preview-e2e` as required once it has reported once.
+- GitHub reads `repository_dispatch` workflows from the repository's **default branch**, so `deployment-gate` must be merged there before it fires. (`deployment_status` is not used: Vercel does not create GitHub Deployments for this project.)
+- Every per-deployment URL, including production ones, is behind Deployment Protection, so the gate always needs the bypass secret. Only the production alias is public.
+- Repository secret needed: `VERCEL_AUTOMATION_BYPASS_SECRET` (from the Vercel project's Protection Bypass for Automation).
+
+### Promotion and Rollback
+
+- **Production branch**: the branch Vercel promotes to production is set in the Vercel project's **Settings > Git**. It defaults to the repository's default branch, which is not necessarily `master`; confirm it there before relying on merge-to-promote.
+- **Promotion**: merge to the production branch. Vercel builds (`tsc --noEmit && vite build`) and promotes; `deployment-gate` then verifies the production headers and load.
+- **Rollback**: in the Vercel dashboard open **Deployments**, pick the last good production deployment, and choose **Instant Rollback** (or `vercel rollback <deployment-url>`). This repoints the production alias without rebuilding. Plan limits on which deployments can be rolled back to depend on your Vercel plan; check yours before you need it.
+- **Roll back when**: browsers report CSP violations on production, fonts fall back to system faces, the production header check fails, or an accessibility regression ships.
+- **Header spot-check after any rollout**: `curl -sI https://<deployment-url>/` (CSP, nosniff), and `curl -sI` a `.woff2` URL from the page (`font/woff2`, `immutable`).
