@@ -11,11 +11,12 @@ export default async function globalSetup(): Promise<void> {
 
   // Trim: a secret pasted into a CI settings form often carries a trailing newline.
   const secret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim() || undefined;
+  // Only the bypass header here. `x-vercel-set-bypass-cookie` answers with a
+  // redirect that sets a cookie; Node's fetch has no cookie jar, so it would
+  // follow that redirect until "redirect count exceeded". Playwright keeps
+  // cookies, so playwright.config.ts can and does send both headers.
   const headers: Record<string, string> = {};
-  if (secret) {
-    headers['x-vercel-protection-bypass'] = secret;
-    headers['x-vercel-set-bypass-cookie'] = 'true';
-  }
+  if (secret) headers['x-vercel-protection-bypass'] = secret;
 
   // A transient network error should not fail the whole gate, so retry briefly.
   // Node's fetch reports every network failure as a bare "fetch failed"; the
