@@ -1,11 +1,19 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { getProjectById, projects } from './data/projects';
 import { deriveEdges } from './utils/graphTopology';
-import type { GraphNode, ParadigmTag, ProjectData, ThemeMode } from './types/portfolio';
+import type {
+  GraphNode,
+  HoverState,
+  ParadigmTag,
+  ProjectData,
+  ThemeMode,
+} from './types/portfolio';
 import { GraphCanvas } from './components/GraphCanvas';
 import { ListView } from './components/ListView';
 import { ControlsOverlay } from './components/ControlsOverlay';
 import { ProjectDrawer } from './components/ProjectDrawer';
+import { AboutModal } from './components/AboutModal';
+import { NodeHoverCard } from './components/NodeHoverCard';
 
 type ViewMode = 'graph' | 'list';
 type CanvasAnchor = { x: number; y: number };
@@ -41,6 +49,8 @@ export default function App() {
   const [theme, setTheme] = useState<ThemeMode>(readStoredTheme);
   const [visitedIds, setVisitedIds] = useState<Set<string>>(readStoredVisited);
   const [drawerAnchor, setDrawerAnchor] = useState<CanvasAnchor | null>(null);
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const [hoverState, setHoverState] = useState<HoverState>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
   const selectedIdRef = useRef<string | null>(null);
 
@@ -98,8 +108,36 @@ export default function App() {
     return dimmed;
   }, [matchesFilters]);
 
+  const openAbout = useCallback(() => {
+    setIsAboutOpen(true);
+    setHoverState(null);
+    if (window.location.hash !== '#/about') {
+      window.location.hash = '#/about';
+    }
+  }, []);
+
+  const closeAbout = useCallback(() => {
+    setIsAboutOpen(false);
+    if (window.location.hash === '#/about') {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, []);
+
+  const handleHoverNode = useCallback(
+    (project: ProjectData | null, position: CanvasAnchor | null) => {
+      setHoverState(project && position ? { project, position } : null);
+    },
+    [],
+  );
+
+  const handleResolveAnchor = useCallback((id: string, anchor: CanvasAnchor) => {
+    if (selectedIdRef.current === id) setDrawerAnchor(anchor);
+  }, []);
+
   const openProject = useCallback((id: string, anchor?: CanvasAnchor) => {
     if (!getProjectById(id)) return;
+    setIsAboutOpen(false);
+    setHoverState(null);
     if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) {
       triggerRef.current = document.activeElement;
     }
@@ -131,6 +169,15 @@ export default function App() {
 
   useEffect(() => {
     const parseHash = () => {
+      if (window.location.hash === '#/about') {
+        setIsAboutOpen(true);
+        setHoverState(null);
+        selectedIdRef.current = null;
+        setSelectedId(null);
+        setDrawerAnchor(null);
+        return;
+      }
+      setIsAboutOpen(false);
       const match = window.location.hash.match(/^#\/p\/(.+)$/);
       const id = match ? decodeURIComponent(match[1]) : null;
       if (id && getProjectById(id)) {
@@ -181,6 +228,7 @@ export default function App() {
         onReset={resetFilters}
         theme={theme}
         onToggleTheme={toggleTheme}
+        onOpenAbout={openAbout}
       />
 
       <main className="absolute inset-0">
@@ -191,6 +239,9 @@ export default function App() {
             dimmedIds={dimmedIds}
             focusedId={view === 'graph' ? focusedId : null}
             visitedIds={visitedIds}
+            initialSelectedId={selectedId}
+            onHoverNode={handleHoverNode}
+            onResolveAnchor={handleResolveAnchor}
             onSelect={openProject}
           />
         ) : (
@@ -229,6 +280,12 @@ export default function App() {
           </button>
         ))}
       </nav>
+
+      {hoverState && !selectedId && !isAboutOpen && (
+        <NodeHoverCard project={hoverState.project} position={hoverState.position} />
+      )}
+
+      <AboutModal isOpen={isAboutOpen} onClose={closeAbout} />
 
       {selected && (
         <ProjectDrawer

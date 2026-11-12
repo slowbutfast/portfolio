@@ -1,6 +1,6 @@
 import { MonitorPlay, Terminal, Image as ImageIcon, ExternalLink } from 'lucide-react';
 import type { ProjectData } from '../types/portfolio';
-import { formatIndex, formatPlate } from '../utils/drafting';
+import { formatIndex } from '../utils/drafting';
 
 interface ListViewProps {
   projects: ProjectData[];
@@ -24,16 +24,10 @@ export function ListView({ projects, dimmedIds, onSelect }: ListViewProps) {
   return (
     <div className="h-full overflow-y-auto px-4 pb-8 pt-24 md:px-8 md:pt-28">
       <div className="mx-auto max-w-6xl">
-        <div className="mb-3 flex items-baseline justify-between gap-4 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted)]">
-          <span>PROJECT INDEX // 06 ENTRIES</span>
-          <span>ASYMMETRIC PUBLICATION</span>
-        </div>
-
         <div className="grid gap-px overflow-hidden rounded-2xl border border-[var(--color-divider)] bg-[var(--color-divider)] md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
           {projects.map((project, i) => {
             const dimmed = dimmedIds.has(project.id);
             const index = formatIndex(i);
-            const plate = formatPlate(i);
             // Every third entry stretches across both columns to create the
             // asymmetric Swiss rhythm while keeping a strict two-column grid.
             const wide = i % 3 === 0;
@@ -60,10 +54,7 @@ export function ListView({ projects, dimmedIds, onSelect }: ListViewProps) {
                   </span>
                 </div>
 
-                <p className="mt-4 font-mono text-[10px] uppercase leading-none tracking-[0.18em] text-[var(--color-muted)]">
-                  {plate} // {project.classification}
-                </p>
-                <h2 className="mt-2 text-xl font-semibold leading-tight text-[var(--color-text)]">
+                <h2 className="mt-4 text-xl font-semibold leading-tight text-[var(--color-text)]">
                   {project.title}
                 </h2>
                 <p className="mt-2 flex-1 text-sm leading-relaxed text-[var(--color-muted)]">
@@ -71,9 +62,6 @@ export function ListView({ projects, dimmedIds, onSelect }: ListViewProps) {
                 </p>
 
                 <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-[var(--color-divider)] pt-3">
-                  <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted)]">
-                    {plate}
-                  </span>
                   {project.tags.map((tag) => (
                     <span key={tag} className="fluid-pill">
                       {tag}

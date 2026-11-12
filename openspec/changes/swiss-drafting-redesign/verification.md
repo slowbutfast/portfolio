@@ -274,3 +274,32 @@ PATCH-02 supersedes the remaining PATCH-01 ornamental rows: the top banner, visi
 3. **Anchored tooltip regression.** The initial implementation lost the anchor when `openProject` wrote the hash and the `hashchange` handler reset it. The handler now preserves the anchor for the same project id; an e2e regression test covers the anchored offset.
 4. **Terminal scope.** Only `agentic-resume-builder` exposes the Terminal tab; all other projects render Media/Link only.
 5. **Font imports.** `main.tsx` still imports the PATCH-01 Space Grotesk font package (outside the PATCH-02 target map); the active UI font is Helvetica, and removing the unused import can be a follow-up cleanup.
+
+## PATCH-03 — Visual Portfolio Showcase & Hover Media Refinement (2026-11-12)
+
+PATCH-03 adds the personal showcase layer on top of the fluid minimal shell: a naked floating top bar for Gregory Lazatin, instant node-hover media previews, an accessible About modal, stroke-free canvas title knockouts, cold-load deep-link anchoring, reduced-motion filter repainting, and residual caption removal.
+
+| Check | Result |
+| :--- | :--- |
+| `npm run typecheck` | PASS — exit 0, 0 diagnostics |
+| `npm run test:unit` | PASS — 27/27 |
+| `npx @google/design.md lint DESIGN.md` | PASS — 0 errors, 0 warnings |
+| `npm run build` | PASS — 0 `data:font` occurrences |
+| `npm run test:e2e` | PASS — 59 passed, 5 intentional skips |
+| Axe WCAG 2.0 A/AA — dark | 0 violations: Graph, List, Drawer, About modal, Hover card |
+| Axe WCAG 2.0 A/AA — light | 0 violations: Graph, List, Drawer, About modal, Hover card |
+| Top bar | `Gregory Lazatin`, `About`, `GitHub ↗`, `Grid`/`Graph`, `Filters ▾` render without a background, border, or pill wrapper |
+| Hover media card | Node hover shows the project screenshot/video, title, `Click to inspect ↗`, summary, and tags; clears on leave |
+| About modal | Button and `#/about` deep link open it; Escape, close button, and backdrop dismiss it with the hash cleared |
+| Deep-link anchoring | Cold load `#/p/open-dungeon` positions the inspector beside the node (observed `left: 906.65px`, not the 510px centered fallback) |
+| Reduced-motion filtering | Tag toggles repaint the static ring through the `dimmedIds` effect; semantic dimming and canvas pixels verified |
+| Caption cleansing | ListView index/classification/plate stamps removed; MediaView figcaptions removed while alt/aria labels remain |
+
+### Resolved implementation assumptions
+
+1. **Target map.** The PATCH-03 handoff's strict map lists 10 files and omits `ProjectDrawer`; `patch.md` lists ProjectDrawer but the patch requires no drawer changes. The 10-file handoff map was followed.
+2. **Hover card state.** App owns the hover state as specified. GraphCanvas emits only on hover enter/leave, so plain pointer movement remains commit-free; the Profiler e2e now samples the node-free bottom edge of the canvas.
+3. **Hover capability.** The preview card is emitted only when `(hover: hover) and (pointer: fine)` matches; touch/mobile interactions continue to open the inspector directly.
+4. **Deep-link settling.** Anchors are emitted on mount and refreshed every 300ms for 3 seconds while physics settles, then stop. Updates are ignored unless the same project remains selected.
+5. **Title knockout.** Canvas title pills are fill-only (`tokens.bg`); no stroke, outline, or border is drawn.
+6. **Media captions.** Figcaptions are removed visually; captions remain as `alt`/`aria-label` so media stays accessible.

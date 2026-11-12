@@ -4,7 +4,8 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import type { GraphEdge } from '../utils/graphTopology';
-import type { GraphNode } from '../types/portfolio';
+import type { GraphNode, ProjectData } from '../types/portfolio';
+import { getProjectById } from '../data/projects';
 import { createSimulation, type GraphSimulation } from '../physics/graphSimulation';
 
 interface GraphCanvasProps {
@@ -13,6 +14,12 @@ interface GraphCanvasProps {
   dimmedIds: Set<string>;
   focusedId: string | null;
   visitedIds: Set<string>;
+  initialSelectedId?: string | null;
+  onHoverNode?: (
+    project: ProjectData | null,
+    position: { x: number; y: number } | null,
+  ) => void;
+  onResolveAnchor?: (id: string, anchor: { x: number; y: number }) => void;
   onSelect: (id: string, anchor?: { x: number; y: number }) => void;
 }
 
@@ -142,6 +149,9 @@ export function GraphCanvas({
   dimmedIds,
   focusedId,
   visitedIds,
+  initialSelectedId,
+  onHoverNode,
+  onResolveAnchor,
   onSelect,
 }: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -163,6 +173,13 @@ export function GraphCanvas({
   focusedRef.current = focusedId;
   const visitedRef = useRef(visitedIds);
   visitedRef.current = visitedIds;
+  const onHoverNodeRef = useRef(onHoverNode);
+  onHoverNodeRef.current = onHoverNode;
+  const onResolveAnchorRef = useRef(onResolveAnchor);
+  onResolveAnchorRef.current = onResolveAnchor;
+  const hoveredProjectIdRef = useRef<string | null>(null);
+  const canHoverRef = useRef(false);
+  const renderRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     const container = containerRef.current;
@@ -173,6 +190,7 @@ export function GraphCanvas({
 
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     reduceMotionRef.current = reduceMotion;
+    canHoverRef.current = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
     const simNodes = nodes.map((n) => ({ id: n.id }));
     const simLinks = edges.map((e) => ({ source: e.source, target: e.target }));
@@ -275,9 +293,6 @@ export function GraphCanvas({
           ctx.roundRect(pillX, pillY, pillWidth, pillHeight, pillHeight / 2);
           ctx.fillStyle = tokens.bg;
           ctx.fill();
-          ctx.strokeStyle = tokens.outline;
-          ctx.lineWidth = 1;
-          ctx.stroke();
 
           ctx.fillStyle = isActive ? tokens.accent : tokens.text;
           ctx.textAlign = 'center';
@@ -289,6 +304,7 @@ export function GraphCanvas({
       ctx.restore();
       ctx.globalAlpha = 1;
     };
+    renderRef.current = render;
 
     // Theme switches re-read the CSS custom properties without restarting the
     // simulation or losing node positions.
@@ -389,6 +405,42 @@ export function GraphCanvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Reduced motion pauses the rAF loop, so filtered dimming needs an explicit
+  // repaint when dimmedIds changes.
+  useEffect(() => {
+    if (reduceMotionRef.current) renderRef.current();
+  }, [dimmedIds]);
+
+  // Deep links open immediately; keep the inspector anchored while the physics
+  // settles from its initial ring positions.
+  useEffect(() => {
+    if (!initialSelectedId) return;
+    const emit = () => {
+      const sim = simRef.current;
+      const canvas = canvasRef.current;
+      if (!sim || !canvas) return;
+      const node = sim.findNode(initialSelectedId);
+      if (!node) return;
+      const pos = reduceMotionRef.current
+        ? staticPosRef.current.get(node.id)
+        : ([node.x, node.y] as [number, number]);
+      if (!pos) return;
+      const rect = canvas.getBoundingClientRect();
+      const t = transformRef.current;
+      onResolveAnchorRef.current?.(initialSelectedId, {
+        x: rect.left + pos[0] * t.scale + t.x,
+        y: rect.top + pos[1] * t.scale + t.y,
+      });
+    };
+    emit();
+    const interval = window.setInterval(emit, 300);
+    const stop = window.setTimeout(() => window.clearInterval(interval), 3000);
+    return () => {
+      window.clearInterval(interval);
+      window.clearTimeout(stop);
+    };
+  }, [initialSelectedId]);
+
   useEffect(() => {
     const goal = targetRef.current;
     const sim = simRef.current;
@@ -431,6 +483,20 @@ export function GraphCanvas({
     };
   };
 
+  const emitHover = (node: GraphNode | null) => {
+    const nextId = node?.id ?? null;
+    if (nextId === hoveredProjectIdRef.current) return;
+    hoveredProjectIdRef.current = nextId;
+    if (!node) {
+      onHoverNodeRef.current?.(null, null);
+      return;
+    }
+    const project = getProjectById(node.id) ?? null;
+    const anchor = nodeScreenPoint(node);
+    if (project && anchor) onHoverNodeRef.current?.(project, anchor);
+    else onHoverNodeRef.current?.(null, null);
+  };
+
   const hitNode = (wx: number, wy: number): GraphNode | null => {
     const sim = simRef.current;
     if (!sim) return null;
@@ -450,18 +516,24 @@ export function GraphCanvas({
   const onPointerMove = (e: ReactPointerEvent<HTMLCanvasElement>) => {
     const sim = simRef.current;
     if (!sim) return;
-    if (reduceMotionRef.current) return;
     const p = worldPoint(e.clientX, e.clientY);
     if (sim.state === 'drag') {
+      emitHover(null);
       sim.dragMove(p.x, p.y);
-    } else if (sim.state === 'idle' || sim.state === 'hover') {
-      sim.hover(hitNode(p.x, p.y));
+      return;
+    }
+    const node = hitNode(p.x, p.y);
+    if (canHoverRef.current) emitHover(node);
+    if (reduceMotionRef.current) return;
+    if (sim.state === 'idle' || sim.state === 'hover') {
+      sim.hover(node);
     }
   };
 
   const onPointerDown = (e: ReactPointerEvent<HTMLCanvasElement>) => {
     const sim = simRef.current;
     if (!sim) return;
+    emitHover(null);
     const p = worldPoint(e.clientX, e.clientY);
     const node = hitNode(p.x, p.y);
     downPosRef.current = { x: p.x, y: p.y };
@@ -493,6 +565,7 @@ export function GraphCanvas({
   };
 
   const onPointerLeave = () => {
+    emitHover(null);
     const sim = simRef.current;
     if (!sim) return;
     if (reduceMotionRef.current) return;

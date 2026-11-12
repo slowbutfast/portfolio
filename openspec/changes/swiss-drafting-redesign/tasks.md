@@ -70,11 +70,11 @@
 
 ## Patch 03: Visual Portfolio Showcase & Hover Media Refinement
 
-- [ ] P03.1 Update `DESIGN.md` to define visual portfolio identity: Gregory Lazatin floating header typography, hover media card specs, About modal dialog tokens, and borderless text pill knockout, ensuring 0 linter errors
-- [ ] P03.2 Implement `src/components/AboutModal.tsx` dialog featuring Gregory Lazatin's bio, focus areas (agent tooling, audio physics, generative systems), GitHub link, and accessible Escape/close controls
-- [ ] P03.3 Implement `src/components/NodeHoverCard.tsx` displaying rich media previews (video clip/screenshot), title, tags, and summary, positioned adjacent to hovered nodes with viewport collision clamping
-- [ ] P03.4 Redesign `src/components/ControlsOverlay.tsx` into an uncluttered floating top bar with no pill/background container: "Gregory Lazatin" on the top left, and "About", "GitHub ↗", "Grid" / "Graph", "Filters ▾" on the top right
-- [ ] P03.5 Refactor `src/components/GraphCanvas.tsx`: remove 1px stroke outline from project title pills (fill only with `tokens.bg`), emit hover coordinates for `NodeHoverCard`, fix reduced-motion filter repaint bug via reactive `dimmedIds` effect, and expose node screen anchor resolver for deep links
-- [ ] P03.6 Update `src/App.tsx`: manage `AboutModal` state, wire `NodeHoverCard` hover state, support `#/about` hash routing, and calculate deep-link anchor coordinates on cold load
-- [ ] P03.7 Cleanse residual captions: strip index headers and classification stamps from `src/components/ListView.tsx`, and remove figcaptions from `src/components/MediaView.tsx`
-- [ ] P03.8 Update `e2e/portfolio.spec.ts` to verify Gregory Lazatin title, About modal interactions, hover card rendering, and full regression suite (`typecheck`, `unit`, `e2e`, axe WCAG A/AA in dark & light, `build`)
+- [x] P03.1 Update `DESIGN.md` to define visual portfolio identity: Gregory Lazatin floating header typography, hover media card specs, About modal dialog tokens, and borderless text pill knockout, ensuring 0 linter errors
+- [x] P03.2 Implement `src/components/AboutModal.tsx` dialog featuring Gregory Lazatin's bio, focus areas (agent tooling, audio physics, generative systems), GitHub link, and accessible Escape/close controls
+- [x] P03.3 Implement `src/components/NodeHoverCard.tsx` displaying rich media previews (video clip/screenshot), title, tags, and summary, positioned adjacent to hovered nodes with viewport collision clamping
+- [x] P03.4 Redesign `src/components/ControlsOverlay.tsx` into an uncluttered floating top bar with no pill/background container: "Gregory Lazatin" on the top left, and "About", "GitHub ↗", "Grid" / "Graph", "Filters ▾" on the top right
+- [x] P03.5 Refactor `src/components/GraphCanvas.tsx`: remove 1px stroke outline from project title pills (fill only with `tokens.bg`), emit hover coordinates for `NodeHoverCard`, fix reduced-motion filter repaint bug via reactive `dimmedIds` effect, and expose node screen anchor resolver for deep links
+- [x] P03.6 Update `src/App.tsx`: manage `AboutModal` state, wire `NodeHoverCard` hover state, support `#/about` hash routing, and calculate deep-link anchor coordinates on cold load
+- [x] P03.7 Cleanse residual captions: strip index headers and classification stamps from `src/components/ListView.tsx`, and remove figcaptions from `src/components/MediaView.tsx`
+- [x] P03.8 Update `e2e/portfolio.spec.ts` to verify Gregory Lazatin title, About modal interactions, hover card rendering, and full regression suite (`typecheck`, `unit`, `e2e`, axe WCAG A/AA in dark & light, `build`)

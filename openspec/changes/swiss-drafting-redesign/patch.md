@@ -80,4 +80,4 @@
   - `e2e/portfolio.spec.ts`
 - **Expected Resolution**:
   The website acts as an immediate, stunning portfolio for Gregory Lazatin with instant hover media cards on the graph, an uncluttered floating top bar, an About modal, stroke-free title knockout pills, 100% clean reduced-motion filtering, anchored deep links, and zero residual CAD captions. All tests and linter suites pass.
-- **Status**: PENDING
+- **Status**: RESOLVED

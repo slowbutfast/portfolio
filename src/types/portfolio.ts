@@ -59,3 +59,9 @@ export interface GraphNode {
   /** True once the project has been opened, persisted across visits. */
   visited?: boolean;
 }
+
+/** Viewport-space point used to anchor hover cards and the inspector tooltip. */
+export type HoverAnchor = { x: number; y: number };
+
+/** Active node-hover preview state, or null when no node is hovered. */
+export type HoverState = { project: ProjectData; position: HoverAnchor } | null;

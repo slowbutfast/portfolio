@@ -53,6 +53,7 @@ typography:
     lineHeight: 16px
     letterSpacing: 0.08em
 rounded:
+  none: 0px
   sm: 8px
   md: 12px
   lg: 16px
@@ -65,6 +66,16 @@ spacing:
   margin-mobile: 16px
   margin-desktop: 32px
 components:
+  site-header:
+    backgroundColor: transparent
+    textColor: "{colors.on-surface}"
+    typography: "{typography.label-md}"
+    rounded: "{rounded.none}"
+  nav-link:
+    backgroundColor: transparent
+    textColor: "{colors.on-surface-variant}"
+    typography: "{typography.label-md}"
+    rounded: "{rounded.full}"
   floating-filters:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.on-surface}"
@@ -79,6 +90,21 @@ components:
     rounded: "{rounded.full}"
     padding: 8px
     height: 32px
+  hover-media-card:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.on-surface}"
+    typography: "{typography.body-md}"
+    rounded: "{rounded.xl}"
+  about-modal:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.on-surface}"
+    typography: "{typography.body-md}"
+    rounded: "{rounded.xl}"
+  title-knockout:
+    backgroundColor: "{colors.background}"
+    textColor: "{colors.on-background}"
+    typography: "{typography.label-md}"
+    rounded: "{rounded.full}"
   inspector-tooltip:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.on-surface}"
@@ -93,7 +119,7 @@ components:
 
 ## Overview
 
-The portfolio is a **fluid minimalist** instrument: an expansive themed void where pure circular primitives, organic ferrofluid connections, and Helvetica typography carry the entire visual identity. Persistent HUD furniture is reduced to a single floating `Filters ▾` control; project inspection appears as a contextual HUD tooltip beside the selected node.
+The portfolio is a **fluid minimalist personal showcase** for Gregory Lazatin: an expansive themed void where pure circular primitives, organic ferrofluid connections, instant media previews, and Helvetica typography carry the entire visual identity. A naked floating top bar frames the work; a `Filters ▾` popover holds search and filtering; hovering a node reveals a media card; and project inspection opens as a contextual HUD tooltip beside the selected node.
 
 Root `DESIGN.md` is the authoritative visual identity definition for the project.
 
@@ -121,6 +147,12 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 - Interactive boundaries remain at least 3:1 against their background in both themes.
 - Theme state persists in `localStorage`; visited project state also persists.
 
+### 5. Human Identity & Discoverability
+- The top-left wordmark is the author's name (`Gregory Lazatin`), rendered as naked typography with no pill, panel, or background container.
+- Top-right navigation is equally bare: `About`, `GitHub ↗`, `Grid` / `Graph`, and `Filters ▾`.
+- Hovering any node on a fine-pointer device immediately reveals a floating media card with its video or screenshot, title, tags, and summary.
+- The About modal carries the biography, focus areas, contact, and GitHub profile.
+
 ---
 
 ## Color System
@@ -145,6 +177,7 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 | Level | Family | Size | Weight | Usage |
 | :--- | :--- | :--- | :--- | :--- |
 | `Display Macro` | Helvetica | `96px` | `800` | List index numerals |
+| `Wordmark` | Helvetica | `18–28px` | `700` | `Gregory Lazatin` floating brand |
 | `H1` | Helvetica | `28px` | `700` | Screen-reader-only page title |
 | `H2` | Helvetica | `20px` | `600` | Project titles in list and inspector |
 | `Body` | Helvetica | `15px` | `400` | Summaries and descriptions |
@@ -155,26 +188,36 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 
 ## Component Anatomy
 
-### Floating Filters (`Filters ▾`)
-- Top-right circular pill trigger with `aria-expanded` and an accessible name of `Filters & Navigation`.
-- Popover card (`rounded-2xl`, backdrop blur) contains Graph/List view toggle, search, stackable tag pills, reset, and the light/dark theme switch.
-- Selecting a view closes the popover; filters and theme remain open for rapid adjustment.
+### Floating Top Bar
+- Naked typography floating directly over the canvas: `Gregory Lazatin` at top-left; `About`, `GitHub ↗`, `Grid` / `Graph`, and `Filters ▾` at top-right.
+- No background fill, no border, and no pill wrapper around the top bar or its text links.
+- Clicking the wordmark resets filters and returns to graph view. The view toggle lives in the bar; `Filters` opens a `rounded-2xl` popover containing search, stackable tag pills, reset, and the theme switch.
+
+### Instant Node Hover Media Card
+- On fine-pointer hover over any graph node, a `rounded-2xl` media card appears adjacent to the node (`+28px, -40px`) and clamps to a 20px viewport margin.
+- Shows the project's video clip when available, otherwise a screenshot, otherwise a CLI specimen panel; follows with title, `Click to inspect ↗`, a two-line summary, and tags.
+- `pointer-events-none` so the underlying node remains clickable; hidden while the inspector or About modal is open.
+
+### About Modal
+- Accessible `role="dialog"` / `aria-modal="true"` card with focus trap, Escape dismissal, backdrop click, and focus restoration.
+- Contains the `Gregory Lazatin` wordmark, `Creative Technologist & Software Engineer` subtitle, bio, focus-area pills, contact line, and `https://github.com/slowbutfast` link.
 
 ### Canvas Primitives & Ferrofluid Bridges
 - Pure flat circles at `r = 22px`; visited nodes in cobalt; hovered/focused nodes in the active accent.
 - Cubic meniscus bridges attach flush to both circumferences, flare at the contact tangent, and narrow at the midpoint as distance increases.
-- Title knockout pills are drawn in the canvas with the theme background, a 1px outline, and the label text.
+- Title knockout pills are filled with the theme background only — no stroke, no outline, no border.
 - Cursor: `crosshair`.
 
 ### Floating Inspector Tooltip
 - Positioned beside the clicked node with `(+32px, -40px)` offset, clamped to the viewport with a 16px margin.
+- Deep links resolve the target node's screen position on cold load and keep the card anchored while physics settles.
 - `rounded-2xl` card, maximum width `420px`, maximum height `85vh`, blurred surface, sticky header.
 - Terminal tab is curated for `agentic-resume-builder` only; other projects present Media and Link tabs.
 - Plate, build SHA, and classification captions are omitted.
 
-### Publication List
-- Asymmetric two-column Swiss editorial rhythm with monumental index numerals and fluid pill tags.
-- Reduced top padding so the layout begins in the upper void below the floating filter trigger.
+### Publication List & Media
+- Asymmetric two-column Swiss editorial rhythm with monumental index numerals and fluid pill tags; index/classification stamps are omitted.
+- Media previews render video and screenshots without figcaption captions; accessible names live on the media elements.
 
 ---
 
@@ -191,8 +234,8 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 
 | Viewport | Pattern | Rules |
 | :--- | :--- | :--- |
-| Mobile `< 768px` | Centered/clamped inspector card, stacked filter popover | Touch targets ≥44px, safe-area insets |
-| Desktop `≥ 768px` | HUD tooltip beside node, floating filter pill | Compact mono metadata, crosshair canvas |
+| Mobile `< 768px` | Wrapped naked top bar, clamped inspector card, stacked filter popover | Touch targets ≥44px, safe-area insets; hover card disabled on coarse pointers |
+| Desktop `≥ 768px` | Naked top bar, HUD tooltip beside node, hover media card | Compact mono metadata, crosshair canvas |
 
 ---
 
@@ -200,6 +243,9 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 
 - **DO** keep connections pure binary (`#ffffff` dark, `#000000` light).
 - **DO** use International Klein Blue `#003399` as the brand accent, with `#3d7fff` for dark-mode focus.
+- **DO** keep the top bar as naked typography — no background panel, border, or pill wrapper.
+- **DO** fill canvas title knockout pills with the theme background only; never stroke them.
+- **DO** reveal an instant hover media card on fine-pointer devices.
 - **DO** keep the canvas void free of grids, tickers, crop marks, crosshairs on nodes, and captions.
 - **DO** use `rounded-full` for controls/chips and `rounded-2xl` for floating cards.
 - **DON'T** render the terminal for any project other than `agentic-resume-builder`.
