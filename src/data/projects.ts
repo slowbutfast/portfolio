@@ -31,6 +31,7 @@ export const projects = [
     title: 'OpenDungeon',
     summary:
       'Generative text-adventure engine with a 20-tool MCP server and an OAuth-gated multiplayer canvas.',
+    classification: 'GENERATIVE ADVENTURE // MCP RUNTIME',
     tags: ['Express', 'Vanilla JS', 'LLM', 'Agent Tooling'],
     repo: 'https://github.com/slowbutfast/open-dungeon',
     liveUrl: 'https://open-dungeon-three.vercel.app/',
@@ -46,6 +47,7 @@ export const projects = [
     title: 'Agentic Resume Builder',
     summary:
       'Python CLI that renders tailored LaTeX resumes from structured YAML via an argparse-driven build pipeline.',
+    classification: 'AGENTIC DOCUMENT PIPELINE // LaTeX',
     tags: ['Agent Tooling', 'LaTeX'],
     repo: 'https://github.com/slowbutfast/agentic-resume-builder',
     previews: [{ kind: 'terminal', label: 'Terminal' }],
@@ -56,6 +58,7 @@ export const projects = [
     title: 'PICT Climate Risk Viz',
     summary:
       'Geospatial climate-risk chat and raster visualization built on an Express backend with React 19.',
+    classification: 'GEOSPATIAL CLIMATE INTELLIGENCE // RASTER VIZ',
     tags: ['Express', 'LLM', 'Geospatial'],
     repo: 'https://github.com/BrownEarthLab/pict-climate-risk-viz-chatbot',
     previews: [
@@ -76,6 +79,7 @@ export const projects = [
     title: 'Transcribe Plus',
     summary:
       'Local transcription workspace with a Vite + Express 5 monorepo and an offline product demo video.',
+    classification: 'LOCAL AUDIO TRANSCRIPTION // MONOREPO',
     tags: ['Express', 'Vanilla JS', 'Audio'],
     repo: 'https://github.com/slowbutfast/transcribe-plus',
     previews: [
@@ -90,6 +94,7 @@ export const projects = [
     title: 'Sandwave Sim',
     summary:
       'Vanilla JS Chladni plate acoustic simulator rendering nodal-line sand patterns with Web Audio.',
+    classification: 'ACOUSTIC PHYSICS SIMULATION // CHLADNI PLATES',
     tags: ['Vanilla JS', 'Audio'],
     repo: 'https://github.com/slowbutfast/sandwave-sim',
     previews: [
@@ -104,6 +109,7 @@ export const projects = [
     title: 'Attention Max',
     summary:
       'Firefox MV3 extension that gamifies focus sessions with a popup timer and an options dashboard.',
+    classification: 'FOCUS PROTOCOL EXTENSION // MV3',
     tags: ['Vanilla JS', 'WebExtension'],
     repo: 'https://github.com/slowbutfast/attention-max-public',
     previews: [

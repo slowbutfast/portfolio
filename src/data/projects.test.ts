@@ -25,6 +25,25 @@ describe('project catalog contract', () => {
     }
   });
 
+  it('declares a non-empty classification on all 6 projects', () => {
+    expect(projects).toHaveLength(6);
+    for (const p of projects) {
+      expect(typeof p.classification, `${p.id} classification type`).toBe('string');
+      expect(p.classification.trim().length, `${p.id} classification empty`).toBeGreaterThan(0);
+    }
+  });
+
+  it('preserves the pinned catalog order and ids', () => {
+    expect(projects.map((p) => p.id)).toEqual([
+      'open-dungeon',
+      'agentic-resume-builder',
+      'pict-climate-risk-viz-chatbot',
+      'transcribe-plus',
+      'sandwave-sim',
+      'attention-max',
+    ]);
+  });
+
   it('declares a discriminated preview union on every project', () => {
     for (const p of projects) {
       expect(p.previews.length).toBeGreaterThan(0);

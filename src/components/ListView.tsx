@@ -1,5 +1,6 @@
 import { MonitorPlay, Terminal, Image as ImageIcon, ExternalLink } from 'lucide-react';
 import type { ProjectData } from '../types/portfolio';
+import { formatIndex } from '../utils/drafting';
 
 interface ListViewProps {
   projects: ProjectData[];
@@ -21,39 +22,56 @@ function previewIcons(project: ProjectData) {
 
 export function ListView({ projects, dimmedIds, onSelect }: ListViewProps) {
   return (
-    <div className="h-full overflow-y-auto px-4 pb-8 pt-48 md:px-8 md:pt-36">
-      <div className="mx-auto grid max-w-6xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {projects.map((project) => {
-          const dimmed = dimmedIds.has(project.id);
-          return (
-            <button
-              key={project.id}
-              type="button"
-              data-testid={`card-${project.id}`}
-              data-dimmed={dimmed ? 'true' : 'false'}
-              onClick={() => onSelect(project.id)}
-              className={`group flex flex-col rounded-xl border border-stone-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-stone-400 hover:shadow-md ${
-                dimmed ? 'opacity-30' : 'opacity-100'
-              }`}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="text-base font-semibold text-stone-900">{project.title}</h2>
-                <span className="flex items-center gap-1.5 text-stone-400">{previewIcons(project)}</span>
-              </div>
-              <p className="mt-2 flex-1 text-sm leading-relaxed text-stone-500">{project.summary}</p>
-              <div className="mt-4 flex flex-wrap gap-1.5">
-                {project.tags.map((tag) => (
+    <div className="h-full overflow-y-auto px-4 pb-8 pt-24 md:px-8 md:pt-28">
+      <div className="mx-auto max-w-6xl">
+        <div className="grid gap-px overflow-hidden rounded-2xl border border-[var(--color-divider)] bg-[var(--color-divider)] md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+          {projects.map((project, i) => {
+            const dimmed = dimmedIds.has(project.id);
+            const index = formatIndex(i);
+            // Every third entry stretches across both columns to create the
+            // asymmetric Swiss rhythm while keeping a strict two-column grid.
+            const wide = i % 3 === 0;
+            return (
+              <button
+                key={project.id}
+                type="button"
+                data-testid={`card-${project.id}`}
+                data-dimmed={dimmed ? 'true' : 'false'}
+                onClick={() => onSelect(project.id)}
+                className={`group relative flex min-h-11 flex-col bg-[var(--color-bg)] p-6 text-left transition-colors hover:bg-[var(--color-surface)] md:p-8 ${
+                  wide ? 'md:col-span-2' : ''
+                } ${dimmed ? 'opacity-30' : 'opacity-100'}`}
+              >
+                <div className="flex items-start justify-between gap-4">
                   <span
-                    key={tag}
-                    className="rounded-full border border-stone-300 px-2 py-0.5 text-[11px] text-stone-500"
+                    aria-hidden="true"
+                    className="select-none font-sans text-[64px] font-extrabold leading-none tracking-tighter text-[var(--color-divider)] transition-colors group-hover:text-[var(--color-outline)] md:text-[96px]"
                   >
-                    {tag}
+                    {index}
                   </span>
-                ))}
-              </div>
-            </button>
-          );
-        })}
+                  <span className="flex items-center gap-1.5 text-[var(--color-muted)]">
+                    {previewIcons(project)}
+                  </span>
+                </div>
+
+                <h2 className="mt-4 text-xl font-semibold leading-tight text-[var(--color-text)]">
+                  {project.title}
+                </h2>
+                <p className="mt-2 flex-1 text-sm leading-relaxed text-[var(--color-muted)]">
+                  {project.summary}
+                </p>
+
+                <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-[var(--color-divider)] pt-3">
+                  {project.tags.map((tag) => (
+                    <span key={tag} className="fluid-pill">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

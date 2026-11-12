@@ -10,6 +10,9 @@ export type ParadigmTag =
 
 export type TerminalStatus = 'ok' | 'warn' | 'error';
 
+/** Light and dark presentation modes for the portfolio shell. */
+export type ThemeMode = 'dark' | 'light';
+
 export interface TerminalCommand {
   command: string;
   output: string[];
@@ -33,6 +36,8 @@ export interface ProjectData {
   id: string;
   title: string;
   summary: string;
+  /** Curated uppercase engineering classification, e.g. "AGENTIC ... // ...". */
+  classification: string;
   tags: ParadigmTag[];
   repo: string;
   liveUrl?: string;
@@ -51,4 +56,12 @@ export interface GraphNode {
   fx?: number | null;
   fy?: number | null;
   radius: number;
+  /** True once the project has been opened, persisted across visits. */
+  visited?: boolean;
 }
+
+/** Viewport-space point used to anchor hover cards and the inspector tooltip. */
+export type HoverAnchor = { x: number; y: number };
+
+/** Active node-hover preview state, or null when no node is hovered. */
+export type HoverState = { project: ProjectData; position: HoverAnchor } | null;

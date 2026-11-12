@@ -7,10 +7,10 @@ interface TerminalSimulatorProps {
 }
 
 function lineClass(line: string): string {
-  if (line.includes('[ok]')) return 'text-emerald-400';
-  if (line.includes('[warn]')) return 'text-amber-400';
-  if (line.includes('[error]')) return 'text-red-400';
-  return 'text-stone-300';
+  if (line.includes('[ok]')) return 'text-[#22c55e]';
+  if (line.includes('[warn]')) return 'text-[#eab308]';
+  if (line.includes('[error]')) return 'text-[#ef4444]';
+  return 'text-[#d4d4d8]';
 }
 
 export function TerminalSimulator({ demo }: TerminalSimulatorProps) {
@@ -52,24 +52,28 @@ export function TerminalSimulator({ demo }: TerminalSimulatorProps) {
 
   return (
     <div
-      className="overflow-hidden rounded-lg border border-stone-800 bg-stone-950 text-[13px] leading-relaxed"
+      className="overflow-hidden rounded-none border border-[#27272a] bg-[#08080a] font-mono text-[13px] leading-relaxed"
       data-testid="terminal"
+      data-prompt={demo.prompt}
+      title={demo.prompt}
     >
-      <div className="flex items-center gap-2 border-b border-stone-800 px-3 py-2">
-        <span className="h-3 w-3 rounded-full bg-red-500/80" />
-        <span className="h-3 w-3 rounded-full bg-amber-500/80" />
-        <span className="h-3 w-3 rounded-full bg-emerald-500/80" />
-        <span className="ml-2 text-xs text-stone-500">terminal — {demo.prompt}</span>
+      <div className="flex items-center gap-2 border-b border-[#27272a] bg-[#0e0f12] px-3 py-2">
+        <span className="h-2.5 w-2.5 rounded-full bg-[#ef4444]/80" aria-hidden="true" />
+        <span className="h-2.5 w-2.5 rounded-full bg-[#eab308]/80" aria-hidden="true" />
+        <span className="h-2.5 w-2.5 rounded-full bg-[#22c55e]/80" aria-hidden="true" />
+        <span className="ml-2 text-[10px] uppercase tracking-[0.18em] text-[#a1a1aa]">
+          TERMINAL // SESSION
+        </span>
       </div>
 
-      <div className="flex flex-wrap gap-2 border-b border-stone-800 px-3 py-2">
+      <div className="flex flex-wrap gap-2 border-b border-[#27272a] px-3 py-2">
         {chips.map((cmd) => (
           <button
             key={cmd}
             type="button"
             data-testid="command-chip"
             onClick={() => execute(cmd)}
-            className="rounded border border-stone-700 px-2 py-1 font-mono text-[12px] text-stone-300 transition hover:border-emerald-500 hover:text-emerald-400"
+            className="min-h-11 rounded-none border border-[#71717a] px-2 py-1 text-[12px] text-[#a1a1aa] transition-colors hover:border-[#00f0ff] hover:text-[#00f0ff] focus-visible:border-[#00f0ff] focus-visible:text-[#00f0ff] md:min-h-0"
           >
             {cmd}
           </button>
@@ -79,39 +83,46 @@ export function TerminalSimulator({ demo }: TerminalSimulatorProps) {
       <div
         ref={outputRef}
         data-testid="terminal-output"
-        className="h-56 overflow-y-auto px-3 py-2 font-mono text-[12px]"
+        className="h-56 overflow-y-auto px-3 py-2 text-[12px]"
         aria-live="polite"
       >
         {entries.length === 0 && (
-          <p className="text-stone-600">Run a command chip above, or type one and press Enter.</p>
+          <p className="text-[#a1a1aa]">Run a command chip above, or type one and press Enter.</p>
         )}
         {entries.map((entry, i) => (
           <div key={i} className="mb-3">
-            <div className="text-stone-500">
-              {demo.prompt} <span className="text-stone-200">{entry.command}</span>
+            <div className="flex gap-2">
+              <span aria-hidden="true" className="text-[#00f0ff]">
+                &gt;_
+              </span>
+              <span className="text-[#f4f4f5]">{entry.command}</span>
             </div>
             {entry.output.map((line, j) => (
               <div key={j} className={lineClass(line)}>
                 {line || '\u00a0'}
               </div>
             ))}
-            <div
-              className={
+            <span
+              data-testid="exit-status"
+              className={`mt-1 inline-flex items-center border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] ${
                 entry.exitCode === 0
-                  ? 'text-emerald-400'
-                  : entry.exitCode === 127
-                    ? 'text-red-400'
-                    : 'text-amber-400'
-              }
+                  ? 'border-[#22c55e]/60 text-[#22c55e]'
+                  : 'border-[#eab308] text-[#eab308]'
+              }`}
             >
               exit code {entry.exitCode}
-            </div>
+            </span>
           </div>
         ))}
       </div>
 
-      <form onSubmit={onSubmit} className="flex items-center gap-2 border-t border-stone-800 px-3 py-2 font-mono">
-        <span className="text-emerald-400">{demo.prompt}</span>
+      <form
+        onSubmit={onSubmit}
+        className="flex items-center gap-2 border-t border-[#27272a] bg-[#0e0f12] px-3 py-2"
+      >
+        <span aria-hidden="true" className="shrink-0 text-[#00f0ff]">
+          &gt;_
+        </span>
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -121,7 +132,7 @@ export function TerminalSimulator({ demo }: TerminalSimulatorProps) {
           spellCheck={false}
           aria-label="Terminal command input"
           placeholder="type a command…"
-          className="w-full bg-transparent text-stone-200 outline-none placeholder:text-stone-600"
+          className="min-h-11 w-full bg-transparent text-[#f4f4f5] outline-none placeholder:text-[#71717a] md:min-h-0"
         />
       </form>
     </div>

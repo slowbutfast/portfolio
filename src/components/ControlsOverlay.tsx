@@ -1,5 +1,6 @@
-import { List, Network, RotateCcw, Search } from 'lucide-react';
-import type { ParadigmTag } from '../types/portfolio';
+import { ChevronDown, Moon, RotateCcw, Search, Sun } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import type { ParadigmTag, ThemeMode } from '../types/portfolio';
 
 type ViewMode = 'graph' | 'list';
 
@@ -12,7 +13,16 @@ interface ControlsOverlayProps {
   search: string;
   onSearchChange: (query: string) => void;
   onReset: () => void;
+  theme: ThemeMode;
+  onToggleTheme: () => void;
+  onOpenAbout: () => void;
 }
+
+const safe = (side: 'top' | 'right' | 'bottom' | 'left', offset: string) =>
+  `calc(env(safe-area-inset-${side}) + ${offset})`;
+
+const bareText =
+  'inline-flex min-h-11 items-center text-[var(--color-muted)] transition-colors hover:text-[var(--color-text)] md:min-h-0';
 
 export function ControlsOverlay({
   view,
@@ -23,95 +33,172 @@ export function ControlsOverlay({
   search,
   onSearchChange,
   onReset,
+  theme,
+  onToggleTheme,
+  onOpenAbout,
 }: ControlsOverlayProps) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    const handlePointer = (event: PointerEvent) => {
+      const root = rootRef.current;
+      if (root && !root.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener('keydown', handleKey);
+    document.addEventListener('pointerdown', handlePointer);
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+      document.removeEventListener('pointerdown', handlePointer);
+    };
+  }, [open]);
+
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col gap-2 p-3 md:p-4">
-      <div className="pointer-events-auto flex flex-wrap items-center gap-2 rounded-xl border border-stone-200 bg-white/85 p-2 shadow-sm backdrop-blur md:gap-3">
-        <div className="flex items-center gap-2 px-1">
-          <span className="h-3 w-3 rounded-full bg-stone-900" aria-hidden="true" />
-          <h1 className="text-sm font-semibold tracking-tight text-stone-900">Node Portfolio Graph</h1>
-        </div>
-
-        <div
-          className="ml-auto flex items-center gap-0.5 rounded-lg border border-stone-200 bg-white p-0.5"
-          role="group"
-          aria-label="View mode"
+    <div ref={rootRef} className="pointer-events-none absolute inset-0 z-40">
+      <header
+        className="pointer-events-auto absolute inset-x-0 top-0 flex flex-wrap items-center gap-x-4 gap-y-1"
+        style={{
+          paddingTop: safe('top', '1rem'),
+          paddingLeft: safe('left', '1rem'),
+          paddingRight: safe('right', '1rem'),
+        }}
+      >
+        <button
+          type="button"
+          data-testid="brand-home"
+          onClick={() => {
+            onReset();
+            onViewChange('graph');
+          }}
+          className="text-base font-bold tracking-tight text-[var(--color-text)] transition-colors hover:text-[var(--color-accent)] md:text-lg"
         >
-          <button
-            type="button"
-            data-testid="view-toggle-graph"
-            aria-pressed={view === 'graph'}
-            onClick={() => onViewChange('graph')}
-            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm transition ${
-              view === 'graph'
-                ? 'bg-stone-900 text-white'
-                : 'text-stone-600 hover:bg-stone-100'
-            }`}
-          >
-            <Network className="h-4 w-4" /> Graph
-          </button>
-          <button
-            type="button"
-            data-testid="view-toggle-list"
-            aria-pressed={view === 'list'}
-            onClick={() => onViewChange('list')}
-            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm transition ${
-              view === 'list'
-                ? 'bg-stone-900 text-white'
-                : 'text-stone-600 hover:bg-stone-100'
-            }`}
-          >
-            <List className="h-4 w-4" /> List
-          </button>
-        </div>
-      </div>
+          Gregory Lazatin
+        </button>
 
-      <div className="pointer-events-auto flex flex-wrap items-center gap-2 rounded-xl border border-stone-200 bg-white/85 p-2 shadow-sm backdrop-blur">
-        {availableTags.map((tag) => {
-          const active = activeTags.has(tag);
-          return (
+        <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs md:gap-x-6">
+          <button type="button" data-testid="nav-about" onClick={onOpenAbout} className={bareText}>
+            About
+          </button>
+          <a
+            href="https://github.com/slowbutfast"
+            target="_blank"
+            rel="noreferrer"
+            data-testid="nav-github"
+            className={`${bareText} gap-1`}
+          >
+            GitHub <span aria-hidden="true">↗</span>
+          </a>
+          <button
+            type="button"
+            data-testid="view-toggle"
+            aria-label={view === 'graph' ? 'Switch to list view' : 'Switch to graph view'}
+            onClick={() => onViewChange(view === 'graph' ? 'list' : 'graph')}
+            className={bareText}
+          >
+            {view === 'graph' ? 'Grid' : 'Graph'}
+          </button>
+
+          <div className="relative">
             <button
-              key={tag}
               type="button"
-              data-testid={`tag-pill-${tag}`}
-              aria-pressed={active}
-              onClick={() => onToggleTag(tag)}
-              className={`rounded-full border px-2.5 py-1 text-xs transition ${
-                active
-                  ? 'border-stone-900 bg-stone-900 text-white'
-                  : 'border-stone-300 text-stone-600 hover:border-stone-500 hover:text-stone-900'
-              }`}
+              data-testid="controls-dropdown-trigger"
+              aria-label="Filters & Navigation"
+              aria-expanded={open}
+              aria-controls="portfolio-controls"
+              onClick={() => setOpen((value) => !value)}
+              className={`${bareText} gap-1`}
             >
-              {tag}
+              Filters
+              <ChevronDown
+                className={`h-3.5 w-3.5 transition-transform duration-200 ${
+                  open ? 'rotate-180' : ''
+                }`}
+                aria-hidden="true"
+              />
             </button>
-          );
-        })}
 
-        <div className="ml-auto flex items-center gap-2">
-          <label className="relative flex items-center">
-            <Search className="pointer-events-none absolute left-2.5 h-4 w-4 text-stone-400" />
-            <input
-              type="search"
-              data-testid="search-input"
-              value={search}
-              onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search projects…"
-              aria-label="Search projects"
-              className="w-44 rounded-lg border border-stone-300 bg-white py-1.5 pl-8 pr-3 text-sm text-stone-800 outline-none transition focus:border-stone-500"
-            />
-          </label>
-          <button
-            type="button"
-            data-testid="reset-filters"
-            onClick={onReset}
-            aria-label="Reset filters"
-            title="Reset filters"
-            className="rounded-lg border border-stone-300 p-1.5 text-stone-500 transition hover:border-stone-500 hover:text-stone-800"
-          >
-            <RotateCcw className="h-4 w-4" />
-          </button>
+            {open && (
+              <div
+                id="portfolio-controls"
+                data-testid="controls-dropdown"
+                className="absolute right-0 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-[var(--color-outline)] bg-[var(--color-surface)]/95 p-4 text-[var(--color-text)] shadow-2xl backdrop-blur-md"
+              >
+                <label className="relative flex items-center">
+                  <Search
+                    className="pointer-events-none absolute left-3 h-4 w-4 text-[var(--color-muted)]"
+                    aria-hidden="true"
+                  />
+                  <input
+                    type="search"
+                    data-testid="search-input"
+                    value={search}
+                    onChange={(event) => onSearchChange(event.target.value)}
+                    placeholder="Search projects…"
+                    aria-label="Search projects"
+                    className="min-h-11 w-full rounded-full border border-[var(--color-outline)] bg-[var(--color-bg)] py-2 pl-9 pr-3 font-mono text-xs text-[var(--color-text)] outline-none transition-colors placeholder:text-[var(--color-muted)] focus:border-[var(--color-accent)] md:min-h-9"
+                  />
+                </label>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {availableTags.map((tag) => {
+                    const active = activeTags.has(tag);
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        data-testid={`tag-pill-${tag}`}
+                        aria-label={tag}
+                        aria-pressed={active}
+                        onClick={() => onToggleTag(tag)}
+                        className={`fluid-pill min-h-11 md:min-h-0 ${
+                          active ? 'fluid-pill-active' : ''
+                        }`}
+                      >
+                        {tag}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-4 flex items-center justify-between gap-2 border-t border-[var(--color-divider)] pt-3">
+                  <button
+                    type="button"
+                    data-testid="theme-toggle"
+                    aria-label={
+                      theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'
+                    }
+                    aria-pressed={theme === 'light'}
+                    onClick={onToggleTheme}
+                    className="fluid-pill min-h-11 md:min-h-0"
+                  >
+                    {theme === 'dark' ? (
+                      <Sun className="h-4 w-4" aria-hidden="true" />
+                    ) : (
+                      <Moon className="h-4 w-4" aria-hidden="true" />
+                    )}
+                    {theme === 'dark' ? 'Light' : 'Dark'}
+                  </button>
+
+                  <button
+                    type="button"
+                    data-testid="reset-filters"
+                    onClick={onReset}
+                    aria-label="Reset filters"
+                    className="fluid-pill min-h-11 md:min-h-0"
+                  >
+                    <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                    Reset
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      </header>
     </div>
   );
 }

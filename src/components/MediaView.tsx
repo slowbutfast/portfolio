@@ -16,13 +16,12 @@ export function MediaView({ previews }: MediaViewProps) {
               controls
               preload="metadata"
               aria-label={preview.caption}
-              className="max-h-72 w-full rounded-lg border border-stone-800 bg-black"
+              className="max-h-72 w-full rounded-xl border border-[var(--color-outline)] bg-[var(--color-bg)]"
               poster={preview.poster}
             >
               <source src={preview.src} type="video/mp4" />
               Your browser does not support HTML5 video.
             </video>
-            <figcaption className="mt-2 text-sm text-stone-400">{preview.caption}</figcaption>
           </figure>
         ) : (
           <figure key={i}>
@@ -30,9 +29,8 @@ export function MediaView({ previews }: MediaViewProps) {
               src={preview.src}
               alt={preview.caption}
               loading="lazy"
-              className="w-full rounded-lg border border-stone-800"
+              className="w-full rounded-xl border border-[var(--color-outline)]"
             />
-            <figcaption className="mt-2 text-sm text-stone-400">{preview.caption}</figcaption>
           </figure>
         ),
       )}
