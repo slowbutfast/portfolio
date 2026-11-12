@@ -23,11 +23,12 @@ The system SHALL enforce edge security headers on all responses, including a str
 
 #### Scenario: Browser loads click-to-load Google Drive resume preview
 - **WHEN** the About modal renders the click-to-load Google Drive resume preview iframe
-- **THEN** the browser renders the `https://drive.google.com/file/.../preview` frame without Content Security Policy blocking errors.
+- **THEN** the browser renders the `https://drive.google.com/file/d/.../preview` frame without Content Security Policy blocking errors.
 
 #### Scenario: Attempting to frame the application
 - **WHEN** an external site attempts to embed the portfolio within an `<iframe>`
 - **THEN** the browser blocks framing according to `frame-ancestors 'none'`.
+
 ### Requirement: Universal immutable caching for content-hashed assets
 The system SHALL configure Vercel edge cache headers such that all assets under `/assets/(.*)` are marked with `public, max-age=31536000, immutable`, while the entry document is revalidated via default edge cache semantics.
 
