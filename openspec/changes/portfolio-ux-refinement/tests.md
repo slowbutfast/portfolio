@@ -1,46 +1,51 @@
 ## Automated Tests
 
-- `npm run typecheck`: Verifies compile-time type safety across all extended models (mandatory `shortTitle: string`, `CandidateProfile`, and `SimulationNode` input type).
+- `npm run typecheck`: Verifies compile-time type safety across all models (`CandidateProfile`, mandatory `shortTitle: string`, `SimulationNode` input types, `BridgeGeometry`).
 - `npm run test:unit`:
-  - `src/data/profile.test.ts`: Verifies candidate profile URL protocols (`mailto:` for email, `https:` for social and resume links), canonical tagline, and non-empty fields.
-  - `src/data/projects.test.ts`: Verifies mandatory non-empty `shortTitle: string` across all 6 projects.
-  - `src/physics/graphSimulation.test.ts`: Verifies `SimulationNode` consumes and preserves `label`.
-  - `src/utils/edgeConfig.test.ts`: Verifies `vercel.json` CSP includes `frame-src 'self' https://drive.google.com;` and matches `SPEC_CSP`.
-- `npx @google/design.md lint DESIGN.md`: Verifies adherence to Google design token guidelines with 0 errors and 0 warnings.
+  - `src/utils/bridgeGeometry.test.ts`:
+    - Asserts bilateral symmetry across arbitrary rotated node positions: $n(CP1_{bottom}) = -n(CP2_{top})$ and $n(CP2_{bottom}) = -n(CP1_{top})$ within $10^{-6}$.
+    - Asserts control handles align with perimeter circle tangents.
+    - Asserts `computeBridgeGeometry` returns `null` when distance $d \le R_A + R_B$.
+  - `src/utils/graphPlanarity.test.ts`:
+    - Asserts `countCrossings(PLANAR_NODE_SEEDS, edges) === 0` across all 9 undirected graph edges.
+  - `src/data/profile.test.ts`:
+    - Asserts canonical Brown University bio statement matches verbatim.
+    - Asserts all contact URL protocols (`mailto:`, `https:`).
+  - `src/data/projects.test.ts`:
+    - Asserts mandatory non-empty `shortTitle: string` for all 6 projects.
+  - `src/utils/edgeConfig.test.ts`:
+    - Asserts `vercel.json` CSP includes `frame-src 'self' https://drive.google.com;` and matches `SPEC_CSP`.
+- `npx @google/design.md lint DESIGN.md`: Verifies design token compliance with 0 errors and 0 warnings.
 - `npm run test:e2e`: Runs Playwright E2E suite across Desktop Chrome and Mobile Chrome viewports verifying:
-  - `index.html` title matches canonical "Gregory Lazatin — Software Engineer & Creative Technologist" and social meta tags are present.
-  - `AboutModal` dialog mounts with `role="dialog"`, traps focus, updates URL hash to `#/about`, and dismisses cleanly via Escape key.
-  - About modal displays top-mounted contact links and click-to-load Google Drive preview button with accessible iframe attributes (`title`, `referrerpolicy`, `sandbox`).
-  - `ProjectDrawer` renders elevated `Code ↗` and `Visit ↗` buttons in the sticky header with descriptive accessible names.
-  - `NodeHoverCard` is interactive (`pointer-events-auto`), maintaining visibility when pointer transfers to card within 150ms, and closing immediately upon canvas node drag.
-  - Graph canvas renders concise labels (`Resume Builder`, `Climate Risk`, `OpenDungeon`) and clamps full pill bounds within canvas edges.
+  - Fresh localStorage visit defaults to Light color scheme with zero initial theme flash.
+  - Header controls render in the canonical sequence: `About`, `GitHub ↗`, `Graph`/`Grid`, `Dark`/`Light`, `Filters ▾`.
+  - Clicking `Dark`/`Light` toggles color scheme and persists to `localStorage`.
+  - `AboutModal` dialog displays the Brown University bio and top-mounted contact links without subtitle or focus area tag pills.
+  - `ProjectDrawer` renders elevated `Code ↗` and `Visit ↗` buttons in the sticky header and houses preview modes in a segmented container track.
+  - `NodeHoverCard` is interactive, maintaining visibility when transferring cursor within 150ms, and closing upon canvas drag.
   - `ListView` renders visual 16:9 thumbnails and provides an authentic terminal specimen fallback for `agentic-resume-builder`.
-  - Mobile viewport (`393x852`) renders `ProjectDrawer` as a docked bottom sheet (`max-h-[85dvh]`) and displays the 12px tagline.
+  - Mobile viewport (`393x852`) renders `ProjectDrawer` as a docked bottom sheet (`max-h-[85dvh]`).
   - Axe WCAG 2.0 A/AA audit produces 0 accessibility violations in dark and light themes.
-- `npm run build`: Verifies clean production bundling with 0 `data:font` occurrences and valid asset hashes.
+- `npm run build`: Verifies clean production bundling with 0 errors.
 
 ## Manual Verification
 
-- **Candidate Contact & Click-to-Load Resume**:
-  - **WHEN** user clicks "About" and clicks "Preview Resume"
-  - **THEN** the About modal expands to display the sandboxed Google Drive document preview, and clicking "Resume (Drive) ↗" opens the document in a new tab.
+- **Theme Default & Header Toggle**:
+  - **WHEN** opening the site in a fresh incognito window
+  - **THEN** the site loads in Light theme without flashing dark, and clicking "Dark" in the top-right header toggles theme seamlessly.
 
-- **Elevated Project Actions in Inspector**:
-  - **WHEN** user opens any project drawer (e.g. OpenDungeon)
-  - **THEN** `Code ↗` and `Visit ↗` buttons are immediately visible in the sticky header below the title with descriptive accessible announcements.
+- **Bilateral Symmetrical Bridges**:
+  - **WHEN** viewing graph connection bridges at 1440×900
+  - **THEN** bridges display exact reflection symmetry without lopsided bowing or skewed fillets.
 
-- **Interactive Hover Card Transfer Zone**:
-  - **WHEN** user hovers over a node on desktop, leaves the node, and enters the card within 150ms
-  - **THEN** the card remains visible and interactive. Starting a drag on any canvas node dismisses the card immediately.
+- **Close-Node Drag Interaction**:
+  - **WHEN** dragging two connected nodes until they overlap
+  - **THEN** the bridge unmounts cleanly without inverting into crossed control points.
 
-- **Concise Graph Node Typography & Clamping**:
-  - **WHEN** viewing the canvas graph near edges or on mobile viewports
-  - **THEN** nodes render concise labels (`Resume Builder`, `Climate Risk`, `Sandwave`, `Transcribe+`, `AttentionMax`, `OpenDungeon`) without overlapping or clipping outside canvas padding.
+- **Initial Load Graph Settling**:
+  - **WHEN** the home page loads
+  - **THEN** nodes initialize in their non-crossing planar positions and breathe naturally without link crossing.
 
-- **Top Bar Scrim on Scroll & Canonical Tagline**:
-  - **WHEN** viewing on desktop or mobile and scrolling Grid view
-  - **THEN** the canonical 12px tagline is clearly visible, and the progressive gradient scrim preserves 100% legibility over scrolled cards.
-
-- **Mobile Bottom Sheet Presentation**:
-  - **WHEN** viewing the site on a mobile device and opening a project
-  - **THEN** the inspector opens docked to the bottom of the screen with `max-h-[85dvh]` avoiding mobile address bar overlap.
+- **About Dialog Content**:
+  - **WHEN** clicking "About"
+  - **THEN** the dialog displays the Brown University statement, top contact buttons (Email, LinkedIn, GitHub, Resume), with no role subtitle and no focus areas.

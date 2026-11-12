@@ -1,41 +1,45 @@
 ## Why
 
-Evaluations by independent technical reviewers revealed that while the organic constructivist physics and visual aesthetic are strong, the candidate conversion experience lacks crucial recruiter fast-paths. Recruiters and engineering managers cannot quickly find a resume, email, or LinkedIn; project repositories and live demos are hidden inside secondary tabs; hover cards cannot be clicked; graph nodes show raw kebab-case slugs that collide on mobile screens; and scrolling Grid view collides with the top bar.
+Evaluations by independent technical reviewers and user design directives identified that while the organic constructivist physics and visual aesthetic are strong, the portfolio requires both candidate conversion improvements and aesthetic geometric refinement:
+1. Recruiters lack quick contact actions, while the About screen carried redundant subtitles and empty focus area tags.
+2. The initial force graph settled into tangled link crossings due to an unnested $K_4$ seed layout.
+3. Fluid bridge connections suffered from asymmetric, lopsided bowing because control points were not mirrored across edge axes.
+4. The site defaulted to dark theme with contrast deficiencies on light container surfaces, while the theme toggle was buried inside a dropdown.
+5. Typography lacked a standardized Swiss hierarchy (Helvetica, Helvetica Light, and Menlo for monospace).
 
-This change refines the candidate experience into a high-converting, friction-free engineering showcase with instant recruiter actions, elevated project links, and responsive polish.
+This change refines the portfolio into a high-converting, aesthetically balanced engineering showcase with bilateral fluid geometry, planar resting states, default light theme, and clean recruiter conversion paths.
 
 ## What Changes
 
-- **Dedicated Candidate Profile**: Introduces `src/data/profile.ts` with typed candidate metadata (email, LinkedIn, GitHub, resume links, bio, and canonical tagline: "Software Engineer · Autonomous Agents & Graphics").
-- **Canonical Metadata & Previews**: Updates `index.html` with canonical `<title>`, `<meta name="description">`, `og:title`, `og:description`, `og:image`, `og:url`, and `twitter:card`.
-- **Top Bar Tagline & Scrim**: Displays the canonical tagline at 12px on both desktop and mobile, with a progressive gradient scrim to prevent collision with scrolled cards in Grid view.
-- **Top-Mounted Contact & Click-to-Load Resume**: Places Email, LinkedIn, GitHub, and Resume directly at the top of the About modal; provides an accessible, click-to-load sandboxed Google Drive document preview (`https://drive.google.com/file/d/1zcDDcEDFt9oXSsbcvQObDyr1py2OjimW/preview`).
-- **Content Security Policy Update**: Updates CSP in `vercel.json` (and coordinates `SPEC_CSP` in guard tests) to permit `frame-src 'self' https://drive.google.com;`.
-- **Elevated Project Actions**: Pins primary `Code ↗` (GitHub repo) and `Visit ↗` (live demo) buttons directly beneath project titles in both the sticky `ProjectDrawer` header and the `NodeHoverCard`, with explicit `aria-label` accessibility annotations.
-- **Interactive Hover Cards with Transfer Rules**: Enables pointer events on `NodeHoverCard`, with robust 150ms transfer grace period between node and card, cancel-on-entry, and dismiss-on-drag.
-- **Mandatory Concise Graph Typography**: Requires `shortTitle: string` on all 6 projects (`OpenDungeon`, `Resume Builder`, `Climate Risk`, `Transcribe+`, `Sandwave`, `AttentionMax`), passing it through `SimulationNode` input types.
-- **Canvas Label Clamping & Collision Offsets**: Clamps text knockout pill full bounds inside canvas margins and offsets labels to prevent multi-node overlap.
-- **Responsive Bottom Sheet & Grid Thumbnails**: Docks `ProjectDrawer` as a mobile bottom sheet using `max-h-[85dvh]` to avoid mobile address bar clipping, and embeds 16:9 visual thumbnails in `ListView` with a terminal specimen fallback for CLI projects.
+- **Typography Standardization**: Sets primary font to Helvetica / Helvetica Neue, secondary font to Helvetica Light (`font-weight: 300`), and monospace font to Menlo across technical displays and terminals.
+- **Default Light Theme & High-Contrast Tokens**: Defaults new visitors to Light theme, hardens contrast tokens (`--color-muted: #525257`, `--color-outline: #71717a`, dark `--color-brand: #3d7fff`), and prevents dark-user flash via `public/theme-init.js`.
+- **Top-Right Header Sequence**: Elevates the theme toggle to the top-right header, following the order: `About` &bull; `GitHub ↗` &bull; `Graph` / `Grid` &bull; `Dark` / `Light` &bull; `Filters ▾`.
+- **Canonical About Me Screen**: Replaces placeholder/statement text with canonical Brown University bio, removes the subtitle and focus areas, and mounts Email, LinkedIn, GitHub, and Resume directly at the top.
+- **Inspect Modal Tab Separation**: Separates `Media` and `Terminal` tabs into a distinct segmented pill track, while elevating `Code ↗` and `Visit ↗` directly into the sticky header.
+- **Planar Initial Graph Embedding**: Implements proven planar seeds (`PLANAR_NODE_SEEDS`) with `sandwave-sim` nested inside the $K_4$ triangle, backed by weak seed-homing forces (`strength: 0.02`) and shared with reduced-motion static layouts.
+- **Bilateral Symmetrical Bézier Bridges**: Implements pure mathematical bridge geometry (`computeBridgeGeometry`) with true C1 tangent continuity, normal-mirrored control points, waist clamping, and close-node inversion guards.
+- **CSP & Content Security**: Updates `vercel.json` CSP with `frame-src 'self' https://drive.google.com;` and synchronizes with `SPEC_CSP` guard tests.
+- **Global Design System Documentation**: Formally documents all typography scales, theme tokens, and bridge geometry rules in `DESIGN.md`.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `candidate-profile`: Defines the typed candidate identity schema and profile records (`src/data/profile.ts`), supplying canonical branding, contact endpoints, social links, resume URLs, and bio text across the application.
+- `candidate-profile`: Defines the typed candidate identity schema and profile records (`src/data/profile.ts`), supplying canonical branding, contact endpoints, social links, resume URLs, and the verified Brown University bio narrative.
 
 ### Modified Capabilities
 
-- `portfolio-controls`: Adds top bar progressive gradient scrim, canonical 12px engineering tagline on desktop and mobile, baseline specification for the About dialog (`role="dialog"`, focus trap, `#/about`, Escape), and top-mounted recruiter contact pathways.
-- `project-drawer`: Elevates `Code ↗` and `Visit ↗` into permanent sticky header actions above tabs, adapts presentation to a mobile bottom sheet with `max-h-[85dvh]`, and specifies interactive `NodeHoverCard` behavior with pointer transfer rules.
+- `portfolio-controls`: Adds default Light theme initialization, top-right header controls (`About`, `GitHub`, `Graph`/`Grid`, `Dark`/`Light`, `Filters`), progressive scroll scrim, first-paint flash prevention (`public/theme-init.js`), and top-mounted recruiter contact links in About modal.
+- `project-drawer`: Elevates `Code ↗` and `Visit ↗` into permanent sticky header actions, separates preview tabs into a distinct segmented container track, and applies `max-h-[85dvh]` on mobile.
 - `project-catalog`: Requires mandatory `shortTitle: string` across all catalog items, and defines visual 16:9 thumbnail previews with CLI fallback for `ListView`.
-- `graph-simulation`: Extends `SimulationNode` input types to accept `label`, emits `shortTitle` to canvas nodes, and clamps pill boundaries with collision offsets.
+- `graph-simulation`: Establishes planar seed coordinates (`PLANAR_NODE_SEEDS`), weak seed-homing forces (`strength: 0.02`), reduced-motion static layout from seeds, and bilaterally symmetric C1-tangent fluid bridge geometry with close-node guards.
 - `edge-deployment`: Extends `vercel.json` CSP with `frame-src 'self' https://drive.google.com;` and coordinates with `SPEC_CSP` guard assertions.
 
 ## Impact
 
-- **Configuration**: `vercel.json` CSP header modified to allow `https://drive.google.com` frames; coordinated with `src/utils/csp.ts` `SPEC_CSP`.
-- **Metadata**: `index.html` title, Open Graph, and Twitter card metadata populated.
-- **Data Layer**: New `src/data/profile.ts`; updated `src/types/portfolio.ts` with required `shortTitle: string` and `CandidateProfile` type.
-- **Components**: `AboutModal.tsx`, `ControlsOverlay.tsx`, `ProjectDrawer.tsx`, `NodeHoverCard.tsx`, `GraphCanvas.tsx`, `ListView.tsx`, `App.tsx`.
-- **Physics**: `src/physics/graphSimulation.ts` input types and node construction updated.
-- **Tests**: Config guards, unit tests for profile and catalog, and Playwright E2E suite updated.
+- **Configuration**: `vercel.json` CSP header modified to allow `https://drive.google.com` frames; synchronized with `src/utils/csp.ts` `SPEC_CSP`.
+- **Global Design**: `DESIGN.md` updated with Helvetica, Helvetica Light, Menlo, contrast tokens, and bilateral bridge geometry.
+- **Data Layer**: New `src/data/profile.ts` and `src/data/graphSeeds.ts`; updated `src/types/portfolio.ts` with required `shortTitle: string`.
+- **Math & Physics**: New `src/utils/bridgeGeometry.ts`; updated `src/physics/graphSimulation.ts` with seed homing forces and `SimulationNode` typing.
+- **Components**: `AboutModal.tsx`, `ControlsOverlay.tsx`, `ProjectDrawer.tsx`, `GraphCanvas.tsx`, `ListView.tsx`, `App.tsx`.
+- **Tests**: New unit tests for bridge geometry and graph planarity; updated E2E tests for light default and header sequence.

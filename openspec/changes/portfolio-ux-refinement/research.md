@@ -1,93 +1,87 @@
 ## Source material
 
 - **User Directives (2026-11-12)**:
-  - *"looks good. i'll probably change this to a video. can vercel natively host media (e.g., videos and photos) so that I can display it on the vercel deployment?"*
-  - *"the email should be `gregory.lazatin2006@gmail.com`"*
-  - *"this is the google drive URL: `https://drive.google.com/file/d/1zcDDcEDFt9oXSsbcvQObDyr1py2OjimW/view?usp=drive_link`. can you display the resume in an embedded view within the about me/contact page, along with a link as well (or however you decide is best to link to the resume google drive link along with the embedded view)"*
-  - *"the link to my linkedin is `https://www.linkedin.com/in/gregory-lazatin/`"*
-  - *"concise abbreviations should be fine here. then you can have the full title in the actual card/hover view/ etc. if the viewer wants to learn more about those projects individually. and this is mainly so that the node view isn't cluttered"*
-  - *"can you make them pinned right below the title, as well as possibly making them clickable as you hover over a project? i envision when you hover over a node on the page, it'll display the floating pop-up with media, and then two easily clickable links to the github repo and the vercel deployment/live demo. and instead of `Live Demo` can you rename that button to `Visit`?"*
-  - *"this won't be a patch, but rather a new openspec change in and of itself."*
+  - *"can you make the secondary font Helvetica Light"*
+  - *"can you make the default color scheme Light"*
+  - *"can you move the color scheme toggle to the top right options exactly like you did with Grid/Graph?"*
+  - *"can you separate the media and link pills more obviously in the inspect popup"*
+  - *"can you make these edits to the about screen: remove Creative Technologist & Software Engineer; remove focus areas; add email to contact field; use text: 'Gregory Lazatin is currently a Junior at Brown University studying Computer Science. He has worked on applied AI systems, geospatial data engineering, and interactive web apps, built with agentic workflows and test-driven design.'"*
+  - *"can you actually use menlo for the monospace font?"*
+  - *"can we go about, github, graph, dark, filters? so just the recommended header item order"*
+  - *"figure out a default node layout for the nodes when the page is first opened that allows them to settle in a 'natural,' and 'aesthetically pleasing' position on first load"*
+  - *"make node connections more symmetric: bilateral symmetry along the center-to-center axis (or normal-mirrored Bézier control points)"*
+  - *"make sure these design changes are documented within the global DESIGN.md"*
 
-- **Evaluator Audit 1 (2026-11-12)**:
-  - *"A recruiter lands on a name and a white shape. The graph renders in about 450ms and looks striking. The nodes are labeled with kebab-case repo slugs (`pict-climate-risk-viz-chatbot`, `agentic-resume-builder`), and nothing on screen says 'software engineer.' The tagline only appears inside the About modal... The browser tab still reads `SYS.PORTFOLIO // NODE GRAPH SPECIMEN`... That's the string a recruiter sees in bookmarks, tab lists, and link previews."*
-  - *"The hover card is instant and shows the media, title, summary, and tags. But clicking outside it closes it, and the hover card itself cannot be interacted with."*
-
-- **Evaluator Audit 2 (2026-11-12)**:
-  - *"In `ProjectDrawer`, clicking a project defaults to Media, leaving the GitHub repository and Live App links buried under a secondary 'Link' tab."*
-  - *"The completely naked top bar collides with cards and giant numerals ('04') when scrolling Grid view."*
-  - *"On mobile screens (390px), the interactive force graph is cramped, long labels collide, and the inspector card floats awkwardly mid-screen."*
+- **Evaluator Audits 1 & 2 (2026-11-12)**:
+  - Planar seeds require Sandwave to be nested strictly inside the $K_4$ triangle (`open-dungeon`, `transcribe-plus`, `attention-max`) to eliminate initial line intersections.
+  - Bézier bridges require true C1 tangent continuity at circle perimeters, waist clamping, and close-node distance guards to prevent inverted geometry.
+  - Light mode contrast tokens require hardening (`--color-muted: #525257`, `--color-outline: #71717a`) to pass WCAG AAA and AA UI boundaries on `#eae9e5` and `#f6f6f4`.
+  - First-paint theme flash for returning dark users must be prevented via `public/theme-init.js`.
 
 ### Raised but not acted on
 
-- **Complete removal of interactive physics graph on mobile**: Evaluator suggested defaulting to Grid view on mobile screens. We maintain the graph mode accessible at all times via the header view toggle and bottom sheet inspector rather than deleting canvas mode on mobile.
-- **Third-party resume hosting / heavy PDF.js bundle**: Evaluated `pdfjs-dist` (~450KB bundle increase). Click-to-load Google Drive preview (`/preview`) preserves zero bundle overhead while keeping the direct link as primary.
-- **Full-card clickability on touch devices**: Touch devices have no hover state; mobile users tap nodes directly to open the bottom sheet inspector, avoiding double-tap ambiguity.
+- **Complete removal of interactive physics graph on mobile**: Kept graph accessible at all times via header toggle and bottom sheet inspector.
+- **Pure Helvetica for code/terminals**: Monospace font is retained as Menlo for technical accuracy in `TerminalSimulator` ASCII tables and coordinate displays.
 
 ## Glossary
 
 | Term | Means | Does NOT mean |
 | :--- | :--- | :--- |
 | `shortTitle` | Mandatory concise human string on `ProjectData` used for graph canvas node rendering (e.g., `Resume Builder`) | An optional property, or altering the canonical full title in metadata or inspector |
-| `Visit ↗` | Action link navigating directly to the live production deployment or interactive web demo | Opening an internal preview tab or simulated terminal |
-| `Code ↗` | Action link navigating directly to the project's source code repository on GitHub | Displaying an inline code viewer or AST inspection tree |
+| Bilateral Symmetry | Exact mathematical reflection of the lower bridge boundary curve across the edge centerline ($y_{bottom}(x) = -y_{top}(x)$) | Approximated or visually balanced curves with lopsided or asymmetric control handles |
+| Planar Embedding | Graph vertex positioning where no edge segments cross or intersect each other | A rigid non-draggable static graph |
+| Seed Homing Force | Subtle d3-force positioning constraint (`strength: 0.02`) guiding nodes back to planar resting seeds after user drags | Rigidly pinning nodes or disabling physical momentum |
 | Candidate Profile | Dedicated data model (`src/data/profile.ts`) managing personal bio, contact endpoints, canonical tagline, and resume links | Storing personal contact data in `projects.ts` or project catalog |
-| Progressive Scrim | Subtle background gradient fade (`from-bg via-bg/80 to-transparent backdrop-blur-[2px]`) under the top bar | An opaque top bar background box or bordered pill navigation wrapper |
-| Click-to-load Embed | Rendering an `<iframe>` only after deliberate user interaction (e.g. clicking "Preview Resume") | Auto-loading external iframes on initial page load or modal mount |
 
 ## External research
 
 | Source | What it establishes | Licence | Accessed |
 | :--- | :--- | :--- | :--- |
-| Google Drive Embed & Access Documentation | Google Drive file preview can be embedded using `https://drive.google.com/file/d/<id>/preview`. File requires General Access set to "Anyone with the link can view"; `usp=drive_link` in URL does NOT prove public access | Google Terms of Service | 2026-11-12 |
+| Kuratowski's & Fáry's Theorems on Planar Graphs | $K_4$ is planar if and only if one vertex is embedded strictly in the interior of the cycle formed by the other three vertices | Mathematical theorem | 2026-11-12 |
+| Hermite & Bézier Tangent Continuity ($C^1$) | A Bézier curve leaves a circle with $C^1$ smoothness if and only if its initial control vector is parallel to the circle tangent at the anchor point | Differential geometry | 2026-11-12 |
+| Google Drive Embed & Access Documentation | Google Drive file preview can be embedded using `https://drive.google.com/file/d/<id>/preview`. File requires General Access set to "Anyone with the link can view" | Google Terms of Service | 2026-11-12 |
 | MDN Content Security Policy: `frame-src` | Controls valid sources for nested browsing contexts such as `<iframe>`. Missing entry causes browser console security block when `default-src 'self'` is specified | W3C / MDN Open Doc | 2026-11-12 |
-| MDN Iframe Sandbox Directive | `sandbox="allow-scripts allow-same-origin allow-popups"` provides isolation while allowing Google Drive's interactive viewer scripts to execute | W3C / MDN Open Doc | 2026-11-12 |
-| Vercel Static Asset CDN & Caching | Static files compiled by Vite to `dist/assets/` or served from `public/` are served with edge immutable caching (`Cache-Control: public, max-age=31536000, immutable`) | Vercel Platform Specs | 2026-11-12 |
 
 ## Candidate tech
 
 | Option | Decision | Reason | Date |
 | :--- | :--- | :--- | :--- |
-| Google Drive `/preview` in sandboxed `iframe` (click-to-load) | Adopted | Zero-dependency document view for recruiter resume review without external PDF JS bundles; lazy-loaded for privacy & performance | 2026-11-12 |
-| React-PDF / PDF.js | Rejected | Adds ~450KB to JS bundle size; unnecessary when Google Drive preview iframe handles multi-page rendering | 2026-11-12 |
-| CSS pointer-events on hover card | Adopted | Allows direct clicking on `Code ↗` and `Visit ↗` while maintaining canvas hit-testing | 2026-11-12 |
-| Dedicated `profile.ts` module | Adopted | Decouples personal candidate identity from project catalog models | 2026-11-12 |
+| Menlo for Monospace | Adopted | High legibility, native Apple font with clean fallbacks for CLI terminals and data displays | 2026-11-12 |
+| Helvetica / Helvetica Light for UI | Adopted | Clean Swiss modernist typography hierarchy across headings, body, and secondary metadata | 2026-11-12 |
+| Nested Planar $K_4$ Seeds | Adopted | Eliminates all edge crossings on initial render and resting states | 2026-11-12 |
+| C1 Tangent-Continuous Fluid Bridges | Adopted | Guarantees exact bilateral reflection symmetry with zero lopsided bulging | 2026-11-12 |
+| `public/theme-init.js` | Adopted | Synchronous blocking script prevents dark-user flash before first paint without violating CSP | 2026-11-12 |
 
 ## Patterns adopted
 
-- **Card Hover Retention Zone & Transfer**: Pointer leaving a node enters a 150ms grace timeout. Moving pointer into `NodeHoverCard` cancels the dismissal timer (`clearTimeout`). Pointer departure from the card restarts the 150ms timeout. Active node dragging immediately closes the hover card.
-- **Progressive Header Scrim**: Top bar gradient mask allowing content to scroll underneath without text illegibility or hard-bordered chrome.
-- **Sticky Header Action Elevation**: Placing `Code ↗` and `Visit ↗` buttons inside the sticky inspector header, guaranteeing discoverability regardless of tab selection or scroll position.
-- **Dynamic Viewport Units**: Using `dvh` (`max-h-[85dvh]`) for mobile bottom sheets to prevent mobile browser URL bar clipping.
+- **Bilateral Tangent Bridges**: Constructing the top curve using perimeter anchors and tangent handles, then reflecting coordinates across the centerline axis $\vec{u}$ to construct the bottom curve.
+- **Weak Seed Homing**: Using d3-force `forceX`/`forceY` at 0.02 strength so nodes settle into their planar positions while remaining fully flingable and interactive.
+- **Top-Right Header Sequence**: `About` &bull; `GitHub ↗` &bull; `Graph`/`Grid` &bull; `Dark`/`Light` &bull; `Filters ▾`.
 
 ## Verified facts
 
 | Claim | Value | How verified | Date | Volatility |
 | :--- | :--- | :--- | :--- | :--- |
-| Project runtime is React 19.3 | True | Inspected `package.json` (`react: ^19.0.0`, lockfile resolved `19.3.0`) | 2026-11-12 | stable |
-| Vercel hosts MP4 media natively | True | Inspected `transcribe-plus` bundled MP4 asset and `vercel.json` immutable caching header | 2026-11-12 | stable |
-| CSP blocks Google Drive preview by default | True | Inspected `vercel.json` CSP string: `default-src 'self'` without `frame-src` blocks external iframes | 2026-11-12 | stable |
-| Node labels currently use raw IDs | True | Inspected `src/physics/graphSimulation.ts` L90: `label: n.id` | 2026-11-12 | stable |
-| Hover card currently ignores pointer | True | Inspected `src/components/NodeHoverCard.tsx` L34: `pointer-events-none` | 2026-11-12 | stable |
-| Vite dev server does not serve vercel.json headers | True | Tested against local dev server; headers require production build + edge emulator or Vercel preview | 2026-11-12 | stable |
+| $K_4$ planar seeds have zero intersections | 0 crossings | Geometric intersection check of all 9 edge segments with Sandwave at (0.56, 0.55) | 2026-11-12 | stable |
+| Hardened light contrast tokens pass AAA | 6.4:1 & 3.96:1 | WCAG contrast formula of `#525257` and `#71717a` against `#eae9e5` and `#f6f6f4` | 2026-11-12 | stable |
+| Runtime environment is React 19.3 | True | Inspected `package.json` (`react: ^19.0.0`, lockfile resolved `19.3.0`) | 2026-11-12 | stable |
+| CSP allows `public/theme-init.js` | True | External script from `'self'` executes under `script-src 'self'` | 2026-11-12 | stable |
 
 ## Unverified assumptions
 
 | Assumption | What checking costs |
 | :--- | :--- |
-| Google Drive file link has public link sharing enabled ("anyone with link can view") | Manual owner check in Google Drive UI before public release |
-| Mobile bottom sheet swipe gesture is intuitive without heavy animation libraries | Verified through standard CSS/DOM touch scrolling and overflow containment |
+| Google Drive resume link has public link sharing enabled ("anyone with link can view") | Manual owner check in Google Drive UI before public deployment |
 
 ## Superseded claims
 
 | What was believed | Why it was wrong | What replaced it |
 | :--- | :--- | :--- |
-| Node graph needs full titles everywhere | Long titles (`pict-climate-risk-viz-chatbot`) cause label collisions on small screens | Mandatory `shortTitle` on all projects for graph nodes; full titles in cards and inspector |
-| Project action buttons belong in the 'Link' tab | Recruiters missed GitHub and demo links because media tab opened first | Elevated `Code ↗` and `Visit ↗` pinned right below title in sticky header and hover card |
-| Action buttons named 'Live Demo' | User requested shorter, cleaner verb 'Visit' | Renamed to `Visit ↗` |
-| Contact data belongs in `projects.ts` | Conflates project metadata with candidate identity | Dedicated `src/data/profile.ts` capability |
+| Naive circular seeds were planar | $K_4$ in convex position forces OpenDungeon-Sandwave and Transcribe-AttentionMax to cross at (0.57, 0.59) | Nested Sandwave interior seed layout with zero segment crossings |
+| Previous bridge math was symmetric | Control points did not follow circle tangents, creating lopsided pinch angles | Normal-mirrored Bézier control points aligned to circle perimeter tangents |
+| `--color-muted #6c6c70` passed AA on all light surfaces | Failed WCAG AA on `#eae9e5` (4.3:1) | Darkened to `#525257` (6.4:1, passing AAA) |
 
 ## Links out
 
-- [portfolio_ux_candidate_experience_plan.md](../../../portfolio_ux_candidate_experience_plan.md)
-- [vercel.json](../../vercel.json)
+- [ui_aesthetic_refinement_plan.md](../../../ui_aesthetic_refinement_plan.md)
+- [DESIGN.md](../../../DESIGN.md)

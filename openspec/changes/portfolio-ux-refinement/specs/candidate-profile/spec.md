@@ -11,6 +11,7 @@ The system SHALL maintain a typed dataset in `src/data/profile.ts` exporting a v
 - Candidate Name: `Gregory Lazatin`
 - Canonical Tagline: `Software Engineer · Autonomous Agents & Graphics`
 - Full Title: `Gregory Lazatin — Software Engineer & Creative Technologist`
+- Bio: `Gregory Lazatin is currently a Junior at Brown University studying Computer Science. He has worked on applied AI systems, geospatial data engineering, and interactive web apps, built with agentic workflows and test-driven design.`
 - Email: `mailto:gregory.lazatin2006@gmail.com`
 - LinkedIn: `https://www.linkedin.com/in/gregory-lazatin/`
 - GitHub: `https://github.com/slowbutfast`

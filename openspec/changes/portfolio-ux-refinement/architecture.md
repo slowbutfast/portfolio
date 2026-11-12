@@ -4,35 +4,38 @@
 
 ## Context
 
-The portfolio is a client-side React 19.3 single-page application built on Vite, deployed to Vercel's global Edge CDN, and running an in-browser physics engine (d3-force) alongside SVG/HTML overlays. Current evaluations highlighted that candidate conversion was impeded by missing recruiter data channels, buried external links, and rigid iframe security headers that prevented embedding Google Drive document previews.
+The portfolio is a client-side React 19.3 single-page application built on Vite, deployed to Vercel's global Edge CDN, and running an in-browser physics engine (d3-force) alongside SVG/HTML overlays. Evaluator audits identified that initial node seeding caused edge crossings in the $K_4$ subgraph, bridge geometry was asymmetrically lopsided, light theme contrast needed hardening, and candidate bio copy needed canonical alignment with verified Brown University background.
 
 ## System Architecture Diagram
 
 ```mermaid
 flowchart TD
     subgraph DataLayer ["Data Layer (Single Sources of Truth)"]
-        ProfileData["src/data/profile.ts\n(CandidateProfile: email, linkedIn, resumeUrls, tagline)"]
-        ProjectCatalog["src/data/projects.ts\n(ProjectData[]: mandatory shortTitle, repo, liveUrl, previews)"]
+        ProfileData["src/data/profile.ts\n(CandidateProfile: Brown University bio, email, social links)"]
+        GraphSeeds["src/data/graphSeeds.ts\n(PLANAR_NODE_SEEDS: K4 nested planar layout)"]
+        ProjectCatalog["src/data/projects.ts\n(ProjectData[]: mandatory shortTitle, repo, liveUrl)"]
     end
 
     subgraph Client ["Client Browser Runtime (React 19.3)"]
+        ThemeInit["public/theme-init.js\n(Synchronous blocking script: reads localStorage)"]
+
         subgraph State ["Application State (App.tsx)"]
             ActiveProject["activeProjectId: string | null"]
             HoveredProject["hoveredProjectId: string | null"]
             ViewModeState["view: 'graph' | 'list'"]
-            FilterTags["selectedTags: Set<ParadigmTag>"]
+            ThemeState["theme: 'light' | 'dark' (Default: 'light')"]
         end
 
-        subgraph GraphSim ["Physics Layer (d3-force)"]
-            CanvasNodes["nodes: (id, label=shortTitle, radius, visited)"]
-            ClampEngine["Full Pill Bounds Clamping & Collision Offsets"]
+        subgraph GeometryLayer ["Mathematical Geometry & Physics"]
+            BridgeMath["src/utils/bridgeGeometry.ts\n(C1 tangent vectors, normal-mirrored control points)"]
+            SimEngine["src/physics/graphSimulation.ts\n(d3-force: weak seed homing strength 0.02)"]
         end
 
         subgraph HUD ["Presentation Components"]
-            Controls["ControlsOverlay\n(Canonical 12px Tagline, Scrim, Tag Filters)"]
-            About["AboutModal\n(Top Contact Actions + Sandboxed Drive IFrame)"]
-            Drawer["ProjectDrawer\n(Sticky Header: Code + Visit ↗, max-h-[85dvh])"]
-            HoverCard["NodeHoverCard\n(pointer-events-auto: Code + Visit ↗, Transfer Zone)"]
+            Controls["ControlsOverlay\n(Header: About, GitHub, Graph, Theme, Filters)"]
+            About["AboutModal\n(Brown University Bio, Top Contact Actions)"]
+            Drawer["ProjectDrawer\n(Sticky Header: Code + Visit ↗, Segmented Tab Track)"]
+            HoverCard["NodeHoverCard\n(Interactive with 150ms Transfer Zone)"]
             Grid["ListView\n(16:9 Thumbnails + Terminal Specimen Fallback)"]
         end
     end
@@ -40,82 +43,66 @@ flowchart TD
     subgraph Edge ["Vercel Edge CDN Infrastructure"]
         VercelJson["vercel.json\n(CSP: frame-src 'self' https://drive.google.com)"]
         CspGuard["src/utils/csp.ts\n(SPEC_CSP synchronized)"]
-        StaticAssets["dist/assets/*\n(Cache-Control: immutable, max-age=31536000)"]
     end
 
-    subgraph External ["External Services"]
-        GoogleDrive["Google Drive Preview Embed\n(/file/d/<id>/preview)"]
-        GitHub["GitHub Repositories"]
-    end
-
-    ProfileData --> Controls
+    ThemeInit -.-> ThemeState
     ProfileData --> About
-    ProjectCatalog --> CanvasNodes
+    ProfileData --> Controls
+    GraphSeeds --> SimEngine
+    ProjectCatalog --> SimEngine
     ProjectCatalog --> Grid
-    ActiveProject --> Drawer
-    HoveredProject --> HoverCard
+    BridgeMath --> SimEngine
     VercelJson -.-> Client
     CspGuard -.-> VercelJson
-    About -.->|Click-to-Load IFrame| GoogleDrive
-    Drawer -->|Navigates| GitHub
-    HoverCard -->|Navigates| GitHub
 ```
 
 ## Goals / Non-Goals
 
 **Goals:**
-- Decouple candidate profile identity from project records by introducing `src/data/profile.ts`.
-- Provide zero-bundle-overhead embedded document inspection for the candidate's Google Drive resume by adapting Vercel Edge CSP to permit `frame-src https://drive.google.com;`, synchronizing `SPEC_CSP` in `src/utils/csp.ts`.
-- Enforce mandatory `shortTitle: string` compile-time type safety across all 6 project entries.
-- Implement robust pointer transfer grace periods between canvas nodes and `NodeHoverCard` (cancel-on-enter, re-arm on leave, dismiss-on-drag).
-- Guard mobile ergonomics using dynamic viewport units (`max-h-[85dvh]`).
+- Provide a provably planar resting layout for the 6 projects by nesting `sandwave-sim` inside the $K_4$ triangle, backed by weak d3-force seed-homing (`strength: 0.02`).
+- Enforce 100% bilateral reflection symmetry across all fluid bridges using tangent-continuous Bézier geometry (`computeBridgeGeometry`), complete with close-node guards.
+- Default new visitors to Light theme while preventing dark-user first-paint flash via `public/theme-init.js`.
+- Standardize typography across the codebase on Helvetica / Helvetica Neue, Helvetica Light (`font-weight: 300`), and Menlo for monospace.
+- Surface canonical candidate credentials (Brown University bio, email, social links) cleanly at the top of the About modal.
 
 **Non-Goals:**
-- Client-side PDF rendering via heavy WebAssembly or PDF.js bundles.
-- Backend server-side rendering or database APIs (the architecture remains a 100% static edge SPA).
-- Replacing d3-force with alternative canvas physics libraries.
+- Replacing d3-force with alternative physics engines.
+- Client-side PDF rendering via heavy WebAssembly bundles (click-to-load iframe handles previews).
+- Backend server-side rendering or database APIs (100% static edge SPA).
 
 ## Technical Decisions
 
-### 1. Dedicated `CandidateProfile` Data Layer
-- **Choice**: Create `src/data/profile.ts` exporting a strongly typed `CandidateProfile` object.
-- **Contract**: Contains `name`, `canonicalTitle`, `tagline`, `email`, `linkedIn`, `github`, `resumeUrl`, and `resumeEmbedUrl`.
-- **Rationale**: Isolates candidate contact channels and canonical branding from repository project models (`ProjectData`), facilitating clean unit testing of URL protocols (`mailto:`, `https:`).
+### 1. Planar Graph Seed Geometry & Weak Homing
+- **Topology Analysis**: The 6 projects contain a complete $K_4$ subgraph (`open-dungeon`, `transcribe-plus`, `sandwave-sim`, `attention-max`).
+- **Mathematical Solution**: Fáry's theorem guarantees a straight-line planar drawing if and only if one vertex is embedded strictly inside the interior triangle of the other three. Placing `sandwave-sim` at `(0.56, 0.55)` inside $\triangle(\text{OD}, \text{TP}, \text{AM})$ yields exactly 0 segment intersections.
+- **Physics Stabilization**: Pure spring forces can distort planarity. We add weak `seedX` and `seedY` forces (`strength: 0.02`) toward the scaled seed coordinates. Nodes remain fully draggable and flingable, but gently breathe back to their planar resting positions.
 
-### 2. Click-to-Load Sandboxed Google Drive Preview
-- **Choice**: Embed `https://drive.google.com/file/d/1zcDDcEDFt9oXSsbcvQObDyr1py2OjimW/preview` inside a sandboxed `<iframe>` only after user interaction ("Preview Resume" click).
-- **Security & Privacy Attributes**:
-  - `title="Resume - Gregory Lazatin"`
-  - `referrerpolicy="no-referrer"`
-  - `sandbox="allow-scripts allow-same-origin allow-popups"`
-  - `loading="lazy"`
-- **CSP Coordination**: Add `frame-src 'self' https://drive.google.com;` to `vercel.json` and update `SPEC_CSP` in `src/utils/csp.ts` so guard tests and the preview deployment gate pass cleanly.
+### 2. Bilateral Tangent-Continuous Bridge Geometry
+- **Formulation**: In `src/utils/bridgeGeometry.ts`:
+  1. Unit direction vector $\vec{u} = \frac{B - A}{\|B - A\|}$, normal $\vec{n} = (-u_y, u_x)$.
+  2. Anchor spread angle $\theta = \min\left(\frac{\pi}{6.5}, \arcsin\left(\frac{h}{R}\right)\right)$.
+  3. Anchor points $A_{top} = A + R_A(\cos\theta \vec{u} + \sin\theta \vec{n})$ and $A_{bottom} = A + R_A(\cos\theta \vec{u} - \sin\theta \vec{n})$.
+  4. Forward tangent pointing toward waist: $\vec{T}_{A,top} = \sin\theta \vec{u} - \cos\theta \vec{n}$.
+  5. Reflected tangent for bottom: $\vec{T}_{A,bottom} = \sin\theta \vec{u} + \cos\theta \vec{n}$.
+  6. Bottom curve control points are exact normal reflections of top curve control points across $\vec{u}$.
+  7. Close-node guard: when distance $d \le R_A + R_B$, returns `null` to avoid inverted curve geometry.
 
-### 3. Simulation Input Type Extension & Mandatory `shortTitle`
-- **Choice**: Extend `SimulationNode` in `src/physics/graphSimulation.ts` to `{ id: string; label?: string }`.
-- **Data Flow**: `projects.ts` defines required `shortTitle: string`. `GraphCanvas.tsx` maps projects to `simNodes` passing `label: p.shortTitle`. `createSimulation` maps `label: n.label || n.id`.
+### 3. First-Paint Flash Prevention & Default Light Theme
+- **Implementation**: Synchronous script `public/theme-init.js` included in `<head>` before stylesheets. It inspects `localStorage.getItem('portfolio_theme')` and immediately assigns `data-theme` on `<html>`. If unset, `<html>` falls back to default light theme.
+- **CSP Compliance**: Served from `'self'` via `<script src="/theme-init.js"></script>`, fully compliant with `script-src 'self'`.
 
-### 4. Hover Card Transfer Zone State Machine
-- **State Flow**:
-  1. Hovering node `H`: mounts `NodeHoverCard` at computed clamp coordinates.
-  2. Pointer leaves node `H`: begins a 150ms timeout.
-  3. Pointer enters `NodeHoverCard`: `onMouseEnter` on card invokes `clearTimeout`, cancelling dismissal.
-  4. Pointer leaves `NodeHoverCard`: `onMouseLeave` restarts the 150ms timeout.
-  5. Pointer begins drag on canvas: canvas `dragstart` immediately unmounts card and cancels any pending timers.
-
-### 5. Multi-Node Label Collision Avoidance
-- **Choice**: When two nodes settle with center-to-center Euclidean distance $< 70\text{px}$, the rendering loop alternates vertical placement (`y - radius - 8` vs `y + radius + 18`) to ensure both labels remain fully legible.
+### 4. Segmented Tab Track & Elevated Actions
+- **Drawer Tabs**: The redundant `Link` tab is eliminated in favor of elevated `Code ↗` and `Visit ↗` buttons in the sticky header.
+- **Segmented Control**: The remaining preview modalities (`Media`, `Terminal`) sit in a rounded segmented container (`bg-[var(--color-surface-container)] rounded-full p-1`) clearly separated from project tags.
 
 ## Risks / Trade-offs
 
-- **[Risk] Google Drive Preview Permission Requirement**: If owner does not configure "Anyone with link can view", Drive renders a sign-in prompt.
-  &rarr; *Mitigation*: Direct `Resume (Drive) ↗` button remains the primary high-visibility action above the embed.
-- **[Risk] Hover Card Event Slip**: Moving mouse across canvas might trigger rapid hover card flicker.
-  &rarr; *Mitigation*: 150ms transfer timeout + drag cancellation keeps interaction stable.
-- **[Risk] Mobile Viewport Clamping**: Long labels might push nodes against screen boundaries.
-  &rarr; *Mitigation*: Full rectangular bounds clamping `[pillX, pillY, pillWidth, pillHeight]` keeps labels inside canvas padding.
+- **[Risk] High-Degree Hub Merging**: `open-dungeon` connects to 5 neighbors. Large bridge anchors could overlap on its perimeter.
+  &rarr; *Mitigation*: Cap spread angle $\theta \le 28^\circ$ ($\pi / 6.5$) to guarantee clearance between adjacent bridges.
+- **[Risk] Touch Target Size on Segmented Tabs**: Compact segmented tabs can fail mobile accessibility if $< 44\text{px}$.
+  &rarr; *Mitigation*: Set `min-h-[44px]` touch targets on mobile viewports.
 
 ## Migration & Rollback Plan
 
-- **Zero DB Migrations**: Entire change is static code, TypeScript types, and configuration.
-- **Rollback Strategy**: Git revert of commit cleanly restores previous CSP headers and layout without residual server state.
+- **Zero DB Migrations**: 100% static client code and styling.
+- **Rollback Strategy**: Git revert cleanly restores previous assets without residual state.
