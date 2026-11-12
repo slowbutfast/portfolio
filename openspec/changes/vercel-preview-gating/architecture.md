@@ -22,7 +22,7 @@ sequenceDiagram
     participant GH as GitHub
     participant CI as ci.yml (PR gate)
     participant V as Vercel
-    participant DG as preview.yml (deployment_status gate)
+    participant DG as preview.yml (repository_dispatch gate)
     participant PW as Playwright
 
     Dev->>GH: open / update PR
@@ -31,16 +31,16 @@ sequenceDiagram
     CI->>PW: test:e2e (local vite dev, no CSP)
     GH->>V: push webhook
     V->>V: tsc --noEmit && vite build (fonts emitted as files, SHA resolved)
-    V-->>GH: deployment_status: success (Preview, target_url)
-    GH->>DG: deployment_status (workflow file read from default branch)
+    V-->>GH: repository_dispatch vercel.deployment.success (Preview, client_payload.url)
+    GH->>DG: repository_dispatch (workflow file read from default branch)
     DG->>DG: checkout deployment.sha, npm ci, playwright install
     DG->>PW: PREVIEW_URL + bypass headers
     PW->>V: e2e + header assertions (real CSP)
     DG-->>GH: commit status "preview-e2e"
     Dev->>GH: merge to production branch
     GH->>V: production build
-    V-->>GH: deployment_status: success (Production)
-    GH->>DG: deployment_status
+    V-->>GH: repository_dispatch vercel.deployment.success (Production)
+    GH->>DG: repository_dispatch
     DG->>PW: header assertions + load test
     DG-->>GH: commit status "production-smoke"
     Note over V: Failure triggers Instant Rollback (alias repoint, no rebuild)
@@ -87,9 +87,10 @@ sequenceDiagram
 - **Alternatives**: disabling Deployment Protection on previews (rejected: exposes unreleased work); per-run shareable links (rejected: need API calls and secrets anyway).
 
 ### 5. Workflows and the default-branch constraint
-- **Decision**: `ci.yml` on `pull_request`; `preview.yml` on `deployment_status` with `if: github.event.deployment_status.state == 'success'`. `preview.yml` checks out `github.event.deployment.sha`, branches on `github.event.deployment.environment` (case-insensitive `preview` vs `production`), passes `PREVIEW_URL` from `github.event.deployment_status.environment_url` (falling back to `target_url`), and reports through the commit status API (`gh api repos/{repo}/statuses/{sha}` with `statuses: write`).
-- **Constraint (known GitHub behaviour, to be confirmed on first run)**: `deployment_status`-triggered workflows read the workflow file from the **default branch** (`jammy-falcon`). The deployment gate does nothing for feature-branch previews until `preview.yml` exists there. Bootstrapping order is part of the migration plan.
-- **Rationale for commit status**: a `deployment_status` run is not attached to a PR, so a required check cannot depend on it directly; a commit status with a stable context can be marked required.
+- **Decision**: `ci.yml` on `pull_request`; `preview.yml` on `repository_dispatch` type `vercel.deployment.success`. `preview.yml` records the dispatch payload to the run summary, resolves the URL (`client_payload.url`), SHA (`client_payload.git.sha`), and kind (`client_payload.environment`, falling back to the ref) in one step, checks out that SHA, passes `PREVIEW_URL`, and reports through the commit status API (`gh api repos/{repo}/statuses/{sha}` with `statuses: write`). It fails with a pointer to the recorded payload if the URL or SHA is missing.
+- **Why not `deployment_status`**: verified that Vercel creates no GitHub Deployments for this project (`gh api repos/.../deployments` is empty after four Vercel deployments), so `deployment_status` never fires. Vercel's docs recommend `repository_dispatch` and state the workflow file must exist on the default branch.
+- **Constraint**: the workflow file is read from the **default branch** (`master`), so the gate does nothing until `preview.yml` is merged there.
+- **Rationale for commit status**: a `repository_dispatch` run is not attached to a PR, so a required check cannot depend on it directly; a commit status with a stable context can be marked required.
 - **Permissions**: `contents: read`, `statuses: write`. Only first-party `actions/*` pinned by major version. No third-party "wait for Vercel" action.
 - **Concurrency**: group per deployment SHA with cancel-in-progress.
 - **Alternatives**: polling the Vercel API from the PR workflow (rejected: needs a broader-scope token); third-party wait-for-preview actions (rejected: supply-chain surface for something GitHub already emits).
@@ -109,7 +110,7 @@ sequenceDiagram
 
 ## Risks / Trade-offs
 
-- **[Preview gate never fires]** `deployment_status` reads the workflow from the default branch → land `preview.yml` on `jammy-falcon` first; verify on the first push.
+- **[Preview gate never fires]** wrong trigger or workflow not on the default branch → `repository_dispatch` plus the file on `master`; verify on the first deployment after merge.
 - **[Required-check wiring]** A required status context only exists after it has reported once → run once, then add it to branch protection.
 - **[Bypass secret leakage]** Traces, reports, or shell tracing could expose it → tracing off, secret only as an env var, no `set -x`, and a task scans artifacts.
 - **[Strict CSP breaks the app on a real deploy]** Never exercised against the redesign → local emulation first, then the preview run; if it fails, the fix is a separate change.
@@ -121,7 +122,7 @@ sequenceDiagram
 
 1. **Config first (safe anywhere)**: resolver, build script, Playwright bypass and pre-flight, guard tests. Behaviour-compatible with today's app.
 2. **Bootstrap the deployment gate**: open a PR adding `.github/workflows/ci.yml` and `preview.yml` to `jammy-falcon`; add the `VERCEL_AUTOMATION_BYPASS_SECRET` repository secret; confirm production branch and system-env exposure in Vercel Project Settings.
-3. **Prove the gate**: push a trivial branch, confirm a Preview `deployment_status` triggers the run and a commit status appears.
+3. **Prove the gate**: merge the `repository_dispatch` workflow, let the resulting production deployment dispatch an event, confirm the run starts and a commit status appears; then do the same for a preview.
 4. **Mark checks required**: after each context has reported once, add `ci` and `preview-e2e` to branch protection.
 5. **Rollback of this change**: each piece is independently revertible with `git revert`; removing the workflows returns to today's manual flow. No data migration. If a deploy misbehaves, use Instant Rollback to the previous deployment.
 
@@ -129,7 +130,7 @@ sequenceDiagram
 
 - What is the Vercel project's configured production branch: `jammy-falcon` or `master`?
 - Is Deployment Protection enabled on previews, and is "Automatically expose System Environment Variables" on?
-- Do `deployment_status` events use `Preview` / `Production` exactly, and which of `environment_url` / `target_url` carries the immutable deployment URL?
+- What is the real `client_payload` shape (environment values, `git.sha`, `git.ref`, whether `url` includes a scheme)? The first run records it in the run summary.
 - Can the commit status be required on a PR whose head SHA equals the deployed SHA, with no extra wiring?
 - What does the Vercel plan allow for Instant Rollback targets?
 - Why was an earlier uncommitted `vercel.json` looser than the committed one, and does the strict policy actually work?

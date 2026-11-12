@@ -25,7 +25,7 @@
 ## 4. CI Workflows and Repository Settings
 
 - [x] 4.1 Add `ci.yml` (staged in `openspec/changes/vercel-preview-gating/workflows/` because writes to `.github/` are denied here; copy to `.github/workflows/`): on `pull_request`, Node 22, `npm ci`, `typecheck`, `test:unit`, Playwright browser install, `test:e2e`, upload report on failure
-- [x] 4.2 Add `preview.yml` (staged alongside `ci.yml`): on `deployment_status` success; branch on environment; checkout `deployment.sha`; run the preview suite (Preview) or header + load test (Production); post `preview-e2e` / `production-smoke` commit status; least-privilege permissions; per-SHA concurrency; no secret echo; no trace artifacts
+- [x] 4.2 Add `preview.yml` (staged alongside `ci.yml`): on `repository_dispatch` `vercel.deployment.success`; branch on the payload environment; checkout the payload SHA; run the preview suite (Preview) or header + load test (Production); post `preview-e2e` / `production-smoke` commit status; least-privilege permissions; per-SHA concurrency; no secret echo; no trace artifacts
 - [x] 4.3 Validate both workflows (actionlint if available, otherwise YAML parse) and grep for secret echoes
 - [ ] 4.4 Read Vercel project state through the Vercel MCP (project link, production branch, Deployment Protection, system-env exposure) and record findings (MCP access works; the Vercel project does not exist yet, waiting for the user to import it in the dashboard)
 - [ ] 4.5 Add the `VERCEL_AUTOMATION_BYPASS_SECRET` repository secret and land `ci.yml` and `preview.yml` on the default branch (user-owned: needs repository and Vercel dashboard access)

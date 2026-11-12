@@ -68,7 +68,7 @@ Verified: 2026-11-12
 ## Open (needs Vercel access, secrets, or settings changes)
 
 - **Vercel project state** (task 4.4): link to `slowbutfast/portfolio`, production branch, Deployment Protection, system-env exposure. The Vercel MCP returns 403 for team scope `joeshmo` until team access is approved via the one-time link.
-- **`deployment_status` payload**: environment names (`Preview` / `Production`), which of `environment_url` / `target_url` holds the deployment URL.
+- **`repository_dispatch` payload shape**: environment values, `git.sha`/`git.ref`, whether `url` has a scheme. Recorded in the first run's summary.
 - **Chromium reports CSP violations as console errors** on a real deployment (task 3.5).
 - **Real preview run** (3.4, 6.2): header spec and full suite against a protected preview with the bypass secret.
 - **Default-branch constraint**: confirm `preview.yml` must live on `jammy-falcon` for the gate to fire.

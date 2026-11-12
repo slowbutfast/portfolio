@@ -28,11 +28,11 @@
 
 - **Preview gate fires on a real preview**:
   - **WHEN** a trivial commit is pushed to a branch after `preview.yml` exists on the default branch
-  - **THEN** a `deployment_status` run starts, checks out the deployed SHA, runs against the preview deployment URL, and a `preview-e2e` commit status appears.
+  - **THEN** a `repository_dispatch` (`vercel.deployment.success`) run starts, checks out the deployed SHA, runs against the preview deployment URL, and a `preview-e2e` commit status appears.
 
 - **Preview gate does not fire before bootstrapping**:
   - **WHEN** a push is made before `preview.yml` is on the default branch
-  - **THEN** no `deployment_status` workflow run appears, confirming the default-branch constraint.
+  - **THEN** no `repository_dispatch` workflow run appears, confirming the default-branch constraint.
 
 - **Protection bypass works and is minimal**:
   - **WHEN** a preview URL is opened in a normal browser without the secret

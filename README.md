@@ -140,8 +140,9 @@ This is an approximation of the Vercel edge (it applies the `vercel.json` header
 ### Release Gating (CI)
 
 - **`ci` (pull requests)**: `npm run typecheck`, `npm run build`, `npm run test:unit` (with `REQUIRE_DIST=1` so the build-output guards run), then `npm run test:e2e` against the local server. Mark it as a required check in branch protection.
-- **`deployment-gate` (Vercel deployments)**: when Vercel reports a successful deployment, runs the E2E suite and header assertions against the preview (using the bypass secret), or the header assertions and load check against production, then posts a `preview-e2e` or `production-smoke` commit status. Mark `preview-e2e` as required once it has reported once.
-- GitHub reads `deployment_status` workflows from the repository's **default branch**, so `deployment-gate` must be merged there before it fires for feature-branch previews.
+- **`deployment-gate` (Vercel deployments)**: when Vercel dispatches a `vercel.deployment.success` `repository_dispatch` event, runs the E2E suite and header assertions against the preview (using the bypass secret), or the header assertions and load check against production, then posts a `preview-e2e` or `production-smoke` commit status. Mark `preview-e2e` as required once it has reported once.
+- GitHub reads `repository_dispatch` workflows from the repository's **default branch**, so `deployment-gate` must be merged there before it fires. (`deployment_status` is not used: Vercel does not create GitHub Deployments for this project.)
+- Every per-deployment URL, including production ones, is behind Deployment Protection, so the gate always needs the bypass secret. Only the production alias is public.
 - Repository secret needed: `VERCEL_AUTOMATION_BYPASS_SECRET` (from the Vercel project's Protection Bypass for Automation).
 
 ### Promotion and Rollback

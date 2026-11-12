@@ -45,7 +45,7 @@ Implementation happens in a git worktree on branch `worktree-vercel-preview-gati
 | :--- | :--- | :--- | :--- |
 | Vite 7.3.6 type declarations (`node_modules/vite/dist/node/index.d.ts`) | `build.assetsInlineLimit` accepts a number or a callback; `0` disables inlining | MIT | 2026-11-11 |
 | Vercel MCP: `list_teams` / `list_projects` | `list_teams` returned no teams; `list_projects` failed 403 for team scope `joeshmo` (`team_dYlLIM0vHe3anzqlJsfzbOjL`) until the user approves access via `authorize_team_access` | n/a | 2026-11-12 |
-| Vercel documentation (Deployment Protection, bypass for automation, system env vars, Instant Rollback, `deployment_status` events) | Behaviour assumed in this change | Proprietary docs, not reproduced | **Not yet fetched** |
+| Vercel docs via MCP `search_vercel_documentation` (Vercel for GitHub) | `deployment_status` is the legacy trigger; use `repository_dispatch` type `vercel.deployment.success`, deployment URL at `github.event.client_payload.url`; the workflow file must exist on the default branch; bypass secret is passed as `VERCEL_AUTOMATION_BYPASS_SECRET` | Proprietary docs, excerpts not reproduced | 2026-11-12 |
 
 Failed lookup recorded: project listing via the Vercel MCP was blocked pending team authorization (above).
 
@@ -104,16 +104,18 @@ All rows verified against `master` at `de357c0` in the worktree on 2026-11-12 un
 | Strict CSP works with the app on the real edge | Full suite: 62 passed, 12 skipped, 0 failed, every console-error assertion green | `PREVIEW_URL=<prod> npx playwright test` | 2026-11-12 | decays |
 | Bypass secret created | `automation-bypass` secret with `isEnvVar: true`, note "GitHub Actions deployment-gate (vercel-preview-gating)" | Vercel MCP `update_project_protection_bypass` | 2026-11-12 | decays |
 | Workflow PR opened | PR #3 `ci/deployment-workflows` → `master`; first `ci` run pending at the time of writing | `gh pr create`, `gh pr checks 3` | 2026-11-12 | decays |
+| Vercel creates no GitHub Deployments for this repo | `gh api repos/slowbutfast/portfolio/deployments` returned nothing after 4 Vercel deployments, and no `deployment-gate` run started after a preview and a production deployment completed | `gh api`, `gh run list` | 2026-11-12 | decays |
+| Workflow PRs | PR #3 (workflows) merged; `ci` passed in 1m23s on its first run; PR #4 carries the implementation | `gh pr checks`, `gh pr merge` | 2026-11-12 | decays |
 
 ## Unverified assumptions
 
-- **Vercel production branch, protection state, system-env exposure.** The project does not exist yet (see Verified facts); the user is importing it in the dashboard. Checking costs one `get_project` call afterwards. The GitHub default branch is `master`, so the default-branch constraint for `deployment_status` workflows is now satisfiable once the workflows are merged to `master`.
+- **Vercel production branch, protection state, system-env exposure.** The project does not exist yet (see Verified facts); the user is importing it in the dashboard. Checking costs one `get_project` call afterwards. The GitHub default branch is `master`, so the default-branch constraint for dispatch-triggered workflows is satisfied once the workflow is merged to `master`.
 - **Whether the Vercel GitHub integration can see `slowbutfast/portfolio`.** Confirmed implicitly when the dashboard import succeeds.
 - **Whether `master` (remote) contains `.github/workflows/*`.** The files exist only in the worktree and as untracked files in the repository root; `deployment_status` workflows are read from the default branch, so they must be merged to `master` first.
 - **Whether the strict committed CSP works end-to-end in a real deployment.** An uncommitted local `vercel.json` read earlier carried `'unsafe-inline'`, `data:` and `blob:`, which suggests someone may have needed them. The committed policy has not been exercised against the redesigned app in a deployment. Local emulation with `vite preview` plus the same headers is a partial check; a preview deployment is the real one.
 - **Why that uncommitted copy was looser.** Unknown; its content is gone from the working tree.
 - **Whether the `/index.html` header rule is needed.** The committed config has none; Vercel's default for static HTML is revalidation. Check with `curl -sI` on `/` after a deployment.
-- **`deployment_status` payloads.** Environment names (`Preview` / `Production`) and `target_url` semantics are believed, not confirmed.
+- **`repository_dispatch` payload shape.** Only `client_payload.url` is documented in what was retrieved; `environment`, `git.sha`, and `git.ref` are believed. The workflow records the payload so the first run settles it.
 - **Chromium reports CSP violations as `console` errors.** Believed; the existing `trackErrors()` relies on it.
 - **Instant Rollback limits on this plan.**
 - **Fontsource subsets all emitted as files.** Believed given `assetsInlineLimit: 0`; confirmed by the build-output guard test.
@@ -135,6 +137,13 @@ All rows verified against `master` at `de357c0` in the worktree on 2026-11-12 un
 - *Claim (assistant, 2026-11-11)*: `.vercelignore`'s `.git/` entry affects Git-integration builds.
   - *Why wrong*: Vercel clones the repo itself; the entry only affects CLI uploads.
   - *Replaced by*: the resolver's fallback chain handles both paths.
+
+- *Claim (assistant, 2026-11-11)*: the deployment gate should trigger on `deployment_status`.
+  - *Why wrong*: Vercel does not create GitHub Deployments for this project, so the event never fires; Vercel's documented trigger is `repository_dispatch` (`vercel.deployment.success`), with the URL in `client_payload.url`.
+  - *Replaced by*: a `repository_dispatch` workflow that records its payload; `preview.yml` v2.
+- *Claim (assistant, 2026-11-11)*: production smoke checks can run against the deployment URL without a bypass secret.
+  - *Why wrong*: per-deployment URLs are SSO-protected even for production (`all_except_custom_domains`); only the production alias is public.
+  - *Replaced by*: the bypass secret is required for every gate run.
 
 ## Links out
 

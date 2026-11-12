@@ -23,15 +23,15 @@ The system SHALL run `npm run typecheck`, `npm run test:unit`, and `npm run test
 - **THEN** the workflow fails, uploads the Playwright report as an artifact, and the pull request cannot merge while the check is required.
 
 ### Requirement: Preview deployment gate
-The system SHALL run the E2E suite and the header assertion test against the deployment URL whenever Vercel reports a successful Preview deployment, passing `PREVIEW_URL` from the `deployment_status` event's deployment URL (`environment_url`, falling back to `target_url`) and the bypass secret from repository secrets.
+The system SHALL run the E2E suite and the header assertion test against the deployment URL whenever Vercel reports a successful Preview deployment through a `repository_dispatch` event of type `vercel.deployment.success`, passing `PREVIEW_URL` from the event's `client_payload.url` and the bypass secret from repository secrets.
 
 #### Scenario: Successful preview deployment
-- **WHEN** a `deployment_status` event with state `success` and a Preview environment is received
+- **WHEN** a `vercel.deployment.success` `repository_dispatch` event for a Preview deployment is received
 - **THEN** the workflow runs the preview E2E suite against the deployment URL and reports the result on the deployed commit.
 
-#### Scenario: Non-successful or non-preview event
-- **WHEN** the event state is not `success`, or the environment is not Preview
-- **THEN** the preview gate does not run the preview suite.
+#### Scenario: Event lacks the data needed to verify
+- **WHEN** the dispatch payload has no deployment URL or no commit SHA
+- **THEN** the job fails with a message pointing at the payload recorded in the run summary, instead of testing the wrong target.
 
 #### Scenario: Bypass secret is not configured
 - **WHEN** `VERCEL_AUTOMATION_BYPASS_SECRET` is empty
@@ -45,7 +45,7 @@ The system SHALL run the E2E suite and the header assertion test against the dep
 The system SHALL run the header assertion test and the load-time console-error test against the production URL whenever Vercel reports a successful Production deployment.
 
 #### Scenario: Successful production deployment
-- **WHEN** a `deployment_status` event with state `success` and a Production environment is received
+- **WHEN** a `vercel.deployment.success` `repository_dispatch` event for a Production deployment is received
 - **THEN** the header assertion test and the load-time console-error test run against its deployment URL and report the result on the deployed commit.
 
 ### Requirement: Documented promotion and rollback procedure

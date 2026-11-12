@@ -1,49 +1,87 @@
 name: deployment-gate
 
 # Runs against real Vercel deployments, where vercel.json headers (the strict
-# CSP) are actually applied. GitHub reads `deployment_status` workflows from the
-# DEFAULT branch, so this file must exist there before it fires for any branch.
+# CSP) are actually applied.
 #
-# Preview deployments are behind Deployment Protection: the bypass secret is
-# passed to Playwright as an environment variable only. It is never echoed, and
+# Trigger: Vercel for GitHub emits `repository_dispatch` events
+# (`vercel.deployment.success`) when a deployment is ready. The older
+# `deployment_status` trigger never fires for this project because Vercel does
+# not create GitHub Deployments here (verified: the repo has none).
+# GitHub reads this workflow file from the DEFAULT branch, so it must exist on
+# `master` before it fires for any deployment.
+#
+# Every Vercel per-deployment URL is behind Deployment Protection (including
+# production deployment URLs), so the bypass secret is required for all runs.
+# It is passed to Playwright as an environment variable only, never echoed, and
 # Playwright tracing is forced off (playwright.config.ts) so no artifact can
 # contain it in recorded request headers.
 on:
-  deployment_status:
+  repository_dispatch:
+    types:
+      - 'vercel.deployment.success'
 
 permissions:
   contents: read
   statuses: write
 
 concurrency:
-  group: deployment-gate-${{ github.event.deployment.sha }}
+  group: deployment-gate-${{ github.event.client_payload.git.sha || github.run_id }}
   cancel-in-progress: true
 
 jobs:
   verify:
-    if: github.event.deployment_status.state == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
       # Event fields reach the shell only as environment variables, never by
       # interpolation into script text.
-      DEPLOY_URL: ${{ github.event.deployment_status.environment_url || github.event.deployment_status.target_url }}
-      DEPLOY_ENV: ${{ github.event.deployment.environment }}
-      DEPLOY_SHA: ${{ github.event.deployment.sha }}
+      PAYLOAD_URL: ${{ github.event.client_payload.url }}
+      PAYLOAD_ENV: ${{ github.event.client_payload.environment }}
+      PAYLOAD_SHA: ${{ github.event.client_payload.git.sha }}
+      PAYLOAD_REF: ${{ github.event.client_payload.git.ref }}
     steps:
-      - name: Classify deployment environment
-        id: kind
+      # The payload holds URLs, SHAs, and names, not secrets. Recording it makes
+      # the real field shape visible in the run summary.
+      - name: Record dispatch payload
+        env:
+          PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}
         run: |
-          env_lc="$(printf '%s' "$DEPLOY_ENV" | tr '[:upper:]' '[:lower:]')"
-          case "$env_lc" in
-            preview*)    echo "value=preview" >> "$GITHUB_OUTPUT" ;;
-            production*) echo "value=production" >> "$GITHUB_OUTPUT" ;;
-            *)           echo "value=other" >> "$GITHUB_OUTPUT"
-                         echo "Ignoring deployment environment: $DEPLOY_ENV" ;;
-          esac
+          {
+            echo '### repository_dispatch client_payload'
+            echo '```json'
+            printf '%s\n' "$PAYLOAD_JSON"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Require bypass secret (preview)
-        if: steps.kind.outputs.value == 'preview'
+      - name: Resolve deployment URL, SHA, and kind
+        id: deploy
+        run: |
+          url="$PAYLOAD_URL"
+          case "$url" in
+            http://*|https://*) ;;
+            "") echo "::error::client_payload.url is empty; see the payload in the run summary."; exit 1 ;;
+            *) url="https://$url" ;;
+          esac
+          if [ -z "$PAYLOAD_SHA" ]; then
+            echo "::error::client_payload.git.sha is empty; cannot check out the deployed commit. See the payload in the run summary."
+            exit 1
+          fi
+          env_lc="$(printf '%s' "$PAYLOAD_ENV" | tr '[:upper:]' '[:lower:]')"
+          if [ -z "$env_lc" ]; then
+            # Older payloads may omit the environment: treat the default branch as production.
+            if [ "$PAYLOAD_REF" = "master" ]; then env_lc=production; else env_lc=preview; fi
+          fi
+          case "$env_lc" in
+            production*) kind=production ;;
+            *)           kind=preview ;;
+          esac
+          {
+            echo "url=$url"
+            echo "sha=$PAYLOAD_SHA"
+            echo "kind=$kind"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Require bypass secret
         env:
           BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
@@ -53,40 +91,36 @@ jobs:
           fi
 
       - uses: actions/checkout@v4
-        if: steps.kind.outputs.value != 'other'
         with:
-          ref: ${{ github.event.deployment.sha }}
+          ref: ${{ steps.deploy.outputs.sha }}
 
       - uses: actions/setup-node@v4
-        if: steps.kind.outputs.value != 'other'
         with:
           node-version: 22
           cache: npm
 
       - name: Install dependencies
-        if: steps.kind.outputs.value != 'other'
         run: npm ci
 
       - name: Install Playwright browsers
-        if: steps.kind.outputs.value != 'other'
         run: npx playwright install --with-deps chromium
 
       - name: E2E and header assertions against the preview
-        if: steps.kind.outputs.value == 'preview'
+        if: steps.deploy.outputs.kind == 'preview'
         env:
-          PREVIEW_URL: ${{ env.DEPLOY_URL }}
+          PREVIEW_URL: ${{ steps.deploy.outputs.url }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: npx playwright test --reporter=list
 
       - name: Header assertions and load check against production
-        if: steps.kind.outputs.value == 'production'
+        if: steps.deploy.outputs.kind == 'production'
         env:
-          PREVIEW_URL: ${{ env.DEPLOY_URL }}
+          PREVIEW_URL: ${{ steps.deploy.outputs.url }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: npx playwright test e2e/preview-headers.spec.ts e2e/portfolio.spec.ts --reporter=list -g "served edge headers|zero console errors"
 
       - name: Upload failure artifacts
-        if: failure() && steps.kind.outputs.value != 'other'
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: deployment-gate-results
@@ -94,16 +128,19 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+      # Runs even when an earlier step failed, so a missing secret or a failed
+      # run is visible on the deployed commit. Skipped only if the SHA is unknown.
       - name: Report commit status
-        if: always() && steps.kind.outputs.value != 'other'
+        if: always() && steps.deploy.outputs.sha != ''
         env:
           GH_TOKEN: ${{ github.token }}
-          KIND: ${{ steps.kind.outputs.value }}
+          KIND: ${{ steps.deploy.outputs.kind }}
+          DEPLOY_SHA: ${{ steps.deploy.outputs.sha }}
           JOB_STATUS: ${{ job.status }}
           REPO: ${{ github.repository }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          if [ "$KIND" = "preview" ]; then context="preview-e2e"; else context="production-smoke"; fi
+          if [ "$KIND" = "production" ]; then context="production-smoke"; else context="preview-e2e"; fi
           if [ "$JOB_STATUS" = "success" ]; then
             state="success"; description="Deployment verified"
           else

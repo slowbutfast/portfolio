@@ -10,7 +10,7 @@ The redesign is merged, but nothing proves it behaves correctly under the real V
 - **Make previews reachable by Playwright**: when `VERCEL_AUTOMATION_BYPASS_SECRET` is set, `playwright.config.ts` sends `x-vercel-protection-bypass` and `x-vercel-set-bypass-cookie`, forces tracing off, and a `globalSetup` pre-flight aborts with a clear message if the response is the Vercel authentication page.
 - **Broaden error tracking**: assert zero console/page errors in the drawer-open, deep-link, About, and terminal flows, not only load; skip the Profiler-based zero-commit test when `PREVIEW_URL` is set because React production builds do not fire `onRender`.
 - **Add a served-header assertion spec** (`e2e/preview-headers.spec.ts`, preview-only): compares the deployed CSP as a directive set, checks the other security headers, discovered `.woff2` cache headers, root revalidation, and a real 404.
-- **Add GitHub Actions**: a PR gate (`typecheck`, `test:unit`, local `test:e2e`) and a `deployment_status` gate for Preview and Production deployments that posts commit statuses.
+- **Add GitHub Actions**: a PR gate (`typecheck`, `test:unit`, local `test:e2e`) and a deployment gate triggered by Vercel's `repository_dispatch` (`vercel.deployment.success`) events for Preview and Production deployments that posts commit statuses.
 - **Document promotion and rollback** in `README.md`.
 
 **Deferred decision**: whether the strict committed CSP works end-to-end in a real deployment is verified by the first preview-gate run. An uncommitted local `vercel.json` seen earlier was looser (`'unsafe-inline'`, `data:`, `blob:`) for an unknown reason; if the strict policy breaks the app, the fix is a follow-up change, not a silent loosening here.
@@ -29,4 +29,4 @@ The redesign is merged, but nothing proves it behaves correctly under the real V
 - **Dependencies**: none added.
 - **Secrets / settings** (outside the repo): a GitHub Actions secret `VERCEL_AUTOMATION_BYPASS_SECRET` sourced from the Vercel project's Protection Bypass for Automation; confirmation of production branch and system-env exposure in Vercel Project Settings (via the Vercel MCP once team access is approved).
 - **Ordering**: assumes `swiss-drafting-redesign` is merged (it is, `de357c0`).
-- **Risk**: the deployment gate is only as good as the unverified assumptions in research.md (project link, protection state, `deployment_status` payload); the first workflow run is the verification.
+- **Risk**: the deployment gate is only as good as the unverified assumptions in research.md (dispatch payload shape, bypass behaviour on a real run); the first workflow run is the verification.
