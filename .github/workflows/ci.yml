@@ -1,0 +1,54 @@
+name: ci
+
+# Pull request gate: typecheck, build, unit tests, and e2e against the local
+# dev server. The local server applies no vercel.json headers, so CSP is only
+# exercised by the deployment gate (preview.yml).
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # The build output guard tests inspect dist/, so build before unit tests.
+      - name: Build
+        run: npm run build
+
+      - name: Unit tests
+        run: npm run test:unit
+        env:
+          REQUIRE_DIST: '1'
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E tests (local server)
+        run: npm run test:e2e -- --reporter=list,html
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
