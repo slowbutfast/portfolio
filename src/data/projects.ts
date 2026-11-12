@@ -50,7 +50,7 @@ export const projects = [
     summary:
       'Python CLI that renders tailored LaTeX resumes from structured YAML via an argparse-driven build pipeline.',
     classification: 'AGENTIC DOCUMENT PIPELINE // LaTeX',
-    tags: ['Agent Tooling', 'LaTeX'],
+    tags: ['Agent Tooling', 'LaTeX', 'Design'],
     repo: 'https://github.com/slowbutfast/agentic-resume-builder',
     previews: [{ kind: 'terminal', label: 'Terminal' }],
     terminalDemo: demo(resumeBuilderCaptured, '$ python3 build_resume.py'),
@@ -116,7 +116,7 @@ export const projects = [
     summary:
       'Firefox MV3 extension that gamifies focus sessions with a popup timer and an options dashboard.',
     classification: 'FOCUS PROTOCOL EXTENSION // MV3',
-    tags: ['Vanilla JS', 'WebExtension'],
+    tags: ['Vanilla JS', 'WebExtension', 'Design', 'Graphics'],
     repo: 'https://github.com/slowbutfast/attention-max-public',
     previews: [
       { kind: 'screenshot', src: attentionMaxScreenshot, caption: 'Attention Max popup UI' },
@@ -124,6 +124,41 @@ export const projects = [
       { kind: 'linkout', url: 'https://github.com/slowbutfast/attention-max-public', label: 'View repository' },
     ],
     terminalDemo: demo(attentionMaxCaptured, '$ npm test'),
+  },
+  {
+    id: 'kintsugi-fracture',
+    title: 'Kintsugi Fracture',
+    shortTitle: 'Kintsugi 3D',
+    summary:
+      'WebGL fracture study that reassembles procedurally shattered geometry along gilded kintsugi seams in real time.',
+    classification: 'PROCEDURAL MESH GENERATION // WEBGL',
+    tags: ['Graphics'],
+    repo: 'https://github.com/slowbutfast/kintsugi-fracture',
+    liveUrl: 'https://kintsugi-fracture.vercel.app/',
+    previews: [
+      {
+        kind: 'linkout',
+        url: 'https://kintsugi-fracture.vercel.app/',
+        label: 'Launch live app',
+      },
+    ],
+  },
+  {
+    id: 'ivy-film-festival-2026',
+    title: 'Ivy Film Festival 2026',
+    shortTitle: 'Ivy Film Fest',
+    summary:
+      'Web design, visual identity, and interactive screening program for the student-run Ivy Film Festival.',
+    classification: 'STUDENT FILM FESTIVAL // BRAND & WEB',
+    tags: ['Design'],
+    liveUrl: 'https://www.ivyfilmfestival.org/',
+    previews: [
+      {
+        kind: 'linkout',
+        url: 'https://www.ivyfilmfestival.org/',
+        label: 'Visit festival site',
+      },
+    ],
   },
 ] satisfies ProjectData[];
 

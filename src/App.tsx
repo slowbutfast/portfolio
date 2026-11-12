@@ -14,6 +14,7 @@ import { ControlsOverlay } from './components/ControlsOverlay';
 import { ProjectDrawer } from './components/ProjectDrawer';
 import { AboutModal } from './components/AboutModal';
 import { NodeHoverCard } from './components/NodeHoverCard';
+import { getAmbientSynth } from './audio/ambientSynth';
 
 type ViewMode = 'graph' | 'list';
 type CanvasAnchor = { x: number; y: number };
@@ -51,6 +52,8 @@ export default function App() {
   const [drawerAnchor, setDrawerAnchor] = useState<CanvasAnchor | null>(null);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [hoverState, setHoverState] = useState<HoverState>(null);
+  const synth = useMemo(() => getAmbientSynth(), []);
+  const [soundEnabled, setSoundEnabled] = useState(() => synth.isEnabled());
   const triggerRef = useRef<HTMLElement | null>(null);
   const selectedIdRef = useRef<string | null>(null);
   const hoverDismissRef = useRef<number | null>(null);
@@ -250,6 +253,20 @@ export default function App() {
     setTheme((current) => (current === 'dark' ? 'light' : 'dark'));
   }, []);
 
+  // A stored `true` preference arms the engine; the first gesture then resumes
+  // the AudioContext without surprising the visitor with autoplay.
+  useEffect(() => {
+    if (soundEnabled) synth.armIfNeeded();
+  }, [soundEnabled, synth]);
+
+  const toggleSound = useCallback(() => {
+    setSoundEnabled((current) => {
+      const next = !current;
+      synth.setSoundEnabled(next);
+      return next;
+    });
+  }, [synth]);
+
   return (
     <div className="relative h-full w-full overflow-hidden bg-[var(--color-bg)] text-[var(--color-text)]">
       <h1 className="sr-only">Portfolio</h1>
@@ -265,6 +282,8 @@ export default function App() {
         onReset={resetFilters}
         theme={theme}
         onToggleTheme={toggleTheme}
+        soundEnabled={soundEnabled}
+        onToggleSound={toggleSound}
         onOpenAbout={openAbout}
       />
 
@@ -277,6 +296,7 @@ export default function App() {
             focusedId={view === 'graph' ? focusedId : null}
             visitedIds={visitedIds}
             initialSelectedId={selectedId}
+            synth={synth}
             onHoverNode={handleHoverNode}
             onCanvasDragStart={dismissHover}
             onResolveAnchor={handleResolveAnchor}

@@ -7,8 +7,9 @@ import type { GraphEdge } from '../utils/graphTopology';
 import type { GraphNode, ProjectData } from '../types/portfolio';
 import { getProjectById } from '../data/projects';
 import { PLANAR_NODE_SEEDS, scaleSeeds } from '../data/graphSeeds';
-import { computeBridgeGeometry } from '../utils/bridgeGeometry';
+import { computeBridgeGeometry, type BridgeOptions } from '../utils/bridgeGeometry';
 import { createSimulation, type GraphSimulation } from '../physics/graphSimulation';
+import type { AmbientSynth } from '../audio/ambientSynth';
 
 interface GraphCanvasProps {
   nodes: GraphNode[];
@@ -17,6 +18,7 @@ interface GraphCanvasProps {
   focusedId: string | null;
   visitedIds: Set<string>;
   initialSelectedId?: string | null;
+  synth?: AmbientSynth | null;
   onHoverNode?: (
     project: ProjectData | null,
     position: { x: number; y: number } | null,
@@ -93,8 +95,9 @@ function drawFluidBridge(
   radiusB: number,
   fillStyle: string,
   alpha: number,
+  options: BridgeOptions,
 ): void {
-  const geometry = computeBridgeGeometry(a, b, radiusA, radiusB);
+  const geometry = computeBridgeGeometry(a, b, radiusA, radiusB, options);
   if (!geometry) return;
 
   const {
@@ -126,6 +129,7 @@ export function GraphCanvas({
   focusedId,
   visitedIds,
   initialSelectedId,
+  synth,
   onHoverNode,
   onCanvasDragStart,
   onResolveAnchor,
@@ -158,6 +162,10 @@ export function GraphCanvas({
   const hoveredProjectIdRef = useRef<string | null>(null);
   const canHoverRef = useRef(false);
   const renderRef = useRef<() => void>(() => {});
+  const wakeRef = useRef<() => void>(() => {});
+  const synthRef = useRef<AmbientSynth | null>(null);
+  synthRef.current = synth ?? null;
+  const lastDragPointRef = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -226,6 +234,10 @@ export function GraphCanvas({
         const a = active.get(edge.source);
         const b = active.get(edge.target);
         if (!a || !b) continue;
+        const link = sim.findLink(edge.source, edge.target);
+        // Detached bridges are a transient drag-only visual. The topological
+        // edge remains in the model and reappears on release.
+        if (link?.isDetached && !reduceMotionRef.current) continue;
         const ra = nodesById.get(edge.source)?.radius ?? 22;
         const rb = nodesById.get(edge.target)?.radius ?? 22;
         const isDim = dimmed.has(edge.source) && dimmed.has(edge.target);
@@ -238,6 +250,11 @@ export function GraphCanvas({
           rb,
           isFocal ? tokens.accent : tokens.connection,
           isDim ? 0.12 : 1,
+          {
+            restDistance: link?.restDistance,
+            sharedTagCount: link?.sharedTagCount ?? edge.tags.length,
+            sag: reduceMotionRef.current ? 0 : link?.oscillator.sag ?? 0,
+          },
         );
       }
 
@@ -291,20 +308,50 @@ export function GraphCanvas({
     const themeObserver = new MutationObserver(() => {
       tokensRef.current = cacheTokens();
       render();
+      wakeRef.current();
     });
     themeObserver.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ['data-theme'],
     });
 
+    let idleSuspended = false;
+
+    const wake = () => {
+      if (disposed) return;
+      if (idleSuspended) {
+        idleSuspended = false;
+        // A small alpha re-heats homing and oscillator integration just enough
+        // to respond without a visible jump.
+        sim.sim.alpha(Math.max(sim.sim.alpha(), 0.05)).restart();
+      }
+      if (raf === 0) raf = requestAnimationFrame(loop);
+    };
+    wakeRef.current = wake;
+
     const loop = () => {
       if (disposed) return;
+      raf = 0;
+      const t = transformRef.current;
+      const goal = targetRef.current;
+      const dx = goal.x - t.x;
+      const dy = goal.y - t.y;
+      const cameraMoving = Math.abs(dx) > 0.05 || Math.abs(dy) > 0.05;
       if (!reduceMotionRef.current) {
-        const t = transformRef.current;
-        const goal = targetRef.current;
-        t.x += (goal.x - t.x) * 0.12;
-        t.y += (goal.y - t.y) * 0.12;
+        t.x += dx * 0.12;
+        t.y += dy * 0.12;
         render();
+      }
+      if (
+        !reduceMotionRef.current &&
+        !cameraMoving &&
+        sim.isIdle
+      ) {
+        // Everything has converged: stop the render loop and the d3 timer.
+        // Pointer, resize, theme, filter, and focus events call wake().
+        idleSuspended = true;
+        sim.sim.stop();
+        return;
       }
       raf = requestAnimationFrame(loop);
     };
@@ -321,8 +368,8 @@ export function GraphCanvas({
       render();
     } else {
       sim.sim.alpha(1).restart();
+      wake();
     }
-    raf = requestAnimationFrame(loop);
 
     sim.sim.on('tick', () => {
       sim.poll();
@@ -353,6 +400,7 @@ export function GraphCanvas({
         sim.resize(width, height);
       }
       render();
+      wakeRef.current();
     };
 
     const observer = new ResizeObserver(resize);
@@ -367,14 +415,16 @@ export function GraphCanvas({
       sim.sim.on('tick', null);
       sim.destroy();
       simRef.current = null;
+      wakeRef.current = () => {};
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Reduced motion pauses the rAF loop, so filtered dimming needs an explicit
-  // repaint when dimmedIds changes.
+  // Filter changes must wake a suspended loop (and repaint immediately when
+  // reduced motion keeps the loop off).
   useEffect(() => {
-    if (reduceMotionRef.current) renderRef.current();
+    renderRef.current();
+    wakeRef.current();
   }, [dimmedIds]);
 
   // Deep links open immediately; keep the inspector anchored while the physics
@@ -401,6 +451,7 @@ export function GraphCanvas({
     emit();
     const interval = window.setInterval(emit, 300);
     const stop = window.setTimeout(() => window.clearInterval(interval), 3000);
+    wakeRef.current();
     return () => {
       window.clearInterval(interval);
       window.clearTimeout(stop);
@@ -422,6 +473,7 @@ export function GraphCanvas({
       goal.x = 0;
       goal.y = 0;
     }
+    wakeRef.current();
   }, [focusedId]);
 
   const worldPoint = (clientX: number, clientY: number) => {
@@ -454,9 +506,11 @@ export function GraphCanvas({
     if (nextId === hoveredProjectIdRef.current) return;
     hoveredProjectIdRef.current = nextId;
     if (!node) {
+      synthRef.current?.onNodeHover(false);
       onHoverNodeRef.current?.(null, null);
       return;
     }
+    synthRef.current?.onNodeHover(true);
     const project = getProjectById(node.id) ?? null;
     const anchor = nodeScreenPoint(node);
     if (project && anchor) onHoverNodeRef.current?.(project, anchor);
@@ -479,11 +533,28 @@ export function GraphCanvas({
     return null;
   };
 
+  const emitAudioPointer = (clientX: number, clientY: number) => {
+    const canvas = canvasRef.current;
+    const synth = synthRef.current;
+    if (!canvas || !synth) return;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    synth.onPointerMove(
+      (clientX - rect.left) / rect.width,
+      (clientY - rect.top) / rect.height,
+    );
+  };
+
   const onPointerMove = (e: ReactPointerEvent<HTMLCanvasElement>) => {
     const sim = simRef.current;
     if (!sim) return;
+    wakeRef.current();
+    emitAudioPointer(e.clientX, e.clientY);
     const p = worldPoint(e.clientX, e.clientY);
     if (sim.state === 'drag') {
+      const last = lastDragPointRef.current;
+      if (last) synthRef.current?.onDragVelocity((p.x - last.x) * 60, (p.y - last.y) * 60);
+      lastDragPointRef.current = { x: p.x, y: p.y };
       emitHover(null);
       sim.dragMove(p.x, p.y);
       return;
@@ -499,10 +570,13 @@ export function GraphCanvas({
   const onPointerDown = (e: ReactPointerEvent<HTMLCanvasElement>) => {
     const sim = simRef.current;
     if (!sim) return;
+    wakeRef.current();
+    emitAudioPointer(e.clientX, e.clientY);
     emitHover(null);
     const p = worldPoint(e.clientX, e.clientY);
     const node = hitNode(p.x, p.y);
     downPosRef.current = { x: p.x, y: p.y };
+    lastDragPointRef.current = { x: p.x, y: p.y };
     if (node) {
       onCanvasDragStartRef.current?.();
       (e.target as HTMLCanvasElement).setPointerCapture(e.pointerId);
@@ -513,6 +587,9 @@ export function GraphCanvas({
   const onPointerUp = (e: ReactPointerEvent<HTMLCanvasElement>) => {
     const sim = simRef.current;
     if (!sim) return;
+    wakeRef.current();
+    synthRef.current?.onDragVelocity(0, 0);
+    lastDragPointRef.current = null;
     const p = worldPoint(e.clientX, e.clientY);
     const start = downPosRef.current;
     const moved = start ? Math.hypot(p.x - start.x, p.y - start.y) : 10;
@@ -532,6 +609,7 @@ export function GraphCanvas({
   };
 
   const onPointerLeave = () => {
+    wakeRef.current();
     emitHover(null);
     const sim = simRef.current;
     if (!sim) return;
@@ -541,6 +619,8 @@ export function GraphCanvas({
     } else {
       sim.hover(null);
     }
+    lastDragPointRef.current = null;
+    synthRef.current?.onDragVelocity(0, 0);
   };
 
   return (

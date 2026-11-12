@@ -8,6 +8,8 @@ const PROJECT_IDS = [
   'transcribe-plus',
   'sandwave-sim',
   'attention-max',
+  'kintsugi-fracture',
+  'ivy-film-festival-2026',
 ];
 
 const GITHUB_URL = 'https://github.com/slowbutfast';
@@ -64,6 +66,7 @@ const HEADER_ORDER = [
   'nav-about',
   'nav-github',
   'view-toggle',
+  'audio-toggle',
   'theme-toggle',
   'controls-dropdown-trigger',
 ];
@@ -111,6 +114,8 @@ test.describe('portfolio graph SPA', () => {
     await expect(page.getByTestId('nav-about')).toBeVisible();
     await expect(page.getByTestId('nav-github')).toBeVisible();
     await expect(page.getByTestId('view-toggle')).toHaveText('Grid');
+    await expect(page.getByTestId('audio-toggle')).toBeVisible();
+    await expect(page.getByTestId('audio-toggle')).toHaveAttribute('aria-pressed', 'false');
     await expect(page.getByTestId('theme-toggle')).toBeVisible();
     await expect(page.getByTestId('controls-dropdown-trigger')).toBeVisible();
 
@@ -138,9 +143,7 @@ test.describe('portfolio graph SPA', () => {
 
   test('document metadata uses the canonical candidate identity', async ({ page }) => {
     await page.goto('/');
-    await expect(page).toHaveTitle(
-      'Gregory Lazatin — Software Engineer & Creative Technologist',
-    );
+    await expect(page).toHaveTitle('Gregory Lazatin | Portfolio');
     const metadata = await page.evaluate(() => ({
       description: document
         .querySelector('meta[name="description"]')
@@ -165,6 +168,7 @@ test.describe('portfolio graph SPA', () => {
   test('header controls follow the canonical top-right sequence', async ({ page }) => {
     await page.goto('/');
     expect(await headerOrder(page)).toEqual(HEADER_ORDER);
+    await expect(page.getByTestId('audio-toggle')).toHaveText('Sound');
     await expect(page.getByTestId('theme-toggle')).toHaveText(/^(Dark|Light)$/);
     await expect(page.getByTestId('top-scrim')).toBeVisible();
 
@@ -175,10 +179,54 @@ test.describe('portfolio graph SPA', () => {
     ).toHaveCount(0);
   });
 
-  test('list view renders 6 cards and a card click opens the project drawer', async ({ page }) => {
+  test('Sound toggle persists the user preference across reloads', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/');
+    const toggle = page.getByTestId('audio-toggle');
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await expect(toggle).toHaveAccessibleName('Enable ambient sound');
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(toggle).toHaveAccessibleName('Mute ambient sound');
+    expect(
+      await page.evaluate(() => localStorage.getItem('portfolio_sound_enabled')),
+    ).toBe('true');
+
+    await page.reload();
+    await expect(page.getByTestId('audio-toggle')).toHaveAttribute('aria-pressed', 'true');
+    await page.getByTestId('audio-toggle').click();
+    await expect(page.getByTestId('audio-toggle')).toHaveAttribute('aria-pressed', 'false');
+    expect(
+      await page.evaluate(() => localStorage.getItem('portfolio_sound_enabled')),
+    ).toBe('false');
+    expect(errors).toEqual([]);
+  });
+
+  test('Ivy Film Fest drawer renders Visit without a Code action', async ({ page }) => {
+    await page.goto('/#/p/ivy-film-festival-2026');
+    await expect(page.getByTestId('project-drawer')).toBeVisible();
+    await expect(page.getByTestId('drawer-heading')).toHaveText('Ivy Film Festival 2026');
+    await expect(page.getByTestId('drawer-visit')).toBeVisible();
+    await expect(page.getByTestId('drawer-visit')).toHaveAttribute(
+      'href',
+      'https://www.ivyfilmfestival.org/',
+    );
+    await expect(page.getByTestId('drawer-code')).toHaveCount(0);
+
+    await page.goto('/#/p/kintsugi-fracture');
+    await expect(page.getByTestId('drawer-code')).toBeVisible();
+    await expect(page.getByTestId('drawer-visit')).toHaveAttribute(
+      'href',
+      'https://kintsugi-fracture.vercel.app/',
+    );
+  });
+
+  test('list view renders 8 cards and a card click opens the project drawer', async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto('/');
     await page.getByTestId('view-toggle').click();
+    expect(PROJECT_IDS).toHaveLength(8);
     for (const id of PROJECT_IDS) {
       await expect(page.getByTestId(`card-${id}`)).toBeVisible();
     }
@@ -186,6 +234,15 @@ test.describe('portfolio graph SPA', () => {
     await expect(page.getByTestId('project-drawer')).toBeVisible();
     await expect(page.getByTestId('project-drawer')).toHaveAttribute('aria-modal', 'true');
     expect(errors).toEqual([]);
+  });
+
+  test('graph view exposes all 8 project nodes through the semantic nav', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('graph-canvas')).toBeVisible();
+    await expect(page.locator('nav[aria-label="Projects"] button')).toHaveCount(8);
+    for (const id of PROJECT_IDS) {
+      await expect(page.getByTestId(`nav-${id}`)).toHaveCount(1);
+    }
   });
 
   test('grid cards render 16:9 thumbnails and a terminal specimen fallback', async ({
@@ -437,6 +494,23 @@ test.describe('portfolio graph SPA', () => {
     await expect(page.getByTestId('about-github')).toHaveAttribute('href', GITHUB_URL);
   });
 
+  test('dragging a node and releasing settles without console errors', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'pointer drag smoke test runs on desktop');
+    const errors = trackErrors(page);
+    await page.goto('/');
+    const box = await hoverCenteredNode(page);
+    const startX = box.x + box.width / 2;
+    const startY = box.y + box.height / 2;
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX + 260, startY + 140, { steps: 12 });
+    await page.mouse.up();
+    await page.waitForTimeout(1400);
+    await expect(page.getByTestId('graph-canvas')).toBeVisible();
+    await expect(page.getByTestId('project-drawer')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
   test('hovering a node reveals its media preview card', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'hover previews are desktop-only');
     await page.goto('/');
@@ -614,6 +688,8 @@ test.describe('portfolio graph SPA', () => {
     await expect(page.getByTestId('nav-about')).toHaveAccessibleName('About');
     await expect(page.getByTestId('nav-github')).toHaveAccessibleName('GitHub');
     await expect(page.getByTestId('view-toggle')).toHaveAccessibleName('Switch to list view');
+    await expect(page.getByTestId('audio-toggle')).toHaveAccessibleName('Enable ambient sound');
+    await expect(page.getByTestId('audio-toggle')).toHaveAttribute('aria-pressed', 'false');
     const trigger = await openFilters(page);
     await expect(trigger).toHaveAccessibleName('Filters & Navigation');
     await expect(trigger).toHaveAttribute('aria-expanded', 'true');

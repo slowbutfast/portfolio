@@ -20,6 +20,7 @@ The system SHALL display an accessible inspection drawer (`role="dialog"`, `aria
 #### Scenario: User closes the drawer
 - **WHEN** the user clicks the close button, clicks the backdrop, or presses the Escape key
 - **THEN** the drawer unmounts, keyboard focus returns cleanly to the triggering element, and the URL hash is cleared.
+
 ### Requirement: Interactive terminal simulation
 The system SHALL provide a client-side terminal simulator for projects declaring a terminal demo, dynamically resolving commands against the project's own command table (`TerminalDemo.commands`), displaying a surgical cyan `>_` prompt, and highlighting diagnostic exit codes with an amber warning chip on non-zero exit codes (e.g. exit code 127) and green/neutral on exit code 0.
 
@@ -65,11 +66,15 @@ The system SHALL format the project drawer as an engineering blueprint featuring
 - **THEN** it renders with zero corner radius, an oversized translucent watermark index numeral, and sharp monospaced section headers.
 
 ### Requirement: Elevated primary repository and live project actions
-The system SHALL display permanent primary action links for `Code ↗` (GitHub repository) and, when `liveUrl` is declared, `Visit ↗` (live deployment or web demo) pinned in the sticky header directly below the project title, providing descriptive accessible names (e.g. `aria-label="OpenDungeon source code, opens in new tab"`) with `aria-hidden="true"` arrows. The legacy `Link` tab (`data-testid="preview-tab-link"`) SHALL be retired and completely removed from the preview tablist (`role="tablist"`), ensuring primary repository and demo links never require a tab switch to discover. Any non-repository reference linkouts (such as external articles or documentation) SHALL be rendered contextually within the Project Overview / Details section rather than as a standalone preview tab.
+The system SHALL display permanent primary action links for `Code ↗` (when `repo` is declared) and `Visit ↗` (when `liveUrl` is declared) pinned in the sticky header directly below the project title, providing descriptive accessible names (e.g. `aria-label="OpenDungeon source code, opens in new tab"`) with `aria-hidden="true"` arrows. If a project does not declare a `repo` (such as `ivy-film-festival-2026`), the system SHALL cleanly omit the `Code ↗` button and render `Visit ↗` as the sole primary action link. The legacy `Link` tab (`data-testid="preview-tab-link"`) SHALL be retired and completely removed from the preview tablist (`role="tablist"`), ensuring primary repository and demo links never require a tab switch to discover. Any non-repository reference linkouts (such as external articles or documentation) SHALL be rendered contextually within the Project Overview / Details section rather than as a standalone preview tab.
 
-#### Scenario: User inspects a project with a live URL
-- **WHEN** the inspector drawer opens for a project with `liveUrl` declared
+#### Scenario: User inspects a project with a live URL and repository
+- **WHEN** the inspector drawer opens for a project with both `repo` and `liveUrl` declared
 - **THEN** both `Code ↗` and `Visit ↗` appear in the sticky header below the title, with accessible descriptions and `target="_blank"`, and no redundant `Link` tab appears in the tablist.
+
+#### Scenario: User inspects a project without a public repository
+- **WHEN** the inspector drawer opens for a project without a `repo` (e.g., `ivy-film-festival-2026`)
+- **THEN** `Visit ↗` renders as the primary action button and `Code ↗` is omitted cleanly without rendering a broken or empty anchor element.
 
 #### Scenario: Drawer tablist contains only deep inspection modalities
 - **WHEN** the drawer renders preview tabs
@@ -96,3 +101,14 @@ The system SHALL render an interactive floating hover card (`NodeHoverCard`) on 
 #### Scenario: User initiates a canvas node drag while hover card is open
 - **WHEN** the pointer triggers a drag event on any canvas node
 - **THEN** the hover card immediately unmounts without lagging behind the gesture.
+
+### Requirement: Frame-rate independent smooth anchor tracking
+The system SHALL smoothly track the active project node's screen coordinates when `anchor` coordinates update (such as during physics settlement or window resize) using an exponential lerp factor ($P_{drawer}(t + \Delta t) = P_{drawer}(t) + (P_{node}(t) - P_{drawer}(t)) \times (1 - e^{-\lambda \Delta t})$ with $\lambda \approx 18$) driven directly by `requestAnimationFrame`, snapping to integer coordinates upon rest to preserve text sharpness, and anchoring statically without continuous motion when `prefers-reduced-motion: reduce` is active.
+
+#### Scenario: Anchor coordinates update during physics settlement
+- **WHEN** the canvas node anchor position updates while its inspection drawer is open
+- **THEN** the drawer smoothly interpolates toward the target position without discrete interval jitter or subpixel text blurring.
+
+#### Scenario: Anchor coordinates reach resting equilibrium
+- **WHEN** the interpolation error $\|P_{drawer} - P_{node}\| < 0.5\text{px}$
+- **THEN** the drawer coordinates snap to integer pixels and the animation loop suspends.

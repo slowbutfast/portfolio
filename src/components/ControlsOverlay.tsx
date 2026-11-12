@@ -16,6 +16,8 @@ interface ControlsOverlayProps {
   onReset: () => void;
   theme: ThemeMode;
   onToggleTheme: () => void;
+  soundEnabled: boolean;
+  onToggleSound: () => void;
   onOpenAbout: () => void;
 }
 
@@ -36,6 +38,8 @@ export function ControlsOverlay({
   onReset,
   theme,
   onToggleTheme,
+  soundEnabled,
+  onToggleSound,
   onOpenAbout,
 }: ControlsOverlayProps) {
   const [open, setOpen] = useState(false);
@@ -107,6 +111,16 @@ export function ControlsOverlay({
             className={bareText}
           >
             {view === 'graph' ? 'Grid' : 'Graph'}
+          </button>
+          <button
+            type="button"
+            data-testid="audio-toggle"
+            aria-label={soundEnabled ? 'Mute ambient sound' : 'Enable ambient sound'}
+            aria-pressed={soundEnabled}
+            onClick={onToggleSound}
+            className={bareText}
+          >
+            Sound
           </button>
           <button
             type="button"

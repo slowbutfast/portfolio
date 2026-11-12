@@ -15,8 +15,8 @@ function assetExists(src: string): boolean {
 }
 
 describe('project catalog contract', () => {
-  it('contains 6 projects with unique non-empty ids', () => {
-    expect(projects).toHaveLength(6);
+  it('contains 8 projects with unique non-empty ids', () => {
+    expect(projects).toHaveLength(8);
     const ids = projects.map((p) => p.id);
     expect(new Set(ids).size).toBe(ids.length);
     for (const id of ids) {
@@ -25,16 +25,16 @@ describe('project catalog contract', () => {
     }
   });
 
-  it('declares a non-empty classification on all 6 projects', () => {
-    expect(projects).toHaveLength(6);
+  it('declares a non-empty classification on all 8 projects', () => {
+    expect(projects).toHaveLength(8);
     for (const p of projects) {
       expect(typeof p.classification, `${p.id} classification type`).toBe('string');
       expect(p.classification.trim().length, `${p.id} classification empty`).toBeGreaterThan(0);
     }
   });
 
-  it('declares a mandatory non-empty shortTitle on all 6 projects', () => {
-    expect(projects).toHaveLength(6);
+  it('declares a mandatory non-empty shortTitle on all 8 projects', () => {
+    expect(projects).toHaveLength(8);
     for (const p of projects) {
       expect(typeof p.shortTitle, `${p.id} shortTitle type`).toBe('string');
       expect(p.shortTitle.trim().length, `${p.id} shortTitle empty`).toBeGreaterThan(0);
@@ -47,6 +47,8 @@ describe('project catalog contract', () => {
       'Transcribe+',
       'Sandwave',
       'AttentionMax',
+      'Kintsugi 3D',
+      'Ivy Film Fest',
     ]);
   });
 
@@ -58,8 +60,46 @@ describe('project catalog contract', () => {
       'transcribe-plus',
       'sandwave-sim',
       'attention-max',
+      'kintsugi-fracture',
+      'ivy-film-festival-2026',
     ]);
   });
+
+  it('defines the new projects with the required classification and summary', () => {
+    const kintsugi = projects.find((p) => p.id === 'kintsugi-fracture');
+    const ivy = projects.find((p) => p.id === 'ivy-film-festival-2026');
+    expect(kintsugi?.shortTitle).toBe('Kintsugi 3D');
+    expect(kintsugi?.classification).toBe('PROCEDURAL MESH GENERATION // WEBGL');
+    expect(kintsugi?.tags).toEqual(['Graphics']);
+    expect(kintsugi?.repo).toBe('https://github.com/slowbutfast/kintsugi-fracture');
+    expect(kintsugi?.liveUrl).toBe('https://kintsugi-fracture.vercel.app/');
+
+    expect(ivy?.shortTitle).toBe('Ivy Film Fest');
+    expect(ivy?.classification).toBe('STUDENT FILM FESTIVAL // BRAND & WEB');
+    expect(ivy?.summary).toBe(
+      'Web design, visual identity, and interactive screening program for the student-run Ivy Film Festival.',
+    );
+    expect(ivy?.tags).toEqual(['Design']);
+    expect(ivy?.repo).toBeUndefined();
+    expect(ivy?.liveUrl).toBe('https://www.ivyfilmfestival.org/');
+  });
+
+  it('treats repo as optional while every other project declares a GitHub URL', () => {
+    for (const p of projects) {
+      if (p.id === 'ivy-film-festival-2026') {
+        expect(p.repo).toBeUndefined();
+        continue;
+      }
+      expect(typeof p.repo, `${p.id} repo`).toBe('string');
+      expect(p.repo).toMatch(/^https:\/\/github\.com\//);
+    }
+  });
+
+  it('keeps sandwave-sim at exactly the two acoustic tags', () => {
+    const sandwave = projects.find((p) => p.id === 'sandwave-sim');
+    expect(sandwave?.tags).toEqual(['Vanilla JS', 'Audio']);
+  });
+
 
   it('declares a discriminated preview union on every project', () => {
     for (const p of projects) {
@@ -96,13 +136,17 @@ describe('project catalog contract', () => {
     }
   });
 
-  it('derives exactly the pinned 9 edges from the real catalog', () => {
+  it('derives exactly the pinned 13 edges from the real catalog', () => {
     const edges = deriveEdges(projects);
-    expect(edges).toHaveLength(9);
+    expect(edges).toHaveLength(13);
     const keys = edges.map((e) => [e.source, e.target].sort().join('<->')).sort();
     expect(keys).toEqual(
       [
+        'agentic-resume-builder<->attention-max',
+        'agentic-resume-builder<->ivy-film-festival-2026',
         'agentic-resume-builder<->open-dungeon',
+        'attention-max<->ivy-film-festival-2026',
+        'attention-max<->kintsugi-fracture',
         'attention-max<->open-dungeon',
         'attention-max<->sandwave-sim',
         'attention-max<->transcribe-plus',

@@ -32,7 +32,7 @@
 
 ## 1. Test Scaffolding (TDD)
 
-- [ ] 1.1 Scaffold unit test `src/utils/graphPlanarity.test.ts` asserting:
+- [x] 1.1 Scaffold unit test `src/utils/graphPlanarity.test.ts` asserting:
   - `PROJECTS.length === 8` and `deriveEdges(PROJECTS).length === 13`.
   - Every node has degree $\ge 1$.
   - `sandwave-sim` has ONLY `['Vanilla JS', 'Audio']` and zero edges to `kintsugi-fracture`.
@@ -40,36 +40,36 @@
   - `countCrossings` returns 0 for `PLANAR_NODE_SEEDS` on desktop (1440×900) and mobile (393×852).
   - 300 ticks of d3-force simulation with weak seed homing yields 0 crossings at resting equilibrium on both desktop and mobile viewports, and preserves minimum node center separation $\ge 44\text{px}$.
   - `sandwave-sim` is strictly interior to $\triangle(\text{open-dungeon}, \text{transcribe-plus}, \text{attention-max})$.
-- [ ] 1.2 Scaffold unit test `src/utils/bridgeOscillator.test.ts` asserting:
+- [x] 1.2 Scaffold unit test `src/utils/bridgeOscillator.test.ts` asserting:
   - 2nd-order ODE integration with $\zeta = 0.35, \omega_n = 14\text{ rad/s}$ satisfies decay envelope $A(t) \le 1.10 \times \frac{A_0}{\sqrt{1 - \zeta^2}} e^{-\zeta \omega_n t}$.
   - Substep accumulator with $\delta t_{sub} \le 16\text{ms}$ and $32\text{ms}$ frame clamp prevents numerical blowup.
   - At zero acceleration, lateral sag decays to resting equilibrium ($|\delta| < 0.001$).
-- [ ] 1.3 Update unit test `src/utils/bridgeGeometry.test.ts` asserting:
+- [x] 1.3 Update unit test `src/utils/bridgeGeometry.test.ts` asserting:
   - Waist width $W_{waist}(d) === W_{base}(n)$ for all $d \le L_{rest}(e)$.
   - $W_{base}(n) = \min(R_A, R_B) \times 0.65$ clamped to $6 + 4(n - 1)\text{px}$.
   - Waist width decreases monotonically for $d > L_{rest}(e)$.
   - Bilateral reflection symmetry and $C^1$ tangent continuity hold when sag delta $\delta \ne 0$.
   - Returns `null` when $d \le R_A + R_B$.
-- [ ] 1.4 Scaffold unit test `src/physics/graphSimulation.test.ts` asserting:
+- [x] 1.4 Scaffold unit test `src/physics/graphSimulation.test.ts` asserting:
   - Dragging a node beyond $2.0 \times L_{rest}(e)$ sets `isDetached: true`.
   - Rubber-band tether function cushions pinned drag coordinates `fx`/`fy`.
   - Releasing drag restores bridge when $d \le 1.4 \times L_{rest}(e)$, preserving all 13 edges with zero permanent edge loss and 0 crossings at settled equilibrium.
-- [ ] 1.5 Scaffold unit test `src/audio/ambientSynth.test.ts` asserting:
+- [x] 1.5 Scaffold unit test `src/audio/ambientSynth.test.ts` asserting:
   - Web Audio node creation matching `audioConstants.ts` (`BASE_FREQ = 65`, `BASE_LOWPASS_FREQ = 600`, `BANDPASS_REST_FREQ = 750`, $Q = 2.5$).
   - AudioContext is suspended until explicit user interaction.
   - Armed state smoothly resumes on first user touch if `portfolio_sound_enabled === 'true'`.
   - `document.visibilitychange` suspends when hidden and resumes when visible.
   - Parameter ramps use `.setTargetAtTime` with $0.05\text{s}$ time constant.
   - State synchronizes with `localStorage.portfolio_sound_enabled`.
-- [ ] 1.6 Update unit test `src/data/projects.test.ts` asserting:
+- [x] 1.6 Update unit test `src/data/projects.test.ts` asserting:
   - 8 projects exist in `projects`.
   - `kintsugi-fracture` (`shortTitle: 'Kintsugi 3D'`, `classification: 'PROCEDURAL MESH GENERATION // WEBGL'`) and `ivy-film-festival-2026` (`shortTitle: 'Ivy Film Fest'`, `classification: 'STUDENT FILM FESTIVAL // BRAND & WEB'`) are valid entries.
   - `repo` is undefined for `ivy-film-festival-2026` and defined string for other projects.
-- [ ] 1.7 Scaffold unit test `src/utils/auditLinks.test.ts` asserting:
+- [x] 1.7 Scaffold unit test `src/utils/auditLinks.test.ts` asserting:
   - URL extraction from `projects.ts` and `profile.ts`.
   - Mocked HTTP response classification (200/301 -> pass, 999/429 -> warning, 404 -> fail).
   - Timeout and regex email validation without live network calls.
-- [ ] 1.8 Scaffold E2E tests in `e2e/portfolio.spec.ts` asserting:
+- [x] 1.8 Scaffold E2E tests in `e2e/portfolio.spec.ts` asserting:
   - Header controls order: `About`, `GitHub ↗`, `Graph`/`Grid`, `Sound`, `Dark`/`Light`, `Filters ▾`.
   - Clicking `Sound` updates `aria-pressed` from `false` to `true` and saves preference in `localStorage.portfolio_sound_enabled`.
   - 8 nodes appear in Graph view and 8 cards in Grid view.
@@ -80,16 +80,16 @@
 
 ## 2. Core Models & 8-Project Planar Catalog
 
-- [ ] 2.1 Update `src/types/portfolio.ts`:
+- [x] 2.1 Update `src/types/portfolio.ts`:
   - Add `'Graphics'` and `'Design'` to `ParadigmTag`.
   - Make `repo?: string` optional on `ProjectData`.
-- [ ] 2.2 Update `src/data/projects.ts`:
+- [x] 2.2 Update `src/data/projects.ts`:
   - Ensure `sandwave-sim` retains ONLY `['Vanilla JS', 'Audio']` (do not add Graphics).
   - Tag `attention-max` with `['Vanilla JS', 'WebExtension', 'Design', 'Graphics']`.
   - Tag `agentic-resume-builder` with `['Agent Tooling', 'LaTeX', 'Design']`.
   - Add `kintsugi-fracture`: shortTitle `'Kintsugi 3D'`, classification `'PROCEDURAL MESH GENERATION // WEBGL'`, tags `['Graphics']`, repo defined, liveUrl defined.
   - Add `ivy-film-festival-2026`: shortTitle `'Ivy Film Fest'`, classification `'STUDENT FILM FESTIVAL // BRAND & WEB'`, summary `'Web design, visual identity, and interactive screening program for the student-run Ivy Film Festival.'`, tags `['Design']`, `repo` omitted, liveUrl defined.
-- [ ] 2.3 Update `src/data/graphSeeds.ts`:
+- [x] 2.3 Update `src/data/graphSeeds.ts`:
   - Define 8 normalized planar seeds strictly matching catalog project IDs (`pict-climate-risk-viz-chatbot`, `kintsugi-fracture`, `ivy-film-festival-2026`):
     - `agentic-resume-builder`: `(0.18, 0.50)`
     - `open-dungeon`: `(0.40, 0.48)`
@@ -99,29 +99,29 @@
     - `sandwave-sim`: `(0.56, 0.55)`
     - `kintsugi-fracture`: `(0.84, 0.72)`
     - `ivy-film-festival-2026`: `(0.15, 0.75)`
-- [ ] 2.4 Run `npm run test:unit src/utils/graphPlanarity.test.ts src/data/projects.test.ts` to confirm 0 crossings and valid catalog.
+- [x] 2.4 Run `npm run test:unit src/utils/graphPlanarity.test.ts src/data/projects.test.ts` to confirm 0 crossings and valid catalog.
 
 ---
 
 ## 3. Bridge Oscillator & Fluid Cinching
 
-- [ ] 3.1 Implement `src/utils/bridgeOscillator.ts`:
+- [x] 3.1 Implement `src/utils/bridgeOscillator.ts`:
   - Export `BridgeOscillatorState` (`sag`, `sagVelocity`, `waistOffset`, `waistVelocity`).
   - Implement 2nd-order ODE integration using Semi-Implicit Euler with substep accumulator ($\delta t_{sub} \le 16\text{ms}$), frame clamping ($32\text{ms}$), $\zeta = 0.35, \omega_n = 14\text{ rad/s}$, and input acceleration clamping.
-- [ ] 3.2 Update `src/utils/bridgeGeometry.ts`:
+- [x] 3.2 Update `src/utils/bridgeGeometry.ts`:
   - Accept `restDistance: number` derived per edge ($L_{rest}(e) = \|\text{seed}_u - \text{seed}_v\|$).
   - Implement rest-normalized waist cinching: $W_{waist}(d) = W_{base}(n)$ for $d \le L_{rest}(e)$, and $W_{waist}(d) = W_{base}(n) \times (1 - \frac{d - L_{rest}(e)}{d_{snap}(e) - L_{rest}(e)})^{1.25}$ for $d > L_{rest}(e)$.
   - Calculate base width $W_{base}(n) = \min(R_A, R_B) \times 0.65$ clamped to $6 + 4(n-1)\text{px}$.
   - Apply lateral sag displacement $\delta$ along the bridge normal vector to Bézier control points while preserving bilateral reflection symmetry and tangent angles.
-- [ ] 3.3 Run `npm run test:unit src/utils/bridgeOscillator.test.ts src/utils/bridgeGeometry.test.ts`.
+- [x] 3.3 Run `npm run test:unit src/utils/bridgeOscillator.test.ts src/utils/bridgeGeometry.test.ts`.
 
 ---
 
 ## 4. Procedural Web Audio Engine
 
-- [ ] 4.1 Implement `src/audio/audioConstants.ts`:
+- [x] 4.1 Implement `src/audio/audioConstants.ts`:
   - Export centralized constants: `BASE_FREQ = 65`, `BASE_LOWPASS_FREQ = 600`, `BASE_DRONE_GAIN = 0.063`, `NOISE_FLOOR_GAIN = 0.016`, `BANDPASS_REST_FREQ = 750`, `BANDPASS_SWEEP_MIN = 450`, `BANDPASS_SWEEP_MAX = 1400`, `HOVER_SWELL_GAIN = 2.0`, `PAN_MIN = -0.75`, `PAN_MAX = 0.75`, `RAMP_TIME_CONSTANT = 0.05`, `STORAGE_KEY = 'portfolio_sound_enabled'`.
-- [ ] 4.2 Implement `src/audio/ambientSynth.ts`:
+- [x] 4.2 Implement `src/audio/ambientSynth.ts`:
   - Procedural sound generator using Web Audio API:
     - 65Hz sawtooth oscillator.
     - 600Hz 24dB/oct lowpass filter producing warm audible transformer buzz (-24dBFS).
@@ -132,68 +132,68 @@
   - Use `setTargetAtTime(val, ctx.currentTime, 0.05)` for all parameter ramps.
   - Singleton AudioContext with armed autoplay state and `visibilitychange` suspend/resume.
   - Read/write `localStorage.getItem('portfolio_sound_enabled')`.
-- [ ] 4.3 Run `npm run test:unit src/audio/ambientSynth.test.ts`.
+- [x] 4.3 Run `npm run test:unit src/audio/ambientSynth.test.ts`.
 
 ---
 
 ## 5. Physics Simulation & Dynamic Drag Snap
 
-- [ ] 5.1 Update `src/physics/graphSimulation.ts`:
+- [x] 5.1 Update `src/physics/graphSimulation.ts`:
   - Derive per-edge rest length $L_{rest}(e)$ from scaled planar seeds.
   - Add link distance guard: during active node drag (`isDragging === true`), if distance $d > 2.0 \times L_{rest}(e)$, mark bridge as snapped (`isDetached: true`).
   - Implement rubber-band displacement damping on pinned drag coordinates `fx`/`fy` to prevent dragging infinitely off-canvas.
   - On pointer release (`dragEnded`), restore all connections and let nodes settle back toward planar equilibrium; bridge reconnects at $d \le 1.4 \times L_{rest}(e)$. Zero permanent edge loss.
   - Maintain map of per-link `BridgeOscillatorState`, stepping each active oscillator and checking whether simulation, camera transforms, and oscillators have converged to sleep.
   - Expose `isIdle: boolean` to pause outer rAF loops.
-- [ ] 5.2 Run `npm run test:unit src/physics/graphSimulation.test.ts` to verify simulation stability and zero permanent link deletion.
+- [x] 5.2 Run `npm run test:unit src/physics/graphSimulation.test.ts` to verify simulation stability and zero permanent link deletion.
 
 ---
 
 ## 6. Presentation Components & UI Integration
 
-- [ ] 6.1 Update `src/components/GraphCanvas.tsx`:
+- [x] 6.1 Update `src/components/GraphCanvas.tsx`:
   - Instantiate and wire `BridgeOscillator` states for each active edge.
   - Render dynamic bridges using updated `computeBridgeGeometry` with sag, per-edge $L_{rest}(e)$, and rest-normalized waist.
   - Suppress rendering of snapped bridges during active drag ($d > 2.0 \times L_{rest}(e)$).
   - Connect audio engine: call `synth.onNodeHover` on hover, `synth.onPointerMove` on canvas move, `synth.onDragVelocity` during drag.
   - Suspend continuous `requestAnimationFrame` loop when simulation, camera lerps, and all bridge oscillators are at rest; awaken on pointer down/move, resize, theme change, filter selection.
-- [ ] 6.2 Update `src/components/ControlsOverlay.tsx`:
+- [x] 6.2 Update `src/components/ControlsOverlay.tsx`:
   - Add `Sound` button in top-right header controls in exact sequence:
     `About` -> `GitHub ↗` -> `Graph`/`Grid` -> `Sound` -> `Dark`/`Light` -> `Filters ▾`.
   - Style with `bareText` class, `aria-pressed={soundEnabled}`, and `data-testid="audio-toggle"`.
-- [ ] 6.3 Update `src/components/ProjectDrawer.tsx`:
+- [x] 6.3 Update `src/components/ProjectDrawer.tsx`:
   - Conditionally render `Code ↗` button only when `project.repo` is defined (`{project.repo && (...)}`).
   - Implement smooth RAF lerp tracking for desktop HUD position when anchor updates, snapping to integer device pixels upon rest.
-- [ ] 6.4 Update `src/App.tsx`:
+- [x] 6.4 Update `src/App.tsx`:
   - Manage audio engine instance and sound preference, providing `soundEnabled` and `onToggleSound` to `ControlsOverlay` and `GraphCanvas`.
-- [ ] 6.5 Update `src/components/ListView.tsx`:
+- [x] 6.5 Update `src/components/ListView.tsx`:
   - Ensure all 8 projects render cleanly in grid mode, handling optional `repo` gracefully in card linkouts.
 
 ---
 
 ## 7. Tooling, Link Auditor & HTML Meta
 
-- [ ] 7.1 Implement `scripts/audit-links.mjs`:
+- [x] 7.1 Implement `scripts/audit-links.mjs`:
   - Native ESM Node script using `fetch` with User-Agent, timeout (5000ms), retries, GET fallback for 405/403, and handling 999 (LinkedIn) as non-blocking warning.
   - Add `"test:links": "node scripts/audit-links.mjs"` to `package.json`.
-- [ ] 7.2 Implement `src/utils/auditLinks.test.ts`:
+- [x] 7.2 Implement `src/utils/auditLinks.test.ts`:
   - Vitest unit test for URL extraction and mocked HTTP status classification.
-- [ ] 7.3 Update `index.html`:
+- [x] 7.3 Update `index.html`:
   - Set `<title>` to `Gregory Lazatin | Portfolio`.
   - Add canonical Open Graph meta tags (`og:title`, `og:description`, `og:type`, `og:url`, `twitter:card`).
-- [ ] 7.4 Run `npm run test:links` to verify external links audit cleanly.
+- [x] 7.4 Run `npm run test:links` to verify external links audit cleanly.
 
 ---
 
 ## 8. Verification & Empirical Audit
 
-- [ ] 8.1 Run `npm run typecheck` and verify 0 TypeScript compiler diagnostics.
-- [ ] 8.2 Run `npm run test:unit` and verify all unit test suites pass cleanly.
-- [ ] 8.3 Run `npm run test:e2e` across Desktop and Mobile viewports verifying:
+- [x] 8.1 Run `npm run typecheck` and verify 0 TypeScript compiler diagnostics.
+- [x] 8.2 Run `npm run test:unit` and verify all unit test suites pass cleanly.
+- [x] 8.3 Run `npm run test:e2e` across Desktop and Mobile viewports verifying:
   - Header controls order and sound toggle state persistence.
   - 8 projects render in canvas and grid views.
   - Closed-source project (Ivy) renders without `Code ↗` button.
   - Smooth node drag and link snapping recovery.
   - 0 accessibility violations across themes via Axe.
-- [ ] 8.4 Run `npm run build` and verify clean production bundle output.
-- [ ] 8.5 Populate `verification.md` with execution traces and Requirement Adherence Matrix.
+- [x] 8.4 Run `npm run build` and verify clean production bundle output.
+- [x] 8.5 Populate `verification.md` with execution traces and Requirement Adherence Matrix.

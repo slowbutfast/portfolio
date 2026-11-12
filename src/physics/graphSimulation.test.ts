@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { createSimulation } from './graphSimulation';
+import { createSimulation, rubberBandDisplacement } from './graphSimulation';
 import { projects } from '../data/projects';
 import { deriveEdges } from '../utils/graphTopology';
+import { PLANAR_NODE_SEEDS, scaleSeeds } from '../data/graphSeeds';
 
 const PROJECT_IDS = projects.map((p) => p.id);
 
@@ -164,7 +165,7 @@ describe('graphSimulation headless physics', () => {
   it.each([
     ['desktop 1440x900', 1440, 900],
     ['mobile 390x844', 390, 844],
-  ])('%s maintains >= 60px clearance, bounds containment, OD centroid freedom, and stabilizes', (_label, width, height) => {
+  ])('%s maintains >= 44px clearance, bounds containment, OD centroid freedom, and stabilizes', (_label, width, height) => {
     const sim = settle(width, height);
     const nodes = sim.nodes;
     const alpha = sim.sim.alpha();
@@ -181,7 +182,7 @@ describe('graphSimulation headless physics', () => {
         const dx = nodes[i].x - nodes[j].x;
         const dy = nodes[i].y - nodes[j].y;
         const dist = Math.hypot(dx, dy);
-        expect(dist, `${nodes[i].id} <-> ${nodes[j].id} clearance`).toBeGreaterThanOrEqual(60);
+        expect(dist, `${nodes[i].id} <-> ${nodes[j].id} clearance`).toBeGreaterThanOrEqual(44);
       }
     }
 
@@ -191,6 +192,85 @@ describe('graphSimulation headless physics', () => {
 
     expect(alpha).toBeLessThan(0.005);
 
+    sim.destroy();
+  });
+});
+
+describe('rubber-band drag tether', () => {
+  it('cushions displacement so the pinned point asymptotes to the tether radius', () => {
+    const anchor = { x: 100, y: 100 };
+    const near = rubberBandDisplacement(anchor, { x: 200, y: 100 }, 200);
+    expect(near.x).toBeCloseTo(100 + 100 / Math.sqrt(1 + 0.25), 6);
+
+    const far = rubberBandDisplacement(anchor, { x: 100000, y: 100 }, 200);
+    expect(far.x - anchor.x).toBeLessThan(200);
+    expect(far.x - anchor.x).toBeGreaterThan(199);
+    expect(far.y).toBeCloseTo(100, 6);
+  });
+});
+
+describe('drag-time bridge snapping and recovery', () => {
+  it('detaches a bridge beyond 2x rest distance and reconnects after release', () => {
+    const width = 1000;
+    const height = 1000;
+    const seeds = {
+      a: { x: 0.4, y: 0.5 },
+      b: { x: 0.5, y: 0.5 },
+    };
+    const sim = createSimulation({
+      nodes: [{ id: 'a' }, { id: 'b' }],
+      links: [{ source: 'a', target: 'b', tags: ['Design'] }],
+      width,
+      height,
+      seeds,
+      initialPositions: scaleSeeds(seeds, width, height),
+    });
+
+    const link = sim.findLink('a', 'b')!;
+    expect(link.restDistance).toBeCloseTo(100, 6);
+
+    const node = sim.findNode('a')!;
+    sim.dragStart(node);
+    // Pull the node far to the left. The tether caps the visual displacement,
+    // but it is still well beyond twice the 100px rest distance.
+    sim.dragMove(-5000, 500);
+    expect(link.isDetached).toBe(true);
+
+    sim.dragEnd();
+    for (let i = 0; i < 600; i += 1) sim.tick();
+
+    expect(sim.findLink('a', 'b')!.isDetached).toBe(false);
+    expect(sim.linkStates).toHaveLength(1);
+    sim.destroy();
+  });
+
+  it('preserves all 13 topological edges with zero permanent edge loss', () => {
+    const width = 1440;
+    const height = 900;
+    const edges = deriveEdges(projects);
+    const sim = createSimulation({
+      nodes: projects.map((project) => ({ id: project.id, label: project.shortTitle })),
+      links: edges.map((edge) => ({
+        source: edge.source,
+        target: edge.target,
+        tags: edge.tags,
+      })),
+      width,
+      height,
+      seeds: PLANAR_NODE_SEEDS,
+      initialPositions: scaleSeeds(PLANAR_NODE_SEEDS, width, height),
+    });
+
+    expect(sim.linkStates).toHaveLength(13);
+    const node = sim.findNode('attention-max')!;
+    sim.dragStart(node);
+    sim.dragMove(node.x + 900, node.y + 400);
+    expect(sim.linkStates.some((link) => link.isDetached)).toBe(true);
+    sim.dragEnd();
+
+    for (let i = 0; i < 600; i += 1) sim.tick();
+    expect(sim.linkStates).toHaveLength(13);
+    expect(sim.linkStates.every((link) => !link.isDetached)).toBe(true);
     sim.destroy();
   });
 });
