@@ -5,7 +5,7 @@ const isPreview = Boolean(process.env.PREVIEW_URL);
 
 // Protected previews answer with Vercel's auth page unless the request carries
 // the project's "Protection Bypass for Automation" secret.
-const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim() || undefined;
 
 export default defineConfig({
   testDir: './e2e',
