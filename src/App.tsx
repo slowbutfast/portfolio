@@ -52,6 +52,7 @@ export default function App() {
   const [drawerAnchor, setDrawerAnchor] = useState<CanvasAnchor | null>(null);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [hoverState, setHoverState] = useState<HoverState>(null);
+  const [layoutResetVersion, setLayoutResetVersion] = useState(0);
   const synth = useMemo(() => getAmbientSynth(), []);
   const [soundEnabled, setSoundEnabled] = useState(() => synth.isEnabled());
   const soundEnabledRef = useRef(soundEnabled);
@@ -135,6 +136,12 @@ export default function App() {
   }, [clearHoverDismissal]);
 
   useEffect(() => clearHoverDismissal, [clearHoverDismissal]);
+
+  // Focus movement is a hover-cancellation signal: dismiss immediately rather
+  // than waiting for the 150ms pointer-transfer grace period.
+  useEffect(() => {
+    dismissHover();
+  }, [focusedId, dismissHover]);
 
   const openAbout = useCallback(() => {
     setIsAboutOpen(true);
@@ -251,6 +258,10 @@ export default function App() {
     setSearch('');
   }, []);
 
+  const resetLayout = useCallback(() => {
+    setLayoutResetVersion((version) => version + 1);
+  }, []);
+
   const toggleTheme = useCallback(() => {
     setTheme((current) => (current === 'dark' ? 'light' : 'dark'));
   }, []);
@@ -281,6 +292,7 @@ export default function App() {
         search={search}
         onSearchChange={setSearch}
         onReset={resetFilters}
+        onResetLayout={resetLayout}
         theme={theme}
         onToggleTheme={toggleTheme}
         soundEnabled={soundEnabled}
@@ -302,6 +314,7 @@ export default function App() {
             onCanvasDragStart={dismissHover}
             onResolveAnchor={handleResolveAnchor}
             onSelect={openProject}
+            layoutResetVersion={layoutResetVersion}
           />
         ) : (
           <ListView
@@ -344,6 +357,7 @@ export default function App() {
         <NodeHoverCard
           project={hoverState.project}
           position={hoverState.position}
+          canvasCenter={{ x: window.innerWidth / 2, y: window.innerHeight / 2 }}
           onPointerEnter={clearHoverDismissal}
           onPointerLeave={scheduleHoverDismiss}
         />

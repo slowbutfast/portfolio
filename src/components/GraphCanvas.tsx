@@ -26,6 +26,8 @@ interface GraphCanvasProps {
   onCanvasDragStart?: () => void;
   onResolveAnchor?: (id: string, anchor: { x: number; y: number }) => void;
   onSelect: (id: string, anchor?: { x: number; y: number }) => void;
+  /** Bumped by the 3-dot menu's "Reset layout" action. */
+  layoutResetVersion?: number;
 }
 
 interface Size {
@@ -62,6 +64,15 @@ const DEFAULT_TOKENS: FluidTokens = {
 const LABEL_FONT =
   '500 12px "Helvetica Neue", Helvetica, -apple-system, BlinkMacSystemFont, Arial, sans-serif';
 
+/** Unified hover gate shared by simulation pinning and the DOM preview card. */
+const HOVER_DWELL_MS = 200;
+/** Proximity-only webbing appears for non-edge pairs inside this distance. */
+const PROXIMITY_MAX_DIST = 96;
+
+function edgeKey(source: string, target: string): string {
+  return [source, target].sort().join('\u0000');
+}
+
 function readToken(name: string, fallback: string): string {
   if (typeof window === 'undefined') return fallback;
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -93,7 +104,7 @@ function drawFluidBridge(
   b: { x: number; y: number },
   radiusA: number,
   radiusB: number,
-  fillStyle: string,
+  fillStyle: string | CanvasGradient,
   alpha: number,
   options: BridgeOptions,
 ): void {
@@ -122,6 +133,51 @@ function drawFluidBridge(
   ctx.fill();
 }
 
+/**
+ * Retracting droplet tips left behind when a bridge snaps. The tips recede into
+ * both endpoint circles over the bridge's `220ms` recoil window.
+ */
+function drawRecoilTips(
+  ctx: CanvasRenderingContext2D,
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  radiusA: number,
+  radiusB: number,
+  color: string,
+  alpha: number,
+  progress: number,
+): void {
+  if (progress <= 0) return;
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const distance = Math.hypot(dx, dy);
+  if (distance <= 0.0001) return;
+  const ux = dx / distance;
+  const uy = dy / distance;
+  const tipRadius = 2 + 5 * progress;
+
+  ctx.globalAlpha = alpha * 0.85 * progress;
+  ctx.fillStyle = color;
+  for (const [origin, direction, radius] of [
+    [a, { x: ux, y: uy }, radiusA],
+    [b, { x: -ux, y: -uy }, radiusB],
+  ] as const) {
+    const cx = origin.x + direction.x * radius;
+    const cy = origin.y + direction.y * radius;
+    ctx.beginPath();
+    ctx.ellipse(
+      cx,
+      cy,
+      tipRadius * 1.4,
+      tipRadius,
+      Math.atan2(direction.y, direction.x),
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+  }
+}
+
 export function GraphCanvas({
   nodes,
   edges,
@@ -134,6 +190,7 @@ export function GraphCanvas({
   onCanvasDragStart,
   onResolveAnchor,
   onSelect,
+  layoutResetVersion = 0,
 }: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -166,6 +223,8 @@ export function GraphCanvas({
   const synthRef = useRef<AmbientSynth | null>(null);
   synthRef.current = synth ?? null;
   const lastDragPointRef = useRef<{ x: number; y: number; t: number } | null>(null);
+  const hoverDwellTimerRef = useRef<number | null>(null);
+  const hoverCandidateRef = useRef<GraphNode | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -176,7 +235,8 @@ export function GraphCanvas({
 
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     reduceMotionRef.current = reduceMotion;
-    canHoverRef.current = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    canHoverRef.current =
+      !reduceMotion && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
     const simNodes = nodes.map((n) => ({ id: n.id, label: n.label }));
     const simLinks = edges.map((e) => ({ source: e.source, target: e.target }));
@@ -227,28 +287,89 @@ export function GraphCanvas({
       const visited = visitedRef.current;
       const focalId = focused ?? sim.hovered?.id ?? null;
 
-      // Pure binary connections. No grayscale, no alpha fade on live edges;
-      // only filtered-out pairs recede to 0.12.
       const nodesById = new Map(sim.nodes.map((n) => [n.id, n]));
+      const nodeColor = (id: string): string => {
+        if (focused === id) return tokens.accent;
+        if (!focused && sim.hovered?.id === id) return tokens.accent;
+        if (visited.has(id) || nodesById.get(id)?.visited === true) return tokens.nodeVisited;
+        return tokens.nodeUnvisited;
+      };
+      const permanentEdgeKeys = new Set(edges.map((edge) => edgeKey(edge.source, edge.target)));
+
+      // Zero-force proximity-only webbing for non-edge pairs. This pass paints
+      // beneath permanent bridges and nodes, in deterministic sorted-pair order,
+      // and skips every permanent edge so a detached bridge never duplicates.
+      const sortedNodeIds = [...active.keys()].sort();
+      for (let i = 0; i < sortedNodeIds.length; i += 1) {
+        for (let j = i + 1; j < sortedNodeIds.length; j += 1) {
+          const sourceId = sortedNodeIds[i];
+          const targetId = sortedNodeIds[j];
+          if (permanentEdgeKeys.has(edgeKey(sourceId, targetId))) continue;
+          const a = active.get(sourceId);
+          const b = active.get(targetId);
+          if (!a || !b) continue;
+          const distance = Math.hypot(a[0] - b[0], a[1] - b[1]);
+          const ra = nodesById.get(sourceId)?.radius ?? 22;
+          const rb = nodesById.get(targetId)?.radius ?? 22;
+          if (distance <= ra + rb || distance >= PROXIMITY_MAX_DIST) continue;
+          const taper = 1 - distance / PROXIMITY_MAX_DIST;
+          drawFluidBridge(
+            ctx,
+            { x: a[0], y: a[1] },
+            { x: b[0], y: b[1] },
+            ra,
+            rb,
+            tokens.connection,
+            0.22 * taper,
+            { restDistance: distance, sharedTagCount: 1, sag: 0 },
+          );
+        }
+      }
+
+      // Pure binary connections. No grayscale, no alpha fade on live edges;
+      // only filtered-out pairs recede to 0.12. Bridge fills blend the endpoint
+      // node colors along the center-to-center axis through `connection`.
       for (const edge of edges) {
         const a = active.get(edge.source);
         const b = active.get(edge.target);
         if (!a || !b) continue;
         const link = sim.findLink(edge.source, edge.target);
-        // Detached bridges are a transient drag-only visual. The topological
-        // edge remains in the model and reappears on release.
-        if (link?.isDetached && !reduceMotionRef.current) continue;
         const ra = nodesById.get(edge.source)?.radius ?? 22;
         const rb = nodesById.get(edge.target)?.radius ?? 22;
         const isDim = dimmed.has(edge.source) && dimmed.has(edge.target);
         const isFocal = focalId !== null && (edge.source === focalId || edge.target === focalId);
+        const sourceColor = nodeColor(edge.source);
+        const targetColor = nodeColor(edge.target);
+        if (link?.isDetached && !reduceMotionRef.current) {
+          drawRecoilTips(
+            ctx,
+            { x: a[0], y: a[1] },
+            { x: b[0], y: b[1] },
+            ra,
+            rb,
+            isFocal ? tokens.accent : tokens.connection,
+            isDim ? 0.12 : 1,
+            link.recoilProgress,
+          );
+          continue;
+        }
+        let fill: string | CanvasGradient;
+        if (sourceColor === targetColor) {
+          fill = sourceColor;
+        } else {
+          const gradient = ctx.createLinearGradient(a[0], a[1], b[0], b[1]);
+          gradient.addColorStop(0, sourceColor);
+          gradient.addColorStop(0.5, tokens.connection);
+          gradient.addColorStop(1, targetColor);
+          fill = gradient;
+        }
         drawFluidBridge(
           ctx,
           { x: a[0], y: a[1] },
           { x: b[0], y: b[1] },
           ra,
           rb,
-          isFocal ? tokens.accent : tokens.connection,
+          fill,
           isDim ? 0.12 : 1,
           {
             restDistance: link?.restDistance,
@@ -412,6 +533,10 @@ export function GraphCanvas({
       observer.disconnect();
       themeObserver.disconnect();
       cancelAnimationFrame(raf);
+      if (hoverDwellTimerRef.current !== null) {
+        window.clearTimeout(hoverDwellTimerRef.current);
+        hoverDwellTimerRef.current = null;
+      }
       sim.sim.on('tick', null);
       sim.destroy();
       simRef.current = null;
@@ -476,6 +601,29 @@ export function GraphCanvas({
     wakeRef.current();
   }, [focusedId]);
 
+  // Focusing a semantic nav entry immediately cancels any pending hover dwell
+  // and dismisses an open preview card.
+  useEffect(() => {
+    if (hoverDwellTimerRef.current !== null) {
+      window.clearTimeout(hoverDwellTimerRef.current);
+      hoverDwellTimerRef.current = null;
+    }
+    hoverCandidateRef.current = null;
+    if (hoveredProjectIdRef.current !== null) {
+      hoveredProjectIdRef.current = null;
+      synthRef.current?.onNodeHover(false);
+      onHoverNodeRef.current?.(null, null);
+    }
+    simRef.current?.hover(null);
+  }, [focusedId]);
+
+  useEffect(() => {
+    if (layoutResetVersion <= 0) return;
+    simRef.current?.resetLayout();
+    renderRef.current();
+    wakeRef.current();
+  }, [layoutResetVersion]);
+
   const worldPoint = (clientX: number, clientY: number) => {
     const canvas = canvasRef.current!;
     const rect = canvas.getBoundingClientRect();
@@ -515,6 +663,57 @@ export function GraphCanvas({
     const anchor = nodeScreenPoint(node);
     if (project && anchor) onHoverNodeRef.current?.(project, anchor);
     else onHoverNodeRef.current?.(null, null);
+  };
+
+  const clearHoverDwell = () => {
+    if (hoverDwellTimerRef.current !== null) {
+      window.clearTimeout(hoverDwellTimerRef.current);
+      hoverDwellTimerRef.current = null;
+    }
+    hoverCandidateRef.current = null;
+  };
+
+  /**
+   * Single 200ms gate for both simulation hover physics and the DOM card. Fast
+   * sweeps across nodes never open a card; a stationary dwell does both at once.
+   */
+  const beginHoverDwell = (node: GraphNode | null) => {
+    const sim = simRef.current;
+    if (!sim) return;
+    clearHoverDwell();
+    if (!node) {
+      emitHover(null);
+      if (!reduceMotionRef.current) sim.hover(null);
+      return;
+    }
+    if (
+      !canHoverRef.current ||
+      reduceMotionRef.current ||
+      sim.state === 'coasting' ||
+      sim.state === 'drag'
+    ) {
+      emitHover(null);
+      return;
+    }
+    if (hoveredProjectIdRef.current === node.id) return;
+    if (hoverCandidateRef.current?.id === node.id) return;
+
+    hoverCandidateRef.current = node;
+    // Close any previous card immediately; the dwell timer re-opens on the new
+    // candidate only if the pointer stays put.
+    emitHover(null);
+    if (sim.state === 'hover') sim.hover(null);
+    hoverDwellTimerRef.current = window.setTimeout(() => {
+      hoverDwellTimerRef.current = null;
+      const currentSim = simRef.current;
+      const candidate = hoverCandidateRef.current;
+      hoverCandidateRef.current = null;
+      if (!currentSim || !candidate || reduceMotionRef.current) return;
+      const current = currentSim.findNode(candidate.id);
+      if (!current || currentSim.state === 'coasting' || currentSim.state === 'drag') return;
+      currentSim.hover(current);
+      emitHover(current);
+    }, HOVER_DWELL_MS);
   };
 
   const hitNode = (wx: number, wy: number): GraphNode | null => {
@@ -558,16 +757,13 @@ export function GraphCanvas({
         synthRef.current?.onDragVelocity((p.x - last.x) / dtS, (p.y - last.y) / dtS);
       }
       lastDragPointRef.current = { x: p.x, y: p.y, t: e.timeStamp };
+      clearHoverDwell();
       emitHover(null);
       sim.dragMove(p.x, p.y);
       return;
     }
     const node = hitNode(p.x, p.y);
-    if (canHoverRef.current) emitHover(node);
-    if (reduceMotionRef.current) return;
-    if (sim.state === 'idle' || sim.state === 'hover') {
-      sim.hover(node);
-    }
+    beginHoverDwell(node);
   };
 
   const onPointerDown = (e: ReactPointerEvent<HTMLCanvasElement>) => {
@@ -575,7 +771,9 @@ export function GraphCanvas({
     if (!sim) return;
     wakeRef.current();
     emitAudioPointer(e.clientX, e.clientY);
+    clearHoverDwell();
     emitHover(null);
+    if (sim.state === 'hover') sim.hover(null);
     const p = worldPoint(e.clientX, e.clientY);
     const node = hitNode(p.x, p.y);
     downPosRef.current = { x: p.x, y: p.y };
@@ -613,6 +811,7 @@ export function GraphCanvas({
 
   const onPointerLeave = () => {
     wakeRef.current();
+    clearHoverDwell();
     emitHover(null);
     const sim = simRef.current;
     if (!sim) return;

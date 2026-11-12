@@ -47,6 +47,10 @@ export interface BridgeLinkState {
   restDistance: number;
   /** True while the user has stretched this bridge past the snap threshold. */
   isDetached: boolean;
+  /** Retracting droplet progress after a snap (`1 -> 0` over `RECOIL_MS`). */
+  recoilProgress: number;
+  /** Simulation-clock timestamp before which reconnection is blocked. */
+  reconnectCooldownUntil: number;
   oscillator: BridgeOscillatorState;
   previousDistance: number;
   previousVelocity: number;
@@ -67,6 +71,8 @@ export interface GraphSimulation {
   dragStart(node: GraphNode): void;
   dragMove(x: number, y: number): void;
   dragEnd(): void;
+  /** Clear user pins and detached flags, then restore the planar seeds. */
+  resetLayout(): void;
   findNode(id: string): GraphNode | undefined;
   findLink(source: string, target: string): BridgeLinkState | undefined;
   restDistance(source: string, target: string): number;
@@ -87,9 +93,17 @@ const VELOCITY_DECAY_COAST = 0.18;
 const COAST_RESTORE_SPEED = 0.5;
 const TICK_MS = 1000 / 60;
 /** Stretch past this multiple of the rest distance severs the visual bridge. */
-export const SNAP_MULTIPLIER = 2;
+export const SNAP_MULTIPLIER = 1.6;
 /** A released bridge reforms once the nodes return within this multiple. */
-export const RECONNECT_MULTIPLIER = 1.4;
+export const RECONNECT_MULTIPLIER = 1.25;
+/** Retracting droplet recoil duration after a snap, in milliseconds. */
+export const RECOIL_MS = 220;
+/** Post-release window before a detached permanent edge may reform. */
+export const RECONNECT_COOLDOWN_MS = 350;
+/** Soft radial exclusion zone for the ambient hover drift, in pixels. */
+export const HOVER_EXCLUSION_RADIUS = 110;
+/** Peak hover-drift acceleration outside the exclusion zone. */
+export const HOVER_DRIFT_STRENGTH = 0.025;
 /**
  * Oscillator excitation scale: distance acceleration -> bridge displacement.
  * Tuned against the 60Hz moderate/extreme fling profiles in
@@ -105,6 +119,20 @@ export function bridgeExcitation(accelerationPxPerS2: number): number {
     -MAX_EXCITATION,
     Math.min(MAX_EXCITATION, accelerationPxPerS2 * EXCITATION_SCALE),
   );
+}
+
+/**
+ * Slow ambient hover drift. Neighbors inside the `HOVER_EXCLUSION_RADIUS`
+ * receive no force; outside it, the outward acceleration ramps linearly from
+ * zero to `HOVER_DRIFT_STRENGTH` over another exclusion radius.
+ */
+export function hoverDriftAcceleration(distance: number, alpha: number): number {
+  if (distance <= HOVER_EXCLUSION_RADIUS) return 0;
+  const ramp = Math.min(
+    1,
+    (distance - HOVER_EXCLUSION_RADIUS) / HOVER_EXCLUSION_RADIUS,
+  );
+  return alpha * HOVER_DRIFT_STRENGTH * ramp;
 }
 
 function chargeStrength(width: number, height: number): number {
@@ -199,6 +227,10 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
   const links: SimulationLinkDatum<GraphNode>[] = opts.links.map((l) => ({ ...l }));
 
   const seeds = opts.seeds ?? PLANAR_NODE_SEEDS;
+  /** User placements survive hover unpinning and resize scaling. */
+  const userPinnedIds = new Set<string>();
+  let previousWidth = width;
+  let previousHeight = height;
 
   const restDistances = new Map<string, number>();
   const linkKey = (a: string, b: string) => [a, b].sort().join('\u0000');
@@ -225,6 +257,8 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
       sharedTagCount: Math.max(1, shared),
       restDistance: restDistances.get(linkKey(link.source, link.target)) ?? LINK_DISTANCE,
       isDetached: false,
+      recoilProgress: 0,
+      reconnectCooldownUntil: 0,
       oscillator: createBridgeOscillatorState(),
       previousDistance: 0,
       previousVelocity: 0,
@@ -248,6 +282,15 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
     }
   };
 
+  const linkForce = forceLink<GraphNode, SimulationLinkDatum<GraphNode>>(links)
+    .id((d) => d.id)
+    .distance((link) => {
+      const s = (link.source as GraphNode).id ?? (link.source as unknown as string);
+      const t = (link.target as GraphNode).id ?? (link.target as unknown as string);
+      return restDistances.get(linkKey(String(s), String(t))) ?? LINK_DISTANCE;
+    })
+    .strength(LINK_STRENGTH);
+
   const sim = forceSimulation<GraphNode>(nodes)
     .force(
       'charge',
@@ -255,17 +298,7 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
         .strength(chargeStrength(width, height))
         .distanceMin(50),
     )
-    .force(
-      'link',
-      forceLink<GraphNode, SimulationLinkDatum<GraphNode>>(links)
-        .id((d) => d.id)
-        .distance((link) => {
-          const s = (link.source as GraphNode).id ?? (link.source as unknown as string);
-          const t = (link.target as GraphNode).id ?? (link.target as unknown as string);
-          return restDistances.get(linkKey(String(s), String(t))) ?? LINK_DISTANCE;
-        })
-        .strength(LINK_STRENGTH),
-    )
+    .force('link', linkForce)
     .force('collide', forceCollide<GraphNode>().radius(COLLIDE_RADIUS))
     .force('seedX', seedForceX)
     .force('seedY', seedForceY)
@@ -276,12 +309,32 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
   let dragNode: GraphNode | null = null;
   let coastingNode: GraphNode | null = null;
   let dragAnchor = { x: 0, y: 0 };
-  let tetherRadius = Math.max(120, Math.min(width, height) * 0.75);
+  // The diagonal tether lets every planarity-preserving edge reach its 1.6x
+  // snap radius even on the 393x852 mobile viewport.
+  let tetherRadius = Math.max(120, Math.hypot(width, height) * 0.75);
   const dragSamples: { x: number; y: number; t: number }[] = [];
+  /** Direct neighbors are held still for the duration of an active drag. */
+  const dragNeighborPins = new Map<string, { fx: number | null; fy: number | null }>();
+  /** Monotonic simulation clock advanced by frame deltas, not wall time. */
+  let simClock = 0;
 
   sim.force('boundary', createBoundaryForce(width, height, BOUNDARY_MARGIN, nodes));
 
   const nodeById = (id: string): GraphNode | undefined => nodes.find((n) => n.id === id);
+
+  /**
+   * d3-force caches per-link strengths when `.strength(fn)` is assigned. Re-run
+   * the assignment on every drag boundary so the zero-strength drag links take
+   * effect synchronously instead of reading a stale cached array.
+   */
+  const refreshLinkStrength = (): void => {
+    linkForce.strength((link) => {
+      if (state !== 'drag' || !dragNode) return LINK_STRENGTH;
+      const source = link.source as GraphNode;
+      const target = link.target as GraphNode;
+      return source === dragNode || target === dragNode ? 0 : LINK_STRENGTH;
+    });
+  };
 
   /** Current center distance for a link, using live node positions. */
   const linkDistance = (link: BridgeLinkState): number => {
@@ -298,21 +351,26 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
   const updateLinkTopology = (): void => {
     for (const link of linkStates) {
       const distance = linkDistance(link);
-      // Visual severance is only possible while dragging. At rest, or after a
-      // release once the nodes are back inside the reconnect radius, every
-      // topological edge remains present.
+      // Visual severance is only possible while dragging. After release, the
+      // 350ms cooldown and the narrower 1.25x reconnect radius govern recovery.
       if (state === 'drag') {
-        if (distance > SNAP_MULTIPLIER * link.restDistance) link.isDetached = true;
-        else if (distance <= RECONNECT_MULTIPLIER * link.restDistance) link.isDetached = false;
+        if (distance > SNAP_MULTIPLIER * link.restDistance) {
+          if (!link.isDetached) {
+            link.isDetached = true;
+            link.recoilProgress = 1;
+            link.reconnectCooldownUntil = 0;
+          }
+        } else if (distance <= RECONNECT_MULTIPLIER * link.restDistance) {
+          link.isDetached = false;
+          link.recoilProgress = 0;
+        }
       } else if (
         link.isDetached &&
-        (distance <= RECONNECT_MULTIPLIER * link.restDistance ||
-          (state === 'idle' && distance <= SNAP_MULTIPLIER * link.restDistance))
+        simClock >= link.reconnectCooldownUntil &&
+        distance <= RECONNECT_MULTIPLIER * link.restDistance
       ) {
-        // Settled recovery is the invariant backstop: once coasting ends, no
-        // topological edge may remain permanently hidden. Bound it to the snap
-        // radius so a bridge cannot pop back while the node is still far away.
         link.isDetached = false;
+        link.recoilProgress = 0;
       }
     }
   };
@@ -343,8 +401,15 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
   };
 
   const afterTick = (dtMs: number): void => {
+    const elapsed = Number.isFinite(dtMs) ? Math.max(0, dtMs) : 0;
+    simClock += elapsed;
     updateLinkTopology();
     stepLinkOscillators(dtMs);
+    for (const link of linkStates) {
+      if (link.isDetached && link.recoilProgress > 0) {
+        link.recoilProgress = Math.max(0, link.recoilProgress - elapsed / RECOIL_MS);
+      }
+    }
   };
 
   let lastTickAt: number | null = null;
@@ -367,11 +432,10 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
       const dx = other.x - h.x;
       const dy = other.y - h.y;
       const dist = Math.hypot(dx, dy) || 1;
-      const pull = alpha * 0.08 * (dist - 120);
-      const ux = dx / dist;
-      const uy = dy / dist;
-      other.vx = (other.vx ?? 0) - ux * pull;
-      other.vy = (other.vy ?? 0) - uy * pull;
+      const push = hoverDriftAcceleration(dist, alpha);
+      if (push === 0) continue;
+      other.vx = (other.vx ?? 0) + (dx / dist) * push;
+      other.vy = (other.vy ?? 0) + (dy / dist) * push;
     }
   };
   sim.force('hoverAttraction', hoverAttraction);
@@ -397,8 +461,10 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
     if (state === 'drag' || state === 'coasting') return;
     if (!node) {
       if (state === 'hover' && hoveredNode) {
-        hoveredNode.fx = null;
-        hoveredNode.fy = null;
+        if (!userPinnedIds.has(hoveredNode.id)) {
+          hoveredNode.fx = null;
+          hoveredNode.fy = null;
+        }
         hoveredNode = null;
         sim.alphaTarget(0);
         state = 'idle';
@@ -409,8 +475,9 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
     // pointermove re-pins the node and re-heats the simulation.
     if (hoveredNode === node) return;
     // Unpin the previous node before pinning the new one, otherwise its fx/fy
-    // stay set and it remains frozen after the pointer moves away.
-    if (hoveredNode) {
+    // stay set and it remains frozen after the pointer moves away. User-placed
+    // anchors survive hover transitions.
+    if (hoveredNode && !userPinnedIds.has(hoveredNode.id)) {
       hoveredNode.fx = null;
       hoveredNode.fy = null;
     }
@@ -422,7 +489,35 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
     sim.alpha(0.3).restart();
   }
 
+  const freezeDragNeighbors = (node: GraphNode): void => {
+    dragNeighborPins.clear();
+    for (const link of linkStates) {
+      const otherId =
+        link.source === node.id ? link.target : link.target === node.id ? link.source : null;
+      if (!otherId || dragNeighborPins.has(otherId)) continue;
+      const other = nodeById(otherId);
+      if (!other) continue;
+      dragNeighborPins.set(otherId, { fx: other.fx ?? null, fy: other.fy ?? null });
+      other.fx = other.x;
+      other.fy = other.y;
+    }
+  };
+
+  const restoreDragNeighbors = (): void => {
+    for (const [id, previous] of dragNeighborPins) {
+      const node = nodeById(id);
+      if (!node) continue;
+      node.fx = previous.fx;
+      node.fy = previous.fy;
+    }
+    dragNeighborPins.clear();
+  };
+
   function dragStart(node: GraphNode): void {
+    if (hoveredNode && !userPinnedIds.has(hoveredNode.id)) {
+      hoveredNode.fx = null;
+      hoveredNode.fy = null;
+    }
     hoveredNode = null;
     dragNode = node;
     node.fx = node.x;
@@ -431,6 +526,10 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
     dragSamples.length = 0;
     dragSamples.push({ x: node.x, y: node.y, t: performance.now() });
     state = 'drag';
+    // Zero the link spring on this node's edges and hold its direct neighbors
+    // still so charge/collision forces cannot drag them along.
+    refreshLinkStrength();
+    freezeDragNeighbors(node);
     sim.alphaTarget(0.2).restart();
   }
 
@@ -452,10 +551,18 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
     // position; using it would falsely reconnect a bridge on release.
     const releaseX = node.fx;
     const releaseY = node.fy;
-    node.fx = null;
-    node.fy = null;
-    if (releaseX != null) node.x = releaseX;
-    if (releaseY != null) node.y = releaseY;
+    // Persist the user's placement. d3-force's native `fx/fy` pin keeps the
+    // node exactly where it was released until resetLayout() or a resize maps
+    // it proportionally.
+    if (releaseX != null) {
+      node.x = releaseX;
+      node.fx = releaseX;
+    }
+    if (releaseY != null) {
+      node.y = releaseY;
+      node.fy = releaseY;
+    }
+    userPinnedIds.add(node.id);
 
     const len = dragSamples.length;
     if (len >= 2) {
@@ -477,29 +584,84 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
 
     coastingNode = node;
     dragNode = null;
+    restoreDragNeighbors();
     dragSamples.length = 0;
     state = 'coasting';
+    for (const link of linkStates) {
+      if (link.isDetached) {
+        link.reconnectCooldownUntil = simClock + RECONNECT_COOLDOWN_MS;
+      }
+    }
+    // Restore full spring strength on every edge now that the drag is over.
+    refreshLinkStrength();
     sim.velocityDecay(VELOCITY_DECAY_COAST);
     sim.alphaTarget(0);
     sim.alpha(0.3).restart();
-    // Reconnect immediately when the release point is already inside the
-    // recovery radius; otherwise the d3 tick.links listener reforms the bridge
-    // as the node settles.
+    // The cooldown gates any immediate reconnect; once it expires the
+    // tick.links listener reforms the bridge when the node is back in range.
     updateLinkTopology();
   }
 
   function resize(nw: number, nh: number): void {
+    const scaleX = previousWidth > 0 ? nw / previousWidth : 1;
+    const scaleY = previousHeight > 0 ? nh / previousHeight : 1;
+    const clampAxis = (value: number, max: number) =>
+      Math.min(Math.max(value, BOUNDARY_MARGIN), Math.max(BOUNDARY_MARGIN, max - BOUNDARY_MARGIN));
+    for (const node of nodes) {
+      if (node.fx != null) {
+        node.fx = clampAxis(node.fx * scaleX, nw);
+        node.x = node.fx;
+      }
+      if (node.fy != null) {
+        node.fy = clampAxis(node.fy * scaleY, nh);
+        node.y = node.fy;
+      }
+    }
+    previousWidth = nw;
+    previousHeight = nh;
     recomputeTargets(nw, nh);
     recomputeRestDistances(nw, nh);
     for (const link of linkStates) {
       link.restDistance = restDistances.get(linkKey(link.source, link.target)) ?? LINK_DISTANCE;
     }
-    tetherRadius = Math.max(120, Math.min(nw, nh) * 0.75);
+    tetherRadius = Math.max(120, Math.hypot(nw, nh) * 0.75);
     (sim.force('charge') as ForceManyBody<GraphNode> | undefined)?.strength(
       chargeStrength(nw, nh),
     );
     sim.force('boundary', createBoundaryForce(nw, nh, BOUNDARY_MARGIN, nodes));
     sim.alpha(0.2).restart();
+  }
+
+  function resetLayout(): void {
+    userPinnedIds.clear();
+    hoveredNode = null;
+    dragNode = null;
+    coastingNode = null;
+    dragNeighborPins.clear();
+    state = 'idle';
+    for (const node of nodes) {
+      node.fx = null;
+      node.fy = null;
+      node.vx = 0;
+      node.vy = 0;
+      const target = targets.get(node.id);
+      if (target) {
+        node.x = target[0];
+        node.y = target[1];
+      }
+    }
+    for (const link of linkStates) {
+      link.isDetached = false;
+      link.recoilProgress = 0;
+      link.reconnectCooldownUntil = 0;
+      link.previousDistance = 0;
+      link.previousVelocity = 0;
+    }
+    refreshLinkStrength();
+    sim.velocityDecay(VELOCITY_DECAY_IDLE);
+    sim.alphaTarget(0);
+    sim.alpha(0.4).restart();
+    updateLinkTopology();
   }
 
   const isIdle = (): boolean => {
@@ -536,6 +698,7 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
     dragStart,
     dragMove,
     dragEnd,
+    resetLayout,
     findNode: (id) => nodes.find((n) => n.id === id),
     findLink: (source, target) => {
       const key = linkKey(source, target);

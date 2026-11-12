@@ -168,4 +168,47 @@ describe('graph planarity after unperturbed d3-force ticks', () => {
     expect(countCrossings(restingPositions)).toBe(0);
     sim.destroy();
   });
+
+  it('returns to zero crossings and >=44px separation after resetLayout', () => {
+    const width = 1440;
+    const height = 900;
+    const sim = createSimulation({
+      nodes: projects.map((project) => ({ id: project.id, label: project.shortTitle })),
+      links: EDGES.map((edge) => ({
+        source: edge.source,
+        target: edge.target,
+        tags: edge.tags,
+      })),
+      width,
+      height,
+      seeds: PLANAR_NODE_SEEDS,
+      initialPositions: scaleSeeds(PLANAR_NODE_SEEDS, width, height),
+    });
+
+    const node = sim.findNode('attention-max')!;
+    sim.dragStart(node);
+    sim.dragMove(node.x + 900, node.y + 400);
+    sim.dragEnd();
+    expect(sim.linkStates.some((link) => link.isDetached)).toBe(true);
+
+    sim.resetLayout();
+    for (let tick = 0; tick < 300; tick += 1) sim.tick();
+
+    const positions: Positions = {};
+    for (const resting of sim.nodes) {
+      positions[resting.id] = [resting.x, resting.y];
+    }
+    for (let i = 0; i < sim.nodes.length; i += 1) {
+      for (let j = i + 1; j < sim.nodes.length; j += 1) {
+        const a = sim.nodes[i];
+        const b = sim.nodes[j];
+        expect(
+          Math.hypot(a.x - b.x, a.y - b.y),
+          `${a.id} <-> ${b.id} separation after reset`,
+        ).toBeGreaterThanOrEqual(44);
+      }
+    }
+    expect(countCrossings(positions)).toBe(0);
+    sim.destroy();
+  });
 });

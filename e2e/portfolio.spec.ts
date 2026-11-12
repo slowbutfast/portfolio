@@ -553,6 +553,78 @@ test.describe('portfolio graph SPA', () => {
     await page.mouse.up();
   });
 
+  test('3-dot controls menu contains the Filters heading and Reset layout action', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const trigger = await openFilters(page);
+    const dropdown = page.getByTestId('controls-dropdown');
+    await expect(trigger).toHaveAccessibleName('Filters & Layout');
+    await expect(dropdown.getByRole('heading', { name: 'Filters' })).toBeVisible();
+    const resetLayout = dropdown.getByTestId('reset-layout');
+    await expect(resetLayout).toBeVisible();
+    await expect(resetLayout).toHaveAccessibleName('Reset layout');
+    await resetLayout.click();
+    await expect(page.getByTestId('graph-canvas')).toBeVisible();
+  });
+
+  test('hover dwell suppresses fast sweeps and opens after 200ms', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'hover previews are desktop-only');
+    await page.goto('/');
+    await page.waitForTimeout(1500);
+    await page.getByTestId('nav-open-dungeon').focus();
+    await page.waitForTimeout(1600);
+
+    const canvas = page.getByTestId('graph-canvas');
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error('graph canvas has no bounding box');
+    const centerX = box.x + box.width / 2;
+    const centerY = box.y + box.height / 2;
+
+    // Cross the centered node and leave well inside the 200ms dwell window.
+    await page.mouse.move(centerX, centerY);
+    await page.mouse.move(box.x + 12, box.y + box.height - 12);
+    await page.waitForTimeout(120);
+    await expect(page.getByTestId('node-hover-card')).toHaveCount(0);
+
+    // Returning and dwelling opens the card only after the timer fires.
+    await page.mouse.move(centerX, centerY);
+    await expect(page.getByTestId('node-hover-card')).toBeVisible();
+  });
+
+  for (const viewport of [
+    { label: 'desktop', width: 1440, height: 900 },
+    { label: 'narrow mobile', width: 393, height: 852 },
+  ]) {
+    test(`hover card stays inside the ${viewport.label} viewport at ${viewport.width}x${viewport.height}`, async ({
+      page,
+    }, testInfo) => {
+      test.skip(testInfo.project.name !== 'desktop', 'hover previews are desktop-only');
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await page.goto('/');
+      await hoverCenteredNode(page);
+      const card = page.getByTestId('node-hover-card');
+      const cardBox = await card.boundingBox();
+      if (!cardBox) throw new Error('hover card has no bounding box');
+      const margin = 20;
+
+      expect(cardBox.x).toBeGreaterThanOrEqual(margin - 1);
+      expect(cardBox.y).toBeGreaterThanOrEqual(margin - 1);
+      expect(cardBox.x + cardBox.width).toBeLessThanOrEqual(viewport.width - margin + 1);
+      expect(cardBox.y + cardBox.height).toBeLessThanOrEqual(viewport.height - margin + 1);
+
+      const cardCenter = {
+        x: cardBox.x + cardBox.width / 2,
+        y: cardBox.y + cardBox.height / 2,
+      };
+      const offset = Math.hypot(
+        cardCenter.x - viewport.width / 2,
+        cardCenter.y - viewport.height / 2,
+      );
+      expect(offset).toBeGreaterThan(60);
+    });
+  }
+
   test('canvas selection anchors the inspector beside the node', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'anchored offset is only distinguishable on desktop');
     await page.goto('/');
@@ -691,7 +763,7 @@ test.describe('portfolio graph SPA', () => {
     await expect(page.getByTestId('audio-toggle')).toHaveAccessibleName('Sound');
     await expect(page.getByTestId('audio-toggle')).toHaveAttribute('aria-pressed', 'false');
     const trigger = await openFilters(page);
-    await expect(trigger).toHaveAccessibleName('Filters & Navigation');
+    await expect(trigger).toHaveAccessibleName('Filters & Layout');
     await expect(trigger).toHaveAttribute('aria-expanded', 'true');
 
     const llmPill = page.getByRole('button', { name: 'LLM', exact: true });

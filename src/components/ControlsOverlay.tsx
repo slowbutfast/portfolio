@@ -1,4 +1,4 @@
-import { ChevronDown, RotateCcw, Search } from 'lucide-react';
+import { LayoutGrid, MoreHorizontal, RotateCcw, Search } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { candidateProfile } from '../data/profile';
 import type { ParadigmTag, ThemeMode } from '../types/portfolio';
@@ -14,6 +14,7 @@ interface ControlsOverlayProps {
   search: string;
   onSearchChange: (query: string) => void;
   onReset: () => void;
+  onResetLayout: () => void;
   theme: ThemeMode;
   onToggleTheme: () => void;
   soundEnabled: boolean;
@@ -37,6 +38,7 @@ export function ControlsOverlay({
   search,
   onSearchChange,
   onReset,
+  onResetLayout,
   theme,
   onToggleTheme,
   soundEnabled,
@@ -141,19 +143,13 @@ export function ControlsOverlay({
             <button
               type="button"
               data-testid="controls-dropdown-trigger"
-              aria-label="Filters & Navigation"
+              aria-label="Filters & Layout"
               aria-expanded={open}
               aria-controls="portfolio-controls"
               onClick={() => setOpen((value) => !value)}
-              className={`${bareText} gap-1`}
+              className={`${bareText} min-w-11 justify-center md:min-w-0`}
             >
-              Filters
-              <ChevronDown
-                className={`h-3.5 w-3.5 transition-transform duration-200 ${
-                  open ? 'rotate-180' : ''
-                }`}
-                aria-hidden="true"
-              />
+              <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
             </button>
 
             {open && (
@@ -162,6 +158,9 @@ export function ControlsOverlay({
                 data-testid="controls-dropdown"
                 className="absolute right-0 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-[var(--color-outline)] bg-[var(--color-surface)]/95 p-4 text-[var(--color-text)] shadow-2xl backdrop-blur-md"
               >
+                <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
+                  Filters
+                </h2>
                 <label className="relative flex items-center">
                   <Search
                     className="pointer-events-none absolute left-3 h-4 w-4 text-[var(--color-muted)]"
@@ -209,6 +208,16 @@ export function ControlsOverlay({
                   >
                     <RotateCcw className="h-4 w-4" aria-hidden="true" />
                     Reset
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="reset-layout"
+                    onClick={onResetLayout}
+                    aria-label="Reset layout"
+                    className="fluid-pill min-h-11 md:min-h-0"
+                  >
+                    <LayoutGrid className="h-4 w-4" aria-hidden="true" />
+                    Reset layout
                   </button>
                 </div>
               </div>

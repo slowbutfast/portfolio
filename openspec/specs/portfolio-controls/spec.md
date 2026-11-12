@@ -90,11 +90,15 @@ The system SHALL default new visitors to the Light color scheme on first visit w
 - **THEN** the `/theme-init.js` script immediately sets `data-theme="dark"` on `document.documentElement` before body paint with zero visual flashing.
 
 ### Requirement: Top-right header navigation sequence and theme toggle
-The system SHALL organize top-right header controls in the canonical sequence: `About`, `GitHub ↗`, `Graph`/`Grid`, `Sound`, `Dark`/`Light`, and `Filters ▾`, presenting the theme toggle as a direct one-click text button (`bareText`) styled identically to the view toggle, and the sound toggle as an accessible `aria-pressed` button reflecting real-time synthesizer state.
+The system SHALL organize top-right header controls in the canonical sequence: `About`, `GitHub ↗`, `Graph`/`Grid`, `Sound`, `Dark`/`Light`, and a 3-dot overflow menu button (`aria-label="Filters & Layout"`), presenting the theme toggle as a direct one-click text button (`bareText`), the sound toggle as an accessible `aria-pressed` button reflecting real-time synthesizer state, and moving the `Filters` section heading inside the 3-dot dropdown panel alongside a `Reset layout` action below the filter controls.
 
 #### Scenario: Desktop visitor views top-right header options
 - **WHEN** the header mounts on a desktop or mobile viewport
-- **THEN** controls appear in the exact sequence: `About`, `GitHub ↗`, `Graph`/`Grid`, `Sound`, `Dark`/`Light`, `Filters ▾`, with `Sound` reflecting the active sound state via `aria-pressed` and toggling audio playback on click.
+- **THEN** controls appear in the exact sequence: `About`, `GitHub ↗`, `Graph`/`Grid`, `Sound`, `Dark`/`Light`, and the 3-dot menu trigger (`data-testid="controls-dropdown-trigger"`), with `Sound` reflecting the active sound state via `aria-pressed` and toggling audio playback on click.
+
+#### Scenario: User opens the 3-dot menu and resets graph layout
+- **WHEN** the user opens the 3-dot menu (`data-testid="controls-dropdown"`)
+- **THEN** the panel displays a `"Filters"` heading above the search input and tag pills, and a `"Reset layout"` button (`data-testid="reset-layout"`) below the filter section that restores all user-pinned nodes and detached bridges to the planar resting equilibrium.
 
 ### Requirement: Accessible About modal dialog with canonical bio
 The system SHALL provide an accessible About dialog (`role="dialog"`, `aria-modal="true"`, `aria-label="About Gregory Lazatin"`, with focus trap, backdrop dismissal, Escape key handler, and `#/about` deep-link routing) presenting candidate name, the canonical Brown University bio statement, and top-mounted contact buttons (Email, LinkedIn, GitHub, Resume), with all role subtitles and focus area tags omitted.

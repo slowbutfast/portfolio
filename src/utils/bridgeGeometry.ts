@@ -48,14 +48,22 @@ export interface BridgeGeometry {
   waistWidth: number;
   /** Signed clearance of the upper curve at its midpoint (positive = open waist). */
   waist: number;
+  /** Handle length targeted by the rest-waist ratio before clamping. */
+  handleForWaist: number;
+  /** Final C1 handle length after the short-gap base-handle clamp. */
+  handle: number;
   restDistance: number;
   sag: number;
 }
 
 /** Fraction of the smaller radius used for the perimeter attachment spread. */
-const HALF_WIDTH_RATIO = 0.65;
+export const HALF_WIDTH_RATIO = 0.85;
 /** Keep adjacent bridges around the 5-degree hub from merging. */
-const MAX_SPREAD_ANGLE = Math.PI / 6.5;
+export const MAX_SPREAD_ANGLE = Math.PI / 6.2;
+/** Rest silhouette waist as a fraction of the full perimeter spread. */
+export const REST_WAIST_RATIO = 0.58;
+/** Bridges cinch to the 2px floor at this multiple of the rest distance. */
+export const SNAP_STRETCH_MULTIPLIER = 1.6;
 /** Base handle length fraction of the free gap between the circles. */
 const HANDLE_GAP_RATIO = 0.45;
 /** Upper bound on handle length relative to the smaller radius. */
@@ -96,20 +104,26 @@ export function bridgeBaseWidth(
 }
 
 /**
- * Rest-normalized cinching curve. The bridge keeps full semantic width until
- * the nodes are pulled beyond their natural seed distance, then necks down to
- * a minimum 2px meniscus at (or past) the snap threshold.
+ * Rest-normalized cinching curve. At rest the bridge silhouettes into a concave
+ * hourglass targeting `REST_WAIST_RATIO` of the perimeter spread, then necks
+ * down to a minimum 2px meniscus at the 1.6x snap threshold.
+ *
+ * `averageHalf` is the mean normal attachment offset. Callers that only know
+ * the semantic width can omit it; the default reconstructs equal-radius
+ * geometry (`baseWidth / 2`).
  */
 export function bridgeWaistWidth(
   baseWidth: number,
   distance: number,
   restDistance: number,
+  averageHalf = baseWidth / 2,
 ): number {
   const rest = Math.max(1, restDistance);
-  if (distance <= rest) return baseWidth;
-  const snap = 2 * rest;
+  const restWaist = Math.max(MIN_WAIST_WIDTH, REST_WAIST_RATIO * 2 * averageHalf);
+  if (distance <= rest) return restWaist;
+  const snap = SNAP_STRETCH_MULTIPLIER * rest;
   const progress = clamp((distance - rest) / Math.max(1, snap - rest), 0, 1);
-  return Math.max(MIN_WAIST_WIDTH, baseWidth * Math.pow(1 - progress, 1.25));
+  return Math.max(MIN_WAIST_WIDTH, restWaist * Math.pow(1 - progress, 1.25));
 }
 
 /**
@@ -138,16 +152,11 @@ export function computeBridgeGeometry(
   const restDistance = Math.max(1, options.restDistance ?? distance);
   const sag = Number.isFinite(options.sag) ? (options.sag as number) : 0;
   const baseWidth = bridgeBaseWidth(radiusA, radiusB, options.sharedTagCount);
-  const waistWidth = bridgeWaistWidth(baseWidth, distance, restDistance);
-  // Narrow ribbons should breathe proportionally, not swing by a fixed number
-  // of pixels. Clamp the scale so 4-6px bridges calm down and 14px+ bridges
-  // keep their full momentum.
-  const widthScale = Math.min(1.2, Math.max(0.5, baseWidth / 10));
-  const scaledSag = sag * widthScale;
 
-  // Attachment spread: half of the semantic base width, capped by the maximum
-  // hub angle so neighbouring bridges never merge.
-  const targetHalf = baseWidth / 2;
+  // Attachment spread: a wide organic fillet proportional to the smaller
+  // radius, capped by the maximum hub angle so neighbouring bridges never
+  // merge. `baseWidth` remains the semantic tag-width used for sag scaling.
+  const targetHalf = Math.min(radiusA, radiusB) * HALF_WIDTH_RATIO;
   const thetaA = Math.min(
     Math.asin(clamp(targetHalf / radiusA, 0, 1)),
     MAX_SPREAD_ANGLE,
@@ -160,6 +169,19 @@ export function computeBridgeGeometry(
   const halfA = radiusA * Math.sin(thetaA);
   const halfB = radiusB * Math.sin(thetaB);
   const halfWidth = Math.min(halfA, halfB);
+  const averageHalf = (halfA + halfB) / 2;
+  const waistWidth = bridgeWaistWidth(
+    baseWidth,
+    distance,
+    restDistance,
+    averageHalf,
+  );
+
+  // Narrow ribbons should breathe proportionally, not swing by a fixed number
+  // of pixels. Clamp the scale so 4-6px bridges calm down and 14px+ bridges
+  // keep their full momentum.
+  const widthScale = Math.min(1.2, Math.max(0.5, baseWidth / 10));
+  const scaledSag = sag * widthScale;
 
   const cosA = Math.cos(thetaA);
   const cosB = Math.cos(thetaB);
@@ -184,7 +206,6 @@ export function computeBridgeGeometry(
     Math.max(0, gap) * HANDLE_GAP_RATIO,
     Math.min(radiusA, radiusB) * HANDLE_RADIUS_RATIO,
   );
-  const averageHalf = (halfA + halfB) / 2;
   const waistDenominator = (3 / 8) * (cosA + cosB);
   const desiredWaistHalf = waistWidth / 2;
   // The midpoint normal offset of a symmetric cubic is
@@ -240,6 +261,8 @@ export function computeBridgeGeometry(
     baseWidth,
     waistWidth: Math.abs(waist) * 2,
     waist,
+    handleForWaist,
+    handle,
     restDistance,
     sag,
   };
