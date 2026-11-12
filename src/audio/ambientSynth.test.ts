@@ -8,6 +8,7 @@ import {
   BASE_FREQ,
   BASE_LOWPASS_FREQ,
   HOVER_SWELL_GAIN,
+  MASTER_GAIN,
   NOISE_FLOOR_GAIN,
   PAN_MAX,
   PAN_MIN,
@@ -313,7 +314,7 @@ describe('autoplay and visibility recovery', () => {
     expect(ctx.resume).toHaveBeenCalledTimes(1);
   });
 
-  it('arms recovery for a stored preference and resumes on the first gesture', async () => {
+  it('arms recovery for a stored preference and starts audio on the first gesture', async () => {
     const { ctx, doc, synth } = setup('true');
     expect(synth.isEnabled()).toBe(true);
     // The engine starts from the stored preference but the fake context is
@@ -321,9 +322,26 @@ describe('autoplay and visibility recovery', () => {
     ctx.state = 'suspended';
     synth.armIfNeeded();
     expect(doc.listeners.get('pointerdown')?.size ?? 0).toBeGreaterThan(0);
+    expect(ctx.osc?.started ?? 0).toBe(0);
 
     doc.emit('pointerdown');
     await Promise.resolve();
+    await Promise.resolve();
+
     expect(ctx.resume).toHaveBeenCalled();
+    expect(ctx.osc?.started).toBe(1);
+    expect(ctx.noise?.started).toBe(1);
+    expect(ctx.gains[0].gain.ramps.at(-1)?.target).toBe(MASTER_GAIN);
+  });
+
+  it('does not start sources when toggled off before the gesture', () => {
+    const { ctx, doc, synth } = setup('true');
+    synth.setSoundEnabled(false);
+    synth.armIfNeeded();
+    expect(doc.listeners.get('pointerdown')?.size ?? 0).toBe(0);
+
+    doc.emit('pointerdown');
+    expect(ctx.osc).toBeNull();
+    expect(ctx.resume).not.toHaveBeenCalled();
   });
 });

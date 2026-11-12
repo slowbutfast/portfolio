@@ -197,3 +197,23 @@
   - 0 accessibility violations across themes via Axe.
 - [x] 8.4 Run `npm run build` and verify clean production bundle output.
 - [x] 8.5 Populate `verification.md` with execution traces and Requirement Adherence Matrix.
+
+---
+
+## Patch 01: Unblock Vercel build, drive bridge physics from real ticks, start stored-preference audio, harden sag
+
+- [x] P01.1 Run the Vercel-parity build (R5) to reproduce the `TS2307` failure; scaffold/run reproducing tests: parity guard, d3 `tick.links` path (reconnect, ring-down, idle), stored-preference audio start, sag pinch clamp, fling-amplitude band
+- [x] P01.2 Apply minimal targeted fixes: `tsconfig.build.json`, `package.json` build script, `src/utils/edgeConfig.test.ts`, `src/utils/vercelParity.test.ts`, optional `.github/workflows/ci.yml` parity job, then `src/physics/graphSimulation.ts`, `src/audio/ambientSynth.ts`, `src/utils/bridgeGeometry.ts`, `src/App.tsx`, `src/components/ControlsOverlay.tsx`, `src/components/GraphCanvas.tsx`
+- [x] P01.3 Verify the parity build and reproduction tests pass, then run the full regression suite and the parity build again
+- [x] P01.4 Update verification.md and mark PATCH-01 resolved in patch.md
+
+
+---
+
+## Patch 02: Bound idle reconnection, scale bridge wobble by width, make build guard read tsconfig, fix Sound class conflict, and assert commit-on-release
+
+- [x] P02.1 Scaffold reproducing test in `src/physics/graphSimulation.test.ts` for idle reconnection distance assertion and commit-on-release coordinate synchronization
+- [x] P02.2 Bound idle reconnect in `src/physics/graphSimulation.ts` to `distance <= SNAP_MULTIPLIER * link.restDistance` and scale sag in `src/utils/bridgeGeometry.ts` by base width
+- [x] P02.3 Update `tsconfig.build.json` to exclude broader test patterns and update `src/utils/vercelParity.test.ts` to read `tsconfig.build.json` directly
+- [x] P02.4 Fix Tailwind class conflict in `src/components/ControlsOverlay.tsx` on Sound button
+- [x] P02.5 Verify reproduction tests pass, run full test suite (`npm run typecheck && npm run test:unit && npm run test:e2e && npm run build`), and mark PATCH-02 resolved in patch.md

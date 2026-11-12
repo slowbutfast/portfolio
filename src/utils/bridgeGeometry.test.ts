@@ -222,7 +222,7 @@ describe('lateral oscillator sag', () => {
     expect(Math.abs(dot(endHandle, endRadius))).toBeLessThan(EPSILON);
   });
 
-  it('translates the midpoint normal offset with the sag displacement', () => {
+  it('translates the midpoint normal offset with width-scaled sag', () => {
     const a = { x: 100, y: 200 };
     const b = { x: 500, y: 200 };
     const flat = computeBridgeGeometry(a, b, 22, 22, { sag: 0 });
@@ -230,6 +230,47 @@ describe('lateral oscillator sag', () => {
     expect(flat).not.toBeNull();
     expect(sagged).not.toBeNull();
     if (!flat || !sagged) return;
-    expect(sagged.waist - flat.waist).toBeCloseTo(10, 5);
+    // One shared tag -> 6px base width -> 0.6 width scale.
+    expect(sagged.waist - flat.waist).toBeCloseTo(6, 5);
+  });
+
+  it.each([
+    ['narrow 6px ribbon', 1, 6],
+    ['medium 10px ribbon', 2, 10],
+    ['wide 14px ribbon', 3, 12],
+  ])('scales sag proportionally for a %s', (_label, sharedTagCount, expectedShift) => {
+    const a = { x: 100, y: 200 };
+    const b = { x: 500, y: 200 };
+    const base = { restDistance: 400, sharedTagCount };
+    const flat = computeBridgeGeometry(a, b, 22, 22, { ...base, sag: 0 });
+    const sagged = computeBridgeGeometry(a, b, 22, 22, { ...base, sag: 10 });
+    expect(flat).not.toBeNull();
+    expect(sagged).not.toBeNull();
+    if (!flat || !sagged) return;
+    expect(sagged.waist - flat.waist).toBeCloseTo(expectedShift, 5);
+  });
+
+  it('never pinches below the 2px minimum', () => {
+    const a = { x: 100, y: 200 };
+    const b = { x: 400, y: 200 };
+    const pinched = computeBridgeGeometry(a, b, 22, 22, {
+      restDistance: 300,
+      sharedTagCount: 1,
+      sag: -10,
+    });
+    expect(pinched).not.toBeNull();
+    if (!pinched) return;
+    expect(pinched.waist).toBeGreaterThanOrEqual(1);
+    expect(pinched.waistWidth).toBeGreaterThanOrEqual(2);
+
+    const bulged = computeBridgeGeometry(a, b, 22, 22, {
+      restDistance: 300,
+      sharedTagCount: 1,
+      sag: 10,
+    });
+    expect(bulged).not.toBeNull();
+    if (!bulged) return;
+    expect(Number.isFinite(bulged.waist)).toBe(true);
+    expect(Number.isFinite(bulged.waistWidth)).toBe(true);
   });
 });

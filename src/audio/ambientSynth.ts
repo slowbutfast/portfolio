@@ -15,6 +15,7 @@ import {
   BASE_FREQ,
   BASE_LOWPASS_FREQ,
   DEFAULT_SOUND_ENABLED,
+  DRAG_VELOCITY_FULL_SCALE,
   HOVER_SWELL_GAIN,
   MASTER_GAIN,
   NOISE_FLOOR_GAIN,
@@ -338,6 +339,12 @@ export class AmbientSynth {
     if (!ctx) return;
     try {
       await ctx.resume();
+      // Resuming the context is not enough: the stored-preference path built
+      // the graph but never started the sources or opened the master gain.
+      if (this.enabled && this.nodes) {
+        this.startSources();
+        ramp(this.nodes.master.gain, MASTER_GAIN, ctx);
+      }
       this.disarmRecovery();
     } catch {
       // Autoplay policy can still refuse; remain armed for the next gesture.
@@ -401,7 +408,7 @@ export class AmbientSynth {
   onDragVelocity(vx: number, vy: number): void {
     if (!this.ctx || !this.nodes) return;
     const speed = Math.hypot(vx, vy);
-    const modulation = clamp(speed / 40, 0, 1) * 0.05;
+    const modulation = clamp(speed / DRAG_VELOCITY_FULL_SCALE, 0, 1) * 0.05;
     ramp(this.nodes.oscillator.frequency, BASE_FREQ * (1 + modulation), this.ctx);
   }
 

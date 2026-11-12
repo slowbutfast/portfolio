@@ -165,7 +165,7 @@ export function GraphCanvas({
   const wakeRef = useRef<() => void>(() => {});
   const synthRef = useRef<AmbientSynth | null>(null);
   synthRef.current = synth ?? null;
-  const lastDragPointRef = useRef<{ x: number; y: number } | null>(null);
+  const lastDragPointRef = useRef<{ x: number; y: number; t: number } | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -553,8 +553,11 @@ export function GraphCanvas({
     const p = worldPoint(e.clientX, e.clientY);
     if (sim.state === 'drag') {
       const last = lastDragPointRef.current;
-      if (last) synthRef.current?.onDragVelocity((p.x - last.x) * 60, (p.y - last.y) * 60);
-      lastDragPointRef.current = { x: p.x, y: p.y };
+      if (last) {
+        const dtS = Math.max(0.004, (e.timeStamp - last.t) / 1000);
+        synthRef.current?.onDragVelocity((p.x - last.x) / dtS, (p.y - last.y) / dtS);
+      }
+      lastDragPointRef.current = { x: p.x, y: p.y, t: e.timeStamp };
       emitHover(null);
       sim.dragMove(p.x, p.y);
       return;
@@ -576,7 +579,7 @@ export function GraphCanvas({
     const p = worldPoint(e.clientX, e.clientY);
     const node = hitNode(p.x, p.y);
     downPosRef.current = { x: p.x, y: p.y };
-    lastDragPointRef.current = { x: p.x, y: p.y };
+    lastDragPointRef.current = { x: p.x, y: p.y, t: e.timeStamp };
     if (node) {
       onCanvasDragStartRef.current?.();
       (e.target as HTMLCanvasElement).setPointerCapture(e.pointerId);

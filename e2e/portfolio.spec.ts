@@ -184,11 +184,11 @@ test.describe('portfolio graph SPA', () => {
     await page.goto('/');
     const toggle = page.getByTestId('audio-toggle');
     await expect(toggle).toHaveAttribute('aria-pressed', 'false');
-    await expect(toggle).toHaveAccessibleName('Enable ambient sound');
+    await expect(toggle).toHaveAccessibleName('Sound');
 
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-pressed', 'true');
-    await expect(toggle).toHaveAccessibleName('Mute ambient sound');
+    await expect(toggle).toHaveAccessibleName('Sound');
     expect(
       await page.evaluate(() => localStorage.getItem('portfolio_sound_enabled')),
     ).toBe('true');
@@ -688,7 +688,7 @@ test.describe('portfolio graph SPA', () => {
     await expect(page.getByTestId('nav-about')).toHaveAccessibleName('About');
     await expect(page.getByTestId('nav-github')).toHaveAccessibleName('GitHub');
     await expect(page.getByTestId('view-toggle')).toHaveAccessibleName('Switch to list view');
-    await expect(page.getByTestId('audio-toggle')).toHaveAccessibleName('Enable ambient sound');
+    await expect(page.getByTestId('audio-toggle')).toHaveAccessibleName('Sound');
     await expect(page.getByTestId('audio-toggle')).toHaveAttribute('aria-pressed', 'false');
     const trigger = await openFilters(page);
     await expect(trigger).toHaveAccessibleName('Filters & Navigation');

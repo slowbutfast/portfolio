@@ -1,5 +1,7 @@
 # Verification Report: portfolio-v2-ferrofluid-audio
 
+> **Patch notice:** PATCH-01 and PATCH-02 supersede the initial pre-patch audit assumptions below. See the PATCH-01 section near the end for the Vercel-parity, real-tick, and stored-audio corrections, and the PATCH-02 section for the bounded idle reconnect, width-scaled wobble, dynamic tsconfig parity guard, and Sound-button class fix.
+
 ## Executive Summary
 
 The ferrofluid bridge, drag-snap mechanics, procedural Web Audio engine, 8-project planar catalog, optional repository links, smooth drawer tracking, header `Sound` control, metadata, and Node link auditor are implemented and verified.
@@ -225,3 +227,98 @@ None.
 ## Final Assessment
 
 **No critical issues.** The implementation is complete and verified. One external-link warning remains for pre-existing broken repository URLs, and one legacy-spec wording suggestion is noted. The change is ready for spec sync (completed), verification, and pull request.
+
+---
+
+## PATCH-01 Verification (2026-11-12 15:29:22 UTC)
+
+### Correction to the prior deployment diagnosis
+
+The earlier note that the failed Vercel deployment "appears to be an upstream Vercel service error" was **incorrect**. The Vercel log shows a real `tsc` failure after `.vercelignore` removed `scripts/`:
+
+```text
+src/utils/auditLinks.test.ts(13,8): error TS2307: Cannot find module
+  '../../scripts/audit-links.mjs' or its corresponding type declarations.
+src/utils/auditLinks.test.ts(37,23): error TS7006: Parameter 'url' implicitly has an 'any' type.
+```
+
+Local builds and CI passed because they retain the full file tree. The deployment gate never ran because no `vercel.deployment.success` event fired. PATCH-01 fixes the file-set mismatch rather than changing what Vercel uploads.
+
+### Patch result
+
+| Check | Before patch | After patch |
+| :--- | :--- | :--- |
+| R5: `.vercelignore`-pruned build | Failed with `TS2307` + `TS7006` | Passed (`tsc --noEmit -p tsconfig.build.json && vite build`) |
+| R6: parity guard | Negative fixture undetected until harness fix | 3/3 passed |
+| R1: d3 `tick.links` path | Listener absent; 4 tests failed | 4/4 passed (reconnect, ring-down/idle, first-tick priming) |
+| R2: stored-preference audio | Sources never started | 2/2 passed (start + ramp; toggled-off no-op) |
+| R3: sag pinch clamp | `waist = -7px` at `sag = -10` | Passed (`waist >= 1`, `waistWidth >= 2`) |
+| R4: fling amplitude | Peak sag ~0.2px | Moderate ≈1.8px, extreme ≈2.3px; both decay <0.01px |
+
+### Full regression after patch
+
+```text
+npm run typecheck   -> clean
+npm run test:unit   -> 16 files, 139 passed (128 baseline + 11 new)
+npm run test:e2e    -> 82 passed, 18 skipped, 0 Axe violations
+npm run build       -> successful (shipped-code typecheck + Vite)
+R5 parity build     -> successful after all fixes
+```
+
+### Patch-specific implementation notes
+
+- `tsconfig.build.json` includes `src` + `vite.config.ts` and excludes `src/**/*.test.ts`; `typecheck` remains the full-project command.
+- `vercelParity.test.ts` parses `.vercelignore` directory entries and proves a non-test `src` file importing `../../scripts/audit-links.mjs` is flagged.
+- The new `vercel-parity` CI job prunes `.vercelignore` paths (except `.git/`, `node_modules/`, `dist/`) before `npm run build`.
+- `graphSimulation.ts` now has `updateLinkTopology()`, `stepLinkOscillators(dtMs)`, `afterTick(dtMs)`, and a `tick.links` listener driven by real `performance.now()` deltas. The wrapper `tick()` still uses a fixed `TICK_MS` for deterministic tests. On release, the last pinned coordinate is committed before unpinning, and settled recovery guarantees zero permanent edge loss.
+- Excitation constants: `EXCITATION_SCALE = 0.04`, `MAX_EXCITATION = 2000`.
+- Stored-preference recovery calls `startSources()` and ramps master gain after `ctx.resume()`; toggling off before a gesture leaves the context uncreated.
+- Drag pitch uses `DRAG_VELOCITY_FULL_SCALE = 1200` px/s and pointer timestamps in `GraphCanvas`.
+- The Sound button keeps the visible label and accessible name `Sound`, exposes `aria-pressed`, and shows an underline + accent pressed state.
+
+### Human follow-ups
+
+1. Confirm the Vercel build turns green on push, then watch the `deployment-gate` / `preview-e2e` run against the real deployment and strict CSP. Report CSP console errors rather than widening the policy.
+2. Confirm the wobble visually at 60Hz and 120Hz and listen to audio with a stored "on" preference after reload plus first click.
+3. Align the Vercel Project Settings Node version (`26.x`) with `engines.node` (`22.x`).
+4. Deferred items remain unchanged: drawer backdrop drag occlusion, two 404 catalog repos, Kintsugi/Ivy media placeholders and summary wording, symmetric-vs-perpendicular sag semantics, muted-context battery, duplicate pointermove ramps, and per-frame drawer `setPosition`.
+
+---
+
+## PATCH-02 Verification (2026-11-12 15:47:04 UTC)
+
+### Findings addressed
+
+1. **Bounded idle reconnect.** The idle backstop now requires `distance <= SNAP_MULTIPLIER * restDistance` in addition to `state === 'idle'`. A dedicated test forces coasting to idle while the nodes are stretched beyond `2 × L_rest`, verifies the bridge stays detached, then records the exact distance when it reconnects and asserts that distance is within the snap bound.
+2. **Width-scaled wobble.** `computeBridgeGeometry` now applies `scaledSag = sag × clamp(baseWidth / 10, 0.5, 1.2)`. For a 10px sag input, a 6px ribbon shifts 6px, a 10px ribbon shifts 10px, and a 14px ribbon shifts 12px. This reduces the 6px bridge's swing from the reported ±60% to about ±36% and keeps it away from the 2px pinch clamp.
+3. **Dynamic tsconfig parity.** `vercelParity.test.ts` now reads `include` and `exclude` from `tsconfig.build.json`, expands the include roots, and filters with tsconfig-style glob matching (including `**/` semantics). The build config excludes `**/*.test.ts`, `**/*.test.tsx`, `**/*.spec.ts`, `src/**/*.test.*`, and `src/**/*.spec.*`.
+4. **Sound class conflict.** `bareTextBase` no longer carries a text color; the Sound button conditionally applies exactly one of `text-[var(--color-accent)]` or `text-[var(--color-muted)]`, plus the underline when pressed.
+5. **Synchronous release commit.** A unit test asserts `dragEnd` copies the final pinned `fx`/`fy` into `node.x`/`node.y` before any d3 tick.
+
+### Reproduction and results
+
+| Check | Before PATCH-02 | After PATCH-02 |
+| :--- | :--- | :--- |
+| Idle backstop beyond `2 × L_rest` | Reconnected immediately once idle | Stayed detached; reconnect distance ≤ `2 × L_rest` |
+| Narrow/medium/wide sag shift | All shifted by 10px | 6px / 10px / 12px respectively |
+| Parity config source | Hard-coded `src` minus `*.test.ts` | Parsed from `tsconfig.build.json` |
+| Broadened test excludes | `*.test.ts` only | `*.test.ts`, `*.test.tsx`, `*.spec.ts`, plus `src/**/*` variants |
+| Sound button color | Conflicting text-color classes | Exactly one conditional color |
+| `dragEnd` synchronous commit | Untested | Passed |
+
+### Full regression after PATCH-02
+
+```text
+npm run typecheck   -> clean
+npm run test:unit   -> 16 files, 146 passed (139 PATCH-01 baseline + 7 new)
+npm run test:e2e    -> 82 passed, 18 skipped, 0 Axe violations
+npm run build       -> successful (shipped-code typecheck + Vite)
+R5 parity build     -> successful with .vercelignore paths pruned
+```
+
+### Human follow-ups after PATCH-02
+
+1. Push the combined PATCH-01 + PATCH-02 diff, confirm Vercel is green, then watch the strict-CSP deployment gate run.
+2. Visually confirm the width-scaled wobble at 60Hz and 120Hz, especially on a 1-tag ribbon.
+3. Confirm the Sound button pressed color is visibly cobalt with the underline.
+4. All previously deferred items remain deferred.

@@ -90,9 +90,22 @@ const TICK_MS = 1000 / 60;
 export const SNAP_MULTIPLIER = 2;
 /** A released bridge reforms once the nodes return within this multiple. */
 export const RECONNECT_MULTIPLIER = 1.4;
-/** Oscillator excitation scale: distance acceleration -> bridge displacement. */
-const EXCITATION_SCALE = 0.004;
-const MAX_EXCITATION = 180;
+/**
+ * Oscillator excitation scale: distance acceleration -> bridge displacement.
+ * Tuned against the 60Hz moderate/extreme fling profiles in
+ * graphSimulation.test.ts: scale 0.04 plus a ±2000 excitation clamp yields
+ * ~1.8px peak sag on a 120px/150ms fling and ~2.3px on a 260px/60ms fling.
+ */
+const EXCITATION_SCALE = 0.04;
+const MAX_EXCITATION = 2000;
+
+/** Clamp distance acceleration into the oscillator's displacement input. */
+export function bridgeExcitation(accelerationPxPerS2: number): number {
+  return Math.max(
+    -MAX_EXCITATION,
+    Math.min(MAX_EXCITATION, accelerationPxPerS2 * EXCITATION_SCALE),
+  );
+}
 
 function chargeStrength(width: number, height: number): number {
   return -Math.min(width, height) * CHARGE_SCALE;
@@ -282,8 +295,7 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
     return Math.hypot(ax - bx, ay - by);
   };
 
-  const updateLinkStates = (dtMs: number): void => {
-    const dtSeconds = Math.max(0.001, dtMs / 1000);
+  const updateLinkTopology = (): void => {
     for (const link of linkStates) {
       const distance = linkDistance(link);
       // Visual severance is only possible while dragging. At rest, or after a
@@ -292,21 +304,57 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
       if (state === 'drag') {
         if (distance > SNAP_MULTIPLIER * link.restDistance) link.isDetached = true;
         else if (distance <= RECONNECT_MULTIPLIER * link.restDistance) link.isDetached = false;
-      } else if (link.isDetached && distance <= RECONNECT_MULTIPLIER * link.restDistance) {
+      } else if (
+        link.isDetached &&
+        (distance <= RECONNECT_MULTIPLIER * link.restDistance ||
+          (state === 'idle' && distance <= SNAP_MULTIPLIER * link.restDistance))
+      ) {
+        // Settled recovery is the invariant backstop: once coasting ends, no
+        // topological edge may remain permanently hidden. Bound it to the snap
+        // radius so a bridge cannot pop back while the node is still far away.
         link.isDetached = false;
       }
+    }
+  };
 
+  const stepLinkOscillators = (dtMs: number): void => {
+    // A real frame delta is clamped to the oscillator's supported range. A gap
+    // longer than 100ms (idle suspend, background tab) re-primes the derivative
+    // instead of injecting a fictitious impulse.
+    const clampedMs = Math.max(1, Math.min(32, dtMs));
+    const dtSeconds = clampedMs / 1000;
+    const reprime = dtMs > 100;
+    for (const link of linkStates) {
+      const distance = linkDistance(link);
+      if (link.previousDistance === 0 || reprime) {
+        // Prime on the first sample so a cold start never looks like a jump
+        // from zero to the current edge length.
+        link.previousDistance = distance;
+        link.previousVelocity = 0;
+        if (reprime) stepBridgeOscillator(link.oscillator, clampedMs, 0);
+        continue;
+      }
       const velocity = (distance - link.previousDistance) / dtSeconds;
       const acceleration = (velocity - link.previousVelocity) / dtSeconds;
-      const excitation = Math.max(
-        -MAX_EXCITATION,
-        Math.min(MAX_EXCITATION, acceleration * EXCITATION_SCALE),
-      );
-      stepBridgeOscillator(link.oscillator, dtMs, excitation);
+      stepBridgeOscillator(link.oscillator, clampedMs, bridgeExcitation(acceleration));
       link.previousDistance = distance;
       link.previousVelocity = velocity;
     }
   };
+
+  const afterTick = (dtMs: number): void => {
+    updateLinkTopology();
+    stepLinkOscillators(dtMs);
+  };
+
+  let lastTickAt: number | null = null;
+  sim.on('tick.links', () => {
+    const now = performance.now();
+    const dtMs = lastTickAt === null ? 0 : now - lastTickAt;
+    lastTickAt = now;
+    if (dtMs > 0) afterTick(dtMs);
+    else updateLinkTopology();
+  });
 
   const hoverAttraction = (alpha: number): void => {
     if (state !== 'hover' || !hoveredNode) return;
@@ -341,7 +389,7 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
 
   function tick(): void {
     sim.tick();
-    updateLinkStates(TICK_MS);
+    afterTick(TICK_MS);
     poll();
   }
 
@@ -393,14 +441,21 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
     dragNode.fy = pinned.y;
     dragSamples.push({ x: pinned.x, y: pinned.y, t: performance.now() });
     if (dragSamples.length > 3) dragSamples.shift();
-    updateLinkStates(TICK_MS);
+    updateLinkTopology();
   }
 
   function dragEnd(): void {
     if (state !== 'drag' || !dragNode) return;
     const node = dragNode;
+    // Commit the last pinned coordinate before unpinning. A pointerup can
+    // arrive between physics ticks, so node.x/y may still hold the drag-start
+    // position; using it would falsely reconnect a bridge on release.
+    const releaseX = node.fx;
+    const releaseY = node.fy;
     node.fx = null;
     node.fy = null;
+    if (releaseX != null) node.x = releaseX;
+    if (releaseY != null) node.y = releaseY;
 
     const len = dragSamples.length;
     if (len >= 2) {
@@ -428,8 +483,9 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
     sim.alphaTarget(0);
     sim.alpha(0.3).restart();
     // Reconnect immediately when the release point is already inside the
-    // recovery radius; otherwise the tick loop reforms it as the node settles.
-    updateLinkStates(TICK_MS);
+    // recovery radius; otherwise the d3 tick.links listener reforms the bridge
+    // as the node settles.
+    updateLinkTopology();
   }
 
   function resize(nw: number, nh: number): void {
@@ -490,6 +546,7 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
     destroy: () => {
       sim.stop();
       sim.on('tick', null);
+      sim.on('tick.links', null);
       sim.on('end', null);
     },
   };

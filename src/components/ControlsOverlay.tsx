@@ -24,8 +24,9 @@ interface ControlsOverlayProps {
 const safe = (side: 'top' | 'right' | 'bottom' | 'left', offset: string) =>
   `calc(env(safe-area-inset-${side}) + ${offset})`;
 
-const bareText =
-  'inline-flex min-h-11 items-center text-[var(--color-muted)] transition-colors hover:text-[var(--color-text)] md:min-h-0';
+const bareTextBase =
+  'inline-flex min-h-11 items-center transition-colors hover:text-[var(--color-text)] md:min-h-0';
+const bareText = `${bareTextBase} text-[var(--color-muted)]`;
 
 export function ControlsOverlay({
   view,
@@ -115,10 +116,13 @@ export function ControlsOverlay({
           <button
             type="button"
             data-testid="audio-toggle"
-            aria-label={soundEnabled ? 'Mute ambient sound' : 'Enable ambient sound'}
             aria-pressed={soundEnabled}
             onClick={onToggleSound}
-            className={bareText}
+            className={`${bareTextBase} ${
+              soundEnabled
+                ? 'text-[var(--color-accent)] underline underline-offset-4'
+                : 'text-[var(--color-muted)]'
+            }`}
           >
             Sound
           </button>

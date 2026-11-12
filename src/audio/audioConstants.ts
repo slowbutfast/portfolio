@@ -16,6 +16,8 @@ export const PAN_MIN = -0.75;
 export const PAN_MAX = 0.75;
 export const RAMP_TIME_CONSTANT = 0.05;
 export const MASTER_GAIN = 1;
+/** Pointer speed (px/s) at which the drag pitch modulation reaches its 5% cap. */
+export const DRAG_VELOCITY_FULL_SCALE = 1200;
 export const STORAGE_KEY = 'portfolio_sound_enabled';
 /** Audio only begins after an explicit gesture; stored preferences arm it. */
 export const DEFAULT_SOUND_ENABLED = false;

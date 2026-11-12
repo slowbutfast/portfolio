@@ -139,6 +139,11 @@ export function computeBridgeGeometry(
   const sag = Number.isFinite(options.sag) ? (options.sag as number) : 0;
   const baseWidth = bridgeBaseWidth(radiusA, radiusB, options.sharedTagCount);
   const waistWidth = bridgeWaistWidth(baseWidth, distance, restDistance);
+  // Narrow ribbons should breathe proportionally, not swing by a fixed number
+  // of pixels. Clamp the scale so 4-6px bridges calm down and 14px+ bridges
+  // keep their full momentum.
+  const widthScale = Math.min(1.2, Math.max(0.5, baseWidth / 10));
+  const scaledSag = sag * widthScale;
 
   // Attachment spread: half of the semantic base width, capped by the maximum
   // hub angle so neighbouring bridges never merge.
@@ -194,8 +199,16 @@ export function computeBridgeGeometry(
   // off its tangent ray would break C1 continuity at the circle perimeter, so
   // the sag is expressed as the only remaining degree of freedom: signed
   // handle extension. Negative handles bow the ribbon outward.
-  const sagHandle = waistDenominator > 0 ? -sag / waistDenominator : 0;
-  const handle = clamp(handleForWaist + sagHandle, -baseHandle, baseHandle);
+  const sagHandle = waistDenominator > 0 ? -scaledSag / waistDenominator : 0;
+  const maxPinchHandle =
+    waistDenominator > 0
+      ? (averageHalf - MIN_WAIST_WIDTH / 2) / waistDenominator
+      : baseHandle;
+  const handle = clamp(
+    handleForWaist + sagHandle,
+    -baseHandle,
+    Math.max(-baseHandle, Math.min(baseHandle, maxPinchHandle)),
+  );
   const waist = averageHalf - (3 / 8) * handle * (cosA + cosB);
 
   // Circle tangents: rotate the radial vector by +/- 90 degrees.

@@ -54,6 +54,8 @@ export default function App() {
   const [hoverState, setHoverState] = useState<HoverState>(null);
   const synth = useMemo(() => getAmbientSynth(), []);
   const [soundEnabled, setSoundEnabled] = useState(() => synth.isEnabled());
+  const soundEnabledRef = useRef(soundEnabled);
+  soundEnabledRef.current = soundEnabled;
   const triggerRef = useRef<HTMLElement | null>(null);
   const selectedIdRef = useRef<string | null>(null);
   const hoverDismissRef = useRef<number | null>(null);
@@ -260,11 +262,10 @@ export default function App() {
   }, [soundEnabled, synth]);
 
   const toggleSound = useCallback(() => {
-    setSoundEnabled((current) => {
-      const next = !current;
-      synth.setSoundEnabled(next);
-      return next;
-    });
+    const next = !soundEnabledRef.current;
+    soundEnabledRef.current = next;
+    synth.setSoundEnabled(next);
+    setSoundEnabled(next);
   }, [synth]);
 
   return (
