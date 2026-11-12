@@ -1,33 +1,26 @@
-# Surgical Patch Handoff: OpenSpec Change 'swiss-drafting-redesign' [PATCH-02]
+# Surgical Patch Handoff: OpenSpec Change 'swiss-drafting-redesign' [PATCH-03]
 
 You are the surgical patch implementation agent.
-Your directive is to execute **`PATCH-02`** on the `swiss-drafting-redesign` change, implementing the **Fluid Minimalist & Organic Constructivist UI Refinement** per the user's approved design specifications.
+Your directive is to execute **`PATCH-03`** on the `swiss-drafting-redesign` change, implementing the **Visual Portfolio Showcase, Floating Top Bar & Hover Media Refinement** based on the user's design direction and the 52-screenshot visual verification audit.
 
 ---
 
 ## 1. Executive Objective & Diagnostic Feedback
 - **Change Name**: `swiss-drafting-redesign`
-- **Patch ID**: `PATCH-02`
-- **Title**: Fluid Minimalist & Organic Constructivist UI Refinement
+- **Patch ID**: `PATCH-03`
+- **Title**: Visual Portfolio Showcase, Floating Top Bar & Hover Media Refinement
 - **Objective**:
-  Transition the portfolio interface into an expansive, uncluttered visual void where 20% larger solid circular primitives interact with organic ferrofluid Bézier bridges. Replace the persistent top banner and coordinate ticker with a compact floating carat dropdown (`Filters ▾`), float the project inspector directly adjacent to the clicked node as a video-game HUD tooltip (Option A), apply background knockout pills behind project titles (Option 1), mark visited nodes in hyperlink cobalt (Variant 1), restrict the terminal pane to `agentic-resume-builder` only, adopt Helvetica typography, and introduce a warm off-white Light Theme alongside the dark canvas.
-- **Diagnostic Feedback & Design Decisions**:
+  Transform the portfolio into an unmistakable, media-rich personal showcase for **Gregory Lazatin**. Add an uncluttered, floating top bar (with zero pill/background container), instant node hover media preview cards (`NodeHoverCard`), an accessible "About Me" modal (`AboutModal`), stroke-free canvas label knockout pills, a fix for the reduced-motion filter repaint stalling, cold-load deep-link tooltip anchoring, and cleansing of lingering CAD captions.
+- **Diagnostic Feedback & Audit Traces**:
   ```text
-  1. Secondary Accent: Shift from cyan to International Klein Blue (#003399) in Light Mode, with dark-calibrated cobalt (#3d7fff) in Dark Mode to guarantee WCAG AA contrast.
-  2. Pure Binary Connections: Remove all grayscale/alpha fading on active connections. Connected nodes render pure white (#ffffff) in Dark Mode and pure black (#000000) in Light Mode.
-  3. Cursor: Set canvas cursor to crosshair (+) via `cursor: crosshair`.
-  4. Floating Carat Dropdown: Replace top banner and search bar with a compact floating pill button with a carat (▾). Move View Mode (Graph/List), Search Input, Stack Filter Pills, Reset Button, and Theme Toggle into the dropdown popover.
-  5. Remove Header & Telemetry: Remove visible `SYS.PORTFOLIO` title (keep `<h1 className="sr-only">Portfolio</h1>` for accessibility) and remove the bottom-left coordinate bar (`X: --- Y: ---`).
-  6. Node Scale: Increase canonical node radius by ~20% from 18px to 22px, with proportional collision (36px) and link distance (210px).
-  7. Ferrofluid Metaball Bridges: Refine connection geometry to use tangent-continuous cubic Bézier fillets with flared circular attachments and a dynamic pinched waist that thins under tension.
-  8. Title Occlusion (Option 1): Render a background-matched rounded pill behind project title text to prevent intersecting connections from obstructing legibility.
-  9. Floating Tooltip HUD (Option A): Transform ProjectDrawer into a floating canvas inspector card positioned directly adjacent to the clicked node (with canvas boundary clamping), featuring circular close button and pill controls.
-  10. Caption & Classification Removal: Remove "PL-04 // BUILD // 685c065" and "LOCAL AUDIO TRANSCRIPTION // MONOREPO" from the project view.
-  11. Terminal Scoping: Render the terminal simulator tab ONLY for `agentic-resume-builder`. For all other projects, display Media and Link tabs directly.
-  12. Typography: Switch default website font from Space Grotesk to Helvetica / Helvetica Neue.
-  13. Dual Themes: Dark Theme (deep black void #0a0a0c, white nodes) and Light Theme (warm off-white #f6f6f4, black nodes, Klein Blue #003399 accent).
-  14. Visited Node Tracking (Variant 1): Mark clicked nodes with hyperlink cobalt (#003399 in light, #3d7fff in dark), persisting in localStorage.
-  15. Fluid UI Geometry: Replace sharp rectangular boxes (`rounded-none`) with circular and pill styling (`rounded-full` for chips/pills/buttons, `rounded-2xl` for dropdown/tooltip card).
+  1. Identity & Framing: The website currently lacks any human branding on first load. Add a floating top bar with "Gregory Lazatin" on the top-left (clicking resets filters/view), and clean text links on the top-right: "About", "GitHub" (https://github.com/slowbutfast), "Grid" / "Graph" view toggle, and "Filters ▾".
+  2. Floating Bar Styling: The top bar must float directly over the canvas with ZERO pill wrapper and ZERO background fill (bg-transparent, border-0, pure typography).
+  3. Visual Discoverability: Nodes are visually opaque on first load. When hovering over any node on desktop, immediately display a floating media card adjacent to the node showing the project's video clip or screenshot, title, tags, and summary.
+  4. About Me Modal: Provide an accessible modal dialog with Gregory Lazatin's bio, focus areas (LLM agent tooling, interactive physics & graphics, generative AI, audio computing), contact, and GitHub link.
+  5. Title Knockout Stroke Removal: Remove the 1px border stroke around project title pills on the canvas; keep just the solid background knockout fill (`tokens.bg`) so it cleanly floats above connections without a rigid border.
+  6. Reduced-Motion Filter Bug: In prefers-reduced-motion mode, toggling filter tags highlights the tag but nodes fail to dim because the animation loop is inactive and no repaint is triggered on `dimmedIds` change.
+  7. Residual CAD Captions: Remove remaining "PROJECT INDEX // 06 ENTRIES", "ASYMMETRIC PUBLICATION", and "PL-01 // ..." lines in ListView.tsx, and remove figcaptions in MediaView.tsx.
+  8. Cold-Load Deep-Link Anchoring: Opening #/p/:id on initial page load centers the drawer in the viewport instead of anchoring beside the deep-linked node.
   ```
 
 ---
@@ -36,150 +29,200 @@ Your directive is to execute **`PATCH-02`** on the `swiss-drafting-redesign` cha
 
 | File Path (relative to repo root) | Target Lines | Modification Summary |
 |---|---|---|
-| `DESIGN.md` | `L1–157` | Update design specification frontmatter and Markdown body to define the Fluid Minimalist system (Helvetica, `#003399`, fluid `rounded-full` pills, dual light/dark themes, metaball physics). Must pass `@google/design.md lint`. |
-| `src/styles.css` | `L1–80` | Update font stack to Helvetica, add dual light/dark color tokens, set canvas cursor to `crosshair`, and update `.bracket-tag` to `.fluid-pill` (`rounded-full`). |
-| `src/types/portfolio.ts` | `L1–75` | Add `ThemeMode` (`'dark' \| 'light'`), add `visited?: boolean` to `GraphNode`. |
-| `src/physics/graphSimulation.ts` | `L45–55, L78–120` | Scale `NODE_RADIUS = 22;`, `COLLIDE_RADIUS = 36;`, `LINK_DISTANCE = 210;`. |
-| `src/components/ControlsOverlay.tsx` | `L1–155` | Replace top banner and bottom ticker with a floating pill button with carat (`Filters ▾`) expanding into a floating popover with view toggle, search bar, stack filter pills, reset button, and light/dark theme switch. |
-| `src/components/GraphCanvas.tsx` | `L37–69, L76–136, L200–280, L485–499` | Implement tangent-continuous Bézier fillets with dynamic tension waist, render pure white/black connections (no grayscale), draw background knockout pills for project titles, render visited nodes in cobalt, apply `cursor: crosshair`. |
-| `src/components/ProjectDrawer.tsx` | `L1–294` | Transform into a floating canvas HUD tooltip positioned adjacent to the clicked node (Option A); remove plate/build/classification captions; restrict terminal tab to `agentic-resume-builder` only; adopt circular/pill buttons. |
-| `src/components/ListView.tsx` | `L24–88` | Reduce top padding from `pt-60` to `pt-24`, adopt `.fluid-pill` tags, and integrate theme tokens. |
-| `src/App.tsx` | `L14–37, L61–80, L111–168` | Manage theme state (`'dark' \| 'light'`), manage visited node IDs (`Set<string>`), remove coordinate ticker, render `<h1 className="sr-only">Portfolio</h1>`. |
-| `e2e/portfolio.spec.ts` | `L22–237` | Update test selectors for carat dropdown, update terminal test to target `agentic-resume-builder`, remove coord ticker test, verify WCAG A/AA across both themes. |
+| `DESIGN.md` | `L1–160` | Update design specification: define Gregory Lazatin header typography, hover media card tokens, About modal tokens, and borderless text pill knockout rule. Must pass `@google/design.md lint`. |
+| `src/types/portfolio.ts` | `L1–85` | Add `HoverAnchor = { x: number; y: number }`, `HoverState = { project: ProjectData; position: HoverAnchor } \| null`, and update component interfaces. |
+| `src/components/AboutModal.tsx` | `[NEW]` | Create accessible modal dialog featuring Gregory Lazatin's bio, focus areas, GitHub link, and accessible Escape/close controls. |
+| `src/components/NodeHoverCard.tsx` | `[NEW]` | Create floating media card displaying video clip or screenshot thumbnail, project title, tags, and summary, positioned adjacent to hovered node with boundary clamping. |
+| `src/components/ControlsOverlay.tsx` | `L35–150` | Redesign top bar: floating naked text header with `Gregory Lazatin` on top-left, `About`, `GitHub ↗`, `Grid` / `Graph`, `Filters ▾` on top-right, with zero background/pill wrapper. |
+| `src/components/GraphCanvas.tsx` | `L265–285, L300–325, L420–460` | Remove `ctx.stroke()` from title pills (fill only with `tokens.bg`); emit `onHoverNode(project, screenXY)` on pointer move; add reactive `useEffect` on `dimmedIds` to trigger `render()` in reduced motion; compute and emit node screen anchor for deep links. |
+| `src/components/ListView.tsx` | `L25–70` | Remove `PROJECT INDEX // 06 ENTRIES`, `ASYMMETRIC PUBLICATION`, and `{plate} // {project.classification}` captions. |
+| `src/components/MediaView.tsx` | `L25–40` | Remove `<figcaption className="...">{preview.caption}</figcaption>` from screenshot and video figures. |
+| `src/App.tsx` | `L14–175` | Manage `isAboutOpen` state, wire `NodeHoverCard` hover state, support `#/about` hash routing, and calculate deep-link anchor coordinates on cold load. |
+| `e2e/portfolio.spec.ts` | `L20–240` | Add tests verifying `Gregory Lazatin` header, `About` modal opening/dismissal, GitHub external link, hover media card rendering, and full regression suite. |
 
 ---
 
 ## 3. Blast Radius & Invariant Guardrails
 - **STRICT BLAST RADIUS**: Modify ONLY the 10 files specified in the Target Context Map.
 - **FORBIDDEN**:
-  - Do NOT modify project IDs, summaries, preview URLs, or topological links in `src/data/projects.ts` or `src/utils/graphTopology.ts`.
-  - Do NOT break keyboard accessibility (Escape to dismiss tooltip, Tab focus trapping, arrow navigation).
-  - Do NOT introduce un-themed hardcoded colors; bind all visual elements to CSS variables or cached tokens.
+  - Do NOT modify project catalog IDs, summaries, URLs, or topological edges in `src/data/projects.ts` or `src/utils/graphTopology.ts`.
+  - Do NOT introduce un-themed hardcoded colors; bind all visual elements to CSS custom properties (`var(--color-...)`) or cached canvas tokens.
+  - Do NOT break keyboard accessibility (Escape to dismiss modals/drawers, Tab focus trap, semantic dialog roles).
 - **INVARIANTS TO PRESERVE**:
-  - All existing unit tests (19/19) must pass.
-  - All e2e tests must pass, with 0 Axe-core WCAG A/AA violations in Graph view, List view, and open Project tooltip across both Dark and Light themes.
+  - All unit tests (19/19) must pass.
+  - All e2e tests must pass, with 0 Axe-core WCAG A/AA violations across Graph view, List view, Hover card, and About modal in both Dark and Light themes.
   - `npx @google/design.md lint DESIGN.md` must pass with 0 errors.
 
 ---
 
-## 4. Implementation Details by Component
+## 4. Implementation Blueprints by Component
 
-### A. Design Tokens & CSS (`DESIGN.md` & `src/styles.css`)
-- **Font Stack**:
-  ```css
-  --font-sans: 'Helvetica Neue', Helvetica, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono Variable', monospace;
-  ```
-- **Dark Theme (`:root`)**:
-  - `--color-bg: #0a0a0c;`
-  - `--color-surface: #121316;`
-  - `--color-surface-container: #18191e;`
-  - `--color-text: #ffffff;`
-  - `--color-muted: #8e8e93;`
-  - `--color-outline: #71717a;`
-  - `--color-accent: #3d7fff;` /* Electric cobalt (5.4:1 contrast on #0a0a0c) */
-  - `--color-brand: #003399;`
-  - `--color-node-unvisited: #ffffff;`
-  - `--color-node-visited: #3d7fff;`
-  - `--color-connection: #ffffff;`
-- **Light Theme (`[data-theme='light']`)**:
-  - `--color-bg: #f6f6f4;` /* Warm Swiss museum paper */
-  - `--color-surface: #ffffff;`
-  - `--color-surface-container: #eae9e5;`
-  - `--color-text: #0a0a0c;`
-  - `--color-muted: #6c6c70;`
-  - `--color-outline: #c7c7cc;`
-  - `--color-accent: #003399;` /* Klein Blue (9.2:1 contrast on #f6f6f4) */
-  - `--color-brand: #003399;`
-  - `--color-node-unvisited: #0a0a0c;`
-  - `--color-node-visited: #003399;`
-  - `--color-connection: #000000;`
-- **Canvas Cursor**:
-  ```css
-  .canvas-interactive {
-    cursor: crosshair;
-  }
-  ```
-- **Fluid Pill Styling**:
-  ```css
-  .fluid-pill {
-    display: inline-flex;
-    align-items: center;
-    border-radius: 9999px;
-    padding: 0.35rem 0.75rem;
-    font-size: 0.75rem;
-    font-weight: 500;
-    transition: all 150ms ease;
-  }
-  ```
+### A. New Component: About Me Modal (`src/components/AboutModal.tsx`)
+Create `src/components/AboutModal.tsx`:
+- Render modal with backdrop blur when `isOpen` is true.
+- Key elements:
+  - Header: `"Gregory Lazatin"` in bold typography (`text-2xl font-bold tracking-tight`).
+  - Subtitle: `"Creative Technologist & Software Engineer"`.
+  - Bio copy:
+    - `"Building systems at the intersection of autonomous agents, generative media, interactive physics, and audio computing."`
+    - `"This portfolio explores organic constructivism—using structural mechanics, mathematical vector tension, and pure typography as the primary aesthetic."`
+  - GitHub Link:
+    - Clean pill/button pointing to `https://github.com/slowbutfast` (`target="_blank" rel="noreferrer"`).
+  - Dismissal:
+    - Close button (`✕`) with `aria-label="Close about modal"`.
+    - `Escape` key dismiss listener and click-on-backdrop dismiss.
+    - `role="dialog"`, `aria-modal="true"`, `aria-label="About Gregory Lazatin"`.
 
-### B. Physics Scaling (`src/physics/graphSimulation.ts`)
-- Update parameters:
+### B. New Component: Floating Node Hover Card (`src/components/NodeHoverCard.tsx`)
+Create `src/components/NodeHoverCard.tsx`:
+- Accepts `project: ProjectData` and `position: { x: number; y: number }`.
+- Viewport boundary clamping:
   ```ts
-  const NODE_RADIUS = 22; // ~20% larger than 18px
-  const BOUNDARY_MARGIN = 48;
-  const COLLIDE_RADIUS = 36;
-  const LINK_DISTANCE = 210;
-  const CHARGE_SCALE = 0.65;
+  const cardWidth = 320;
+  const cardHeight = 220;
+  const margin = 20;
+  const left = Math.min(Math.max(margin, position.x + 28), window.innerWidth - cardWidth - margin);
+  const top = Math.min(Math.max(margin, position.y - 40), window.innerHeight - cardHeight - margin);
   ```
+- Structure:
+  - Container: `pointer-events-none fixed z-30 overflow-hidden rounded-2xl border border-[var(--color-outline)] bg-[var(--color-surface)]/95 p-3.5 shadow-2xl backdrop-blur-md`.
+  - Thumbnail:
+    - Video: `<video src={video.src} autoPlay loop muted playsInline className="h-32 w-full object-cover rounded-xl" />`
+    - Screenshot: `<img src={screenshot.src} alt={project.title} className="h-32 w-full object-cover rounded-xl" />`
+    - Fallback: Clean stylized container for CLI/terminal tools.
+  - Title & Action Prompt:
+    - `<h3 className="text-sm font-bold text-[var(--color-text)]">{project.title}</h3>`
+    - `<span className="font-mono text-[10px] text-[var(--color-accent)] font-semibold">Click to inspect ↗</span>`
+  - Summary:
+    - `<p className="mt-1 line-clamp-2 text-xs text-[var(--color-muted)] leading-relaxed">{project.summary}</p>`
 
-### C. Controls & Floating Carat Dropdown (`src/components/ControlsOverlay.tsx`)
-- Strip the top banner, `SYS.PORTFOLIO` heading, and bottom coordinate ticker.
-- Add a floating trigger button in the top-right corner:
-  - Accessible name: `Filters & Navigation`
-  - Test ID: `controls-dropdown-trigger`
-  - Contains label (e.g. `Filters ▾`) with carat SVG that rotates on open.
-- Dropdown Popover (`rounded-2xl`, border, shadow, backdrop-blur):
-  - Segmented View Mode Toggle: `Graph` (`data-testid="view-toggle-graph"`) and `List` (`data-testid="view-toggle-list"`).
-  - Search Input (`data-testid="search-input"`): Pill-shaped with search icon.
-  - Paradigm Filter Pills (`data-testid="tag-pill-${tag}"`): `.fluid-pill` rounded tags.
-  - Theme Switcher: Toggle between Dark and Light mode (`data-testid="theme-toggle"`).
-  - Reset Filters button (`data-testid="reset-filters"`).
-
-### D. Canvas Rendering & Ferrofluid Bézier Bridges (`src/components/GraphCanvas.tsx`)
-- **Connection Geometry**:
-  - Implement tangent-continuous cubic Bézier fillets.
-  - Tangent points are calculated on each circle's perimeter at angle $\theta = \pm \arcsin(\text{halfWidth} / r)$.
-  - Dynamic waist formula:
-    $$\text{waist} = \text{halfWidth} \times \max\left(0.12, 1 - \frac{d}{d_{\text{max}}}\right)$$
-  - Pure binary colors:
-    - In Dark Theme: connected edges fill with `#ffffff` (alpha 1.0).
-    - In Light Theme: connected edges fill with `#000000` (alpha 1.0).
-    - Dimmed edges render with alpha 0.12.
-- **Node Primitives**:
-  - Pure filled circles with radius $r = 22\text{px}$.
-  - Unvisited: `tokens.nodeUnvisited` (`#ffffff` dark, `#0a0a0c` light).
-  - Visited: `tokens.nodeVisited` (`#3d7fff` dark, `#003399` light).
-  - Active/Hovered: highlighted accent.
-- **Project Title Occlusion Pills**:
-  - Measure label width: `w = ctx.measureText(label).width + 16`.
-  - Draw rounded pill capsule: `ctx.roundRect(x - w/2, y + r + 8, w, 20, 10)` filled with `tokens.bg` and 1px border with `tokens.outline`.
-  - Draw text inside pill using `ctx.fillText(label, x, y + r + 22)` in `tokens.text`.
-
-### E. Floating Video-Game HUD Tooltip (`src/components/ProjectDrawer.tsx`)
-- Anchor the inspector card adjacent to the clicked node in canvas space:
-  - Convert node world coordinates $(x, y)$ to screen coordinates.
-  - Offset card by $(+32\text{px}, -40\text{px})$ relative to the node, with viewport collision clamping so it stays fully visible.
-  - Max dimensions: `max-w-[420px] max-h-[85vh]`, `rounded-2xl`, `border border-outline`, `bg-surface/95 backdrop-blur-md shadow-2xl`.
-  - Keep `data-testid="project-drawer"`, `role="dialog"`, `aria-modal="true"`, Escape key dismiss, and Tab focus trap.
-- Remove caption: strip `{plateLabel} // BUILD // {__COMMIT_HASH__}` and `{project.classification}`.
-- Restrict terminal tab:
-  ```ts
-  if (project.id === 'agentic-resume-builder' && project.terminalDemo) {
-    list.push({ kind: 'terminal', label: 'Terminal' });
-  }
+### C. Floating Uncluttered Top Bar (`src/components/ControlsOverlay.tsx`)
+- Strip all background panels, container borders, and outer pill shapes from the header area.
+- Top Left:
+  ```tsx
+  <div className="pointer-events-auto flex items-center">
+    <button
+      type="button"
+      data-testid="brand-home"
+      onClick={onReset}
+      className="text-base md:text-lg font-bold tracking-tight text-[var(--color-text)] hover:text-[var(--color-accent)] transition-colors"
+    >
+      Gregory Lazatin
+    </button>
+  </div>
   ```
-  All other projects show only Media and Link tabs.
+- Top Right:
+  ```tsx
+  <div className="pointer-events-auto ml-auto flex items-center gap-4 md:gap-6 font-mono text-xs">
+    <button
+      type="button"
+      data-testid="nav-about"
+      onClick={onOpenAbout}
+      className="text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors"
+    >
+      About
+    </button>
+    <a
+      href="https://github.com/slowbutfast"
+      target="_blank"
+      rel="noreferrer"
+      data-testid="nav-github"
+      className="text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors inline-flex items-center gap-1"
+    >
+      GitHub <span aria-hidden="true">↗</span>
+    </a>
+    <button
+      type="button"
+      data-testid="view-toggle"
+      onClick={() => onViewChange(view === 'graph' ? 'list' : 'graph')}
+      className="text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors"
+    >
+      {view === 'graph' ? 'Grid' : 'Graph'}
+    </button>
+    <button
+      type="button"
+      data-testid="controls-dropdown-trigger"
+      aria-expanded={isDropdownOpen}
+      onClick={() => setIsDropdownOpen((prev) => !prev)}
+      className="text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors inline-flex items-center gap-1"
+    >
+      Filters <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+    </button>
+  </div>
+  ```
+- Keep the dropdown popover accessible when `isDropdownOpen` is true (containing the search input, tag pills, theme toggle, and reset filters).
 
-### F. Application State & Accessibility (`src/App.tsx`)
-- Manage `theme` state (`'dark' | 'light'`) initialized from `localStorage.getItem('portfolio_theme') || 'dark'`. Apply `data-theme` attribute to `document.documentElement`.
-- Manage `visitedIds` state (`Set<string>`) initialized from `localStorage.getItem('portfolio_visited')`. On `openProject(id)`, add `id` to `visitedIds` and persist to `localStorage`.
-- Provide `<h1 className="sr-only">Portfolio</h1>` for heading structure.
-- Remove `coordTickerRef` and associated ticker synchronization.
+### D. Canvas Refinements & Bug Fixes (`src/components/GraphCanvas.tsx`)
+1. **Remove Title Pill Stroke (Lines 275–281)**:
+   ```ts
+   ctx.beginPath();
+   ctx.roundRect(pillX, pillY, pillWidth, pillHeight, pillHeight / 2);
+   ctx.fillStyle = tokens.bg;
+   ctx.fill();
+   // REMOVE ctx.stroke() and ctx.strokeStyle! Fill only.
+   ```
+2. **Hover Coordinates for Hover Card**:
+   - Add prop: `onHoverNode?: (project: ProjectData | null, screenPos: { x: number; y: number } | null) => void`.
+   - In `onPointerMove`: when `hitNode(p.x, p.y)` finds a node, compute screen coordinates:
+     ```ts
+     const t = transformRef.current;
+     const screenX = (reduceMotionRef.current ? (staticPosRef.current.get(node.id)?.[0] ?? node.x) : node.x) * t.scale + t.x;
+     const screenY = (reduceMotionRef.current ? (staticPosRef.current.get(node.id)?.[1] ?? node.y) : node.y) * t.scale + t.y;
+     const proj = getProjectById(node.id) ?? null;
+     onHoverNodeRef.current?.(proj, { x: screenX, y: screenY });
+     ```
+   - On pointer leave or when hovering nothing, call `onHoverNodeRef.current?.(null, null)`.
+3. **Reduced-Motion Tag Filter Repaint Fix**:
+   - In `GraphCanvas.tsx`, keep a ref to `render`:
+     ```ts
+     const renderRef = useRef<() => void>(() => {});
+     renderRef.current = render;
+     ```
+   - Add reactive effect:
+     ```ts
+     useEffect(() => {
+       if (reduceMotionRef.current) {
+         renderRef.current?.();
+       }
+     }, [dimmedIds]);
+     ```
+4. **Cold-Load Deep-Link Anchor Resolver**:
+   - Add prop: `initialSelectedId?: string | null`, `onResolveAnchor?: (id: string, anchor: CanvasAnchor) => void`.
+   - On mount/resize, if `initialSelectedId` is provided and no anchor exists, compute its screen coordinates and call `onResolveAnchor(initialSelectedId, anchor)`.
 
-### G. List View (`src/components/ListView.tsx`)
-- Reduce top padding from `pt-60` to `pt-24`.
-- Apply `.fluid-pill` tags and theme-aware colors.
+### E. Caption Cleansing (`src/components/ListView.tsx` & `src/components/MediaView.tsx`)
+1. **In `src/components/ListView.tsx`**:
+   - Delete lines 27–30: Remove `<div className="... PROJECT INDEX // 06 ENTRIES ...">`.
+   - Delete line 64: Remove `<p className="mt-4 font-mono text-[10px] ...">{plate} // {project.classification}</p>`.
+2. **In `src/components/MediaView.tsx`**:
+   - Delete lines 25–27 and 37–39: Remove `<figcaption className="...">{preview.caption}</figcaption>`.
+
+### F. Application Orchestration (`src/App.tsx`)
+- State:
+  - `const [isAboutOpen, setIsAboutOpen] = useState(false);`
+  - `const [hoverState, setHoverState] = useState<{ project: ProjectData; position: { x: number; y: number } } | null>(null);`
+- Hash Routing:
+  - Add support for `#/about`:
+    ```ts
+    if (window.location.hash === '#/about') {
+      setIsAboutOpen(true);
+    }
+    ```
+- Render `AboutModal`:
+  ```tsx
+  <AboutModal isOpen={isAboutOpen} onClose={() => {
+    setIsAboutOpen(false);
+    if (window.location.hash === '#/about') {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }} />
+  ```
+- Render `NodeHoverCard`:
+  ```tsx
+  {hoverState && !selectedId && (
+    <NodeHoverCard project={hoverState.project} position={hoverState.position} />
+  )}
+  ```
 
 ---
 
@@ -201,28 +244,28 @@ npm run typecheck
 ```bash
 npm run test:unit
 ```
-*Expected: 19/19 passing tests.*
+*Expected: All 19 unit tests pass.*
 
 ### Step 4: Playwright E2E & Accessibility Tests
 ```bash
 npm run test:e2e
 ```
-*Expected: All tests pass, including Axe WCAG A/AA audits in Dark and Light themes.*
+*Expected: All tests pass, including Axe WCAG A/AA audits in Dark and Light themes, testing brand header, about modal, and clean title pills.*
 
 ### Step 5: Production Build
 ```bash
 npm run build
 ```
-*Expected: Clean build with zero `data:font` inlined assets.*
+*Expected: Clean build with zero `data:font` inlining violations.*
 
 ---
 
 ## 6. Surgical Patch Checklist
-- [ ] P02.1 Update `DESIGN.md` with Fluid Minimalist specification and verify `@google/design.md lint` passes.
-- [ ] P02.2 Update `src/styles.css` with Helvetica stack, dual theme tokens, `cursor: crosshair`, and fluid pill classes.
-- [ ] P02.3 Update `src/physics/graphSimulation.ts` with 20% larger node radius (22px), collision radius (36px), and link distance (210px).
-- [ ] P02.4 Redesign `src/components/ControlsOverlay.tsx` to floating carat dropdown (`Filters ▾`).
-- [ ] P02.5 Refactor `src/components/GraphCanvas.tsx` with tangent Bézier bridges, binary connection colors, text knockout pills, and visited node styling.
-- [ ] P02.6 Redesign `src/components/ProjectDrawer.tsx` to floating adjacent HUD tooltip with caption and terminal restrictions.
-- [ ] P02.7 Update `src/App.tsx` and `src/components/ListView.tsx` with theme state, visited tracking, and fluid pill styling.
-- [ ] P02.8 Update `e2e/portfolio.spec.ts` and verify all tests and builds pass.
+- [ ] P03.1 Update `DESIGN.md` to define visual portfolio identity: Gregory Lazatin floating header typography, hover media card specs, About modal dialog tokens, and borderless text pill knockout, ensuring 0 linter errors.
+- [ ] P03.2 Implement `src/components/AboutModal.tsx` dialog featuring Gregory Lazatin's bio, focus areas (agent tooling, audio physics, generative systems), GitHub link, and accessible Escape/close controls.
+- [ ] P03.3 Implement `src/components/NodeHoverCard.tsx` displaying rich media previews (video clip/screenshot), title, tags, and summary, positioned adjacent to hovered nodes with viewport collision clamping.
+- [ ] P03.4 Redesign `src/components/ControlsOverlay.tsx` into an uncluttered floating top bar with no pill/background container: "Gregory Lazatin" on the top left, and "About", "GitHub ↗", "Grid" / "Graph", "Filters ▾" on the top right.
+- [ ] P03.5 Refactor `src/components/GraphCanvas.tsx`: remove 1px stroke outline from project title pills (fill only with `tokens.bg`), emit hover coordinates for `NodeHoverCard`, fix reduced-motion filter repaint bug via reactive `dimmedIds` effect, and expose node screen anchor resolver for deep links.
+- [ ] P03.6 Update `src/App.tsx`: manage `AboutModal` state, wire `NodeHoverCard` hover state, support `#/about` hash routing, and calculate deep-link anchor coordinates on cold load.
+- [ ] P03.7 Cleanse residual captions: strip index headers and classification stamps from `src/components/ListView.tsx`, and remove figcaptions from `src/components/MediaView.tsx`.
+- [ ] P03.8 Update `e2e/portfolio.spec.ts` to verify Gregory Lazatin title, About modal interactions, hover card rendering, and full regression suite (`typecheck`, `unit`, `e2e`, axe WCAG A/AA in dark & light, `build`).

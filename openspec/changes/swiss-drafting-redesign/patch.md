@@ -51,3 +51,33 @@
 - **Expected Resolution**:
   The portfolio operates in pure Fluid Minimalist mode with a clean void canvas, crosshair cursor, 20% larger circular nodes, pure binary connections, floating carat dropdown for filters/views/theme, floating video-game HUD inspector tooltip, background knockout title pills, Helvetica typography, and dual light/dark themes. All unit, e2e, and lint tests pass.
 - **Status**: RESOLVED
+
+
+### [PATCH-03] Visual Portfolio Showcase, Floating Top Bar & Hover Media Refinement
+- **Date**: 2026-11-12 01:42:00 UTC
+- **Feedback Source**: User Visual Review & 52-Screenshot Empirical Audit
+- **Reported Issue**:
+  > 1. Identity & Structure: The site feels like an anonymous art piece rather than an unmistakable portfolio for Gregory Lazatin. Add a floating top bar (with zero pill/background container) with "Gregory Lazatin" on the top-left and "About", "GitHub" (slowbutfast), "Grid" / "Graph", and "Filters ▾" on the top-right.
+  > 2. Discoverability: Nodes are visually opaque on first paint. Gliding the cursor across any node should instantly pop up a rich floating media card displaying the video clip/screenshot, title, tags, and summary.
+  > 3. About Page: Provide an accessible "About Me" modal dialog with bio, focus areas, contact, and GitHub link.
+  > 4. Title Pills: Remove the 1px border stroke around project title pills on the canvas; keep just the solid background knockout fill (tokens.bg).
+  > 5. Reduced-Motion Filter Bug: In prefers-reduced-motion mode, toggling filter tags fails to dim non-matching nodes because the animation loop is inactive and no repaint is triggered.
+  > 6. Residual CAD Captions: Remove remaining "PROJECT INDEX // 06 ENTRIES", "ASYMMETRIC PUBLICATION", and "PL-01 // ..." lines in ListView.tsx, and figcaptions in MediaView.tsx.
+  > 7. Deep-Link Anchoring: Cold-loading #/p/:id centers the tooltip in the viewport instead of anchoring beside the deep-linked node.
+- **Root Cause**:
+  Lack of visual media exposure up front in the node graph, absence of author branding/navigation, residual drafting labels in secondary views, missing reactive repaint trigger in reduced motion, and uninitialized anchor coordinates on deep-link load.
+- **Target Files**:
+  - `DESIGN.md`
+  - `src/components/AboutModal.tsx` (new)
+  - `src/components/NodeHoverCard.tsx` (new)
+  - `src/components/ControlsOverlay.tsx`
+  - `src/components/GraphCanvas.tsx`
+  - `src/components/ProjectDrawer.tsx`
+  - `src/components/ListView.tsx`
+  - `src/components/MediaView.tsx`
+  - `src/App.tsx`
+  - `src/types/portfolio.ts`
+  - `e2e/portfolio.spec.ts`
+- **Expected Resolution**:
+  The website acts as an immediate, stunning portfolio for Gregory Lazatin with instant hover media cards on the graph, an uncluttered floating top bar, an About modal, stroke-free title knockout pills, 100% clean reduced-motion filtering, anchored deep links, and zero residual CAD captions. All tests and linter suites pass.
+- **Status**: PENDING

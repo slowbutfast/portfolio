@@ -66,3 +66,15 @@
 - [x] P02.6 Redesign `src/components/ProjectDrawer.tsx` into a floating canvas HUD tooltip adjacent to the selected node (Option A), removing caption/classification clutter, restricting terminal to `agentic-resume-builder` only, and adopting circular/pill geometry
 - [x] P02.7 Update `src/App.tsx` and `src/components/ListView.tsx` with theme state, visited tracking, sr-only h1, and fluid pill padding
 - [x] P02.8 Update `e2e/portfolio.spec.ts` and verify full regression suite passes (`typecheck`, `unit`, `e2e`, axe WCAG A/AA, and `design.md lint`)
+
+
+## Patch 03: Visual Portfolio Showcase & Hover Media Refinement
+
+- [ ] P03.1 Update `DESIGN.md` to define visual portfolio identity: Gregory Lazatin floating header typography, hover media card specs, About modal dialog tokens, and borderless text pill knockout, ensuring 0 linter errors
+- [ ] P03.2 Implement `src/components/AboutModal.tsx` dialog featuring Gregory Lazatin's bio, focus areas (agent tooling, audio physics, generative systems), GitHub link, and accessible Escape/close controls
+- [ ] P03.3 Implement `src/components/NodeHoverCard.tsx` displaying rich media previews (video clip/screenshot), title, tags, and summary, positioned adjacent to hovered nodes with viewport collision clamping
+- [ ] P03.4 Redesign `src/components/ControlsOverlay.tsx` into an uncluttered floating top bar with no pill/background container: "Gregory Lazatin" on the top left, and "About", "GitHub ↗", "Grid" / "Graph", "Filters ▾" on the top right
+- [ ] P03.5 Refactor `src/components/GraphCanvas.tsx`: remove 1px stroke outline from project title pills (fill only with `tokens.bg`), emit hover coordinates for `NodeHoverCard`, fix reduced-motion filter repaint bug via reactive `dimmedIds` effect, and expose node screen anchor resolver for deep links
+- [ ] P03.6 Update `src/App.tsx`: manage `AboutModal` state, wire `NodeHoverCard` hover state, support `#/about` hash routing, and calculate deep-link anchor coordinates on cold load
+- [ ] P03.7 Cleanse residual captions: strip index headers and classification stamps from `src/components/ListView.tsx`, and remove figcaptions from `src/components/MediaView.tsx`
+- [ ] P03.8 Update `e2e/portfolio.spec.ts` to verify Gregory Lazatin title, About modal interactions, hover card rendering, and full regression suite (`typecheck`, `unit`, `e2e`, axe WCAG A/AA in dark & light, `build`)
