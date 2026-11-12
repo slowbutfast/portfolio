@@ -12,10 +12,19 @@ const PROJECT_IDS = [
 
 const GITHUB_URL = 'https://github.com/slowbutfast';
 
+// Vercel injects its Preview Comments toolbar (vercel.live/_next-live/feedback)
+// into preview deployments. Our strict CSP (`script-src 'self'`) correctly
+// blocks it, which logs a console error that is not an application defect.
+// Production has no toolbar. Ignore only this known, Vercel-injected script;
+// every other console error, including any other CSP violation, still fails.
+const VERCEL_TOOLBAR_CSP_ERROR = /vercel\.live\/_next-live\/feedback/;
+
 function trackErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on('console', (msg) => {
-    if (msg.type() === 'error') errors.push(msg.text());
+    if (msg.type() === 'error' && !VERCEL_TOOLBAR_CSP_ERROR.test(msg.text())) {
+      errors.push(msg.text());
+    }
   });
   page.on('pageerror', (err) => errors.push(err.message));
   return errors;
