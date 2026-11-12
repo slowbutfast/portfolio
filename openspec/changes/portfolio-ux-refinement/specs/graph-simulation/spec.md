@@ -1,7 +1,16 @@
 ## ADDED Requirements
 
 ### Requirement: Authoritative planar graph seed embedding and homing force
-The system SHALL initialize graph simulation nodes from the authoritative normalized planar coordinate map (`PLANAR_NODE_SEEDS`), scaled to container dimensions $(width, height)$:
+The system SHALL initialize graph simulation nodes from the authoritative normalized planar coordinate map (`PLANAR_NODE_SEEDS`), scaled to container dimensions $(width, height)$ via $(x = \text{seed}.x \times width, y = \text{seed}.y \times height)$, across the 9 undirected graph links derived from shared tags in `projects.ts`:
+1. `open-dungeon` &mdash; `agentic-resume-builder`
+2. `open-dungeon` &mdash; `pict-climate-risk-viz-chatbot`
+3. `open-dungeon` &mdash; `transcribe-plus`
+4. `open-dungeon` &mdash; `sandwave-sim`
+5. `open-dungeon` &mdash; `attention-max`
+6. `pict-climate-risk-viz-chatbot` &mdash; `transcribe-plus`
+7. `transcribe-plus` &mdash; `sandwave-sim`
+8. `transcribe-plus` &mdash; `attention-max`
+9. `sandwave-sim` &mdash; `attention-max`
 
 | Project ID | Normalized $(x, y)$ | Role in Planar Embedding |
 | :--- | :--- | :--- |
@@ -13,12 +22,13 @@ The system SHALL initialize graph simulation nodes from the authoritative normal
 | `attention-max` | `(0.52, 0.80)` | Bottom vertex of the $K_4$ triangle |
 
 The system SHALL guarantee that:
-1. The initial node layout has strictly 0 edge crossings across all 9 connections.
-2. The reduced-motion static layout renders directly from these scaled planar seeds with 0 edge crossings.
-3. The dynamic physics simulation applies weak homing forces (`seedX`/`seedY` with `strength: 0.02`) toward scaled seed positions, ensuring the unperturbed resting equilibrium remains crossing-free while preserving interactive dragging and flinging.
+1. **Initial Mount Layout**: Node coordinates scaled to any positive canvas dimensions ($width > 0, height > 0$) have strictly 0 segment crossings across all 9 links.
+2. **Reduced-Motion Layout**: The static layout renders directly from these scaled planar seeds with 0 edge crossings.
+3. **Resting Simulation State**: The dynamic physics simulation applies weak homing forces (`seedX`/`seedY` with `strength: 0.02`) toward scaled seed positions, ensuring the unperturbed resting equilibrium maintains 0 edge crossings.
+4. **Interactive Boundaries**: Active user dragging is permitted to temporarily displace nodes. Once released, the seed-homing forces guide the graph back to its planar resting equilibrium.
 
 #### Scenario: Canvas graph initializes on first load
-- **WHEN** the 2D canvas mounts with dynamic physics enabled
+- **WHEN** the 2D canvas mounts with dynamic physics enabled on any viewport (e.g. 1440x900 desktop or 393x852 mobile)
 - **THEN** simulation nodes initialize at the scaled planar seed positions, with zero edge crossings between any of the 9 connection links.
 
 #### Scenario: Reduced motion is enabled
@@ -34,7 +44,7 @@ The system SHALL construct connection bridges between nodes using pure bilateral
 - Anchors $A_{top}, A_{bottom}$ on circle A and $B_{top}, B_{bottom}$ on circle B are placed at spread angles $\pm \theta$ relative to unit direction $\vec{u} = \frac{B - A}{\|B - A\|}$.
 - Control points leave circle circumferences along exact circle tangent rays:
   $$CP1_{top} = A_{top} + L_A \vec{T}_{A,top}, \quad CP2_{top} = B_{top} + L_B \vec{T}_{B,top}$$
-  where $\vec{T}_{A,top} = \sin\theta_A \vec{u} - \cos\theta_A \vec{n}$ and $\vec{T}_{B,top} = -\sin\theta_B \vec{u} - \cos\theta_B \vec{n}$, guaranteeing true $C^1$ tangent continuity at both circle boundaries.
+  where $\vec{T}_{A,top} = \sin\theta_A \vec{u} - \cos\theta_A \vec{n}$ and $\vec{T}_{B,top} = -\sin\theta_B \vec{u} - \cos\theta_B \vec{n}$, guaranteeing true $C^1$ tangent continuity at both circle boundaries ($(CP1_{top} - A_{top}) \cdot (A_{top} - A) = 0$ and $(B_{top} - CP2_{top}) \cdot (B_{top} - B) = 0$).
 - The bottom boundary curve is an exact mathematical reflection of the top curve across $\vec{u}$ ($y_{bottom} = -y_{top}$ in edge-local coordinates).
 - Close-node guard: when center distance $d \le R_A + R_B$, bridge calculation returns `null` and rendering is bypassed to prevent inverted or crossed geometry.
 

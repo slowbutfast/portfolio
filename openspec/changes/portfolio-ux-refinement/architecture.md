@@ -75,8 +75,17 @@ flowchart TD
 ## Technical Decisions
 
 ### 1. Authoritative Planar Seed Geometry & Weak Homing
-- **Topology Analysis**: The 6 projects contain a complete $K_4$ subgraph (`open-dungeon`, `transcribe-plus`, `sandwave-sim`, `attention-max`).
-- **Planar Embedding**: We choose a planar straight-line embedding that nests `sandwave-sim` strictly within the interior triangle of the other three $K_4$ vertices.
+- **Topology Analysis**: The 6 portfolio projects form an undirected graph with 9 links derived from shared technology tags in `src/data/projects.ts`:
+  1. `open-dungeon` &mdash; `agentic-resume-builder` (Agent Tooling)
+  2. `open-dungeon` &mdash; `pict-climate-risk-viz-chatbot` (Express, LLM)
+  3. `open-dungeon` &mdash; `transcribe-plus` (Express, Vanilla JS)
+  4. `open-dungeon` &mdash; `sandwave-sim` (Vanilla JS)
+  5. `open-dungeon` &mdash; `attention-max` (Vanilla JS)
+  6. `pict-climate-risk-viz-chatbot` &mdash; `transcribe-plus` (Express)
+  7. `transcribe-plus` &mdash; `sandwave-sim` (Audio, Vanilla JS)
+  8. `transcribe-plus` &mdash; `attention-max` (Vanilla JS)
+  9. `sandwave-sim` &mdash; `attention-max` (Vanilla JS)
+- **$K_4$ Planar Embedding**: Four nodes (`open-dungeon`, `transcribe-plus`, `sandwave-sim`, `attention-max`) form a complete $K_4$ subgraph. In any straight-line planar drawing of $K_4$, the 4 vertices cannot be in convex position (otherwise their two diagonals cross). Therefore, exactly one vertex must be embedded strictly in the interior of the triangle formed by the other three. We choose the straight-line planar embedding that places `sandwave-sim` strictly in the interior of $\triangle(\text{open-dungeon}, \text{transcribe-plus}, \text{attention-max})$, with `agentic-resume-builder` placed to the far left and `pict-climate-risk-viz-chatbot` placed at the top.
 - **Authoritative Coordinates (`src/data/graphSeeds.ts`)**:
   ```ts
   export const PLANAR_NODE_SEEDS: Record<string, { x: number; y: number }> = {
@@ -88,39 +97,41 @@ flowchart TD
     'attention-max':                 { x: 0.52, y: 0.80 },
   };
   ```
-- **Guarantees & Scope**:
-  1. Initial mount: exactly 0 edge segment crossings across all 9 links.
-  2. Reduced-motion layout (`staticRing`): renders directly from scaled planar seeds with 0 crossings.
-  3. Dynamic simulation: weak `seedX`/`seedY` forces (`strength: 0.02`) guide the unperturbed simulation toward a crossing-free resting equilibrium without restricting interactive drag/fling.
+- **Definition of "Planar" & Guarantees**:
+  1. **Initial Mount Layout**: When normalized seeds are scaled to canvas dimensions ($x = \text{seed}.x \times W, y = \text{seed}.y \times H$), the graph has strictly 0 segment intersections across all 9 links across all positive aspect ratios ($W > 0, H > 0$).
+  2. **Reduced-Motion Layout (`staticRing`)**: Renders directly from scaled planar seeds with 0 edge crossings.
+  3. **Resting Simulation State**: The unperturbed d3-force simulation initializes at these planar seeds and applies weak seed-homing forces (`seedX`/`seedY` with `strength: 0.02`), settling at an equilibrium with 0 edge crossings.
+  4. **Interactive Drag Boundary**: Active user dragging is permitted to temporarily displace nodes. Once released, the seed-homing forces guide the graph back into the planar resting basin of attraction.
 
 ### 2. Bilateral Tangent-Continuous Bridge Geometry
 - **Formulation in `src/utils/bridgeGeometry.ts`**:
   1. Direction vector $\vec{D} = B - A$, distance $d = \|\vec{D}\|$, unit direction $\vec{u} = \vec{D} / d$, normal $\vec{n} = (-u_y, u_x)$.
-  2. **Close-node guard**: when $d \le R_A + R_B$, returns `null` to bypass bridge drawing and prevent inverted curves when circles touch or overlap.
-  3. **Anchor spread**: half-width $h = \min(R_{min} \times 0.65, w_{max})$, spread angle $\theta = \arcsin(h / R)$. Capped at $\theta \le \pi / 6.5$ ($28^\circ$) to prevent adjacent bridges from merging at the 5-degree `open-dungeon` hub.
+  2. **Close-node guard**: when $d \le R_A + R_B$, `computeBridgeGeometry` returns `null` to bypass bridge drawing and prevent inverted curves when circles touch or overlap during drag or close proximity.
+  3. **Anchor spread**: half-width $h = \min(R_A, R_B) \times 0.65$, spread angle $\theta_A = \arcsin(h / R_A)$ and $\theta_B = \arcsin(h / R_B)$. Capped at $\theta \le \pi / 6.5$ ($28^\circ$) to prevent adjacent bridges from merging at the 5-degree `open-dungeon` hub.
   4. **Perimeter anchors**:
      $$A_{top} = A + R_A(\cos\theta_A \vec{u} + \sin\theta_A \vec{n}), \quad A_{bottom} = A + R_A(\cos\theta_A \vec{u} - \sin\theta_A \vec{n})$$
      $$B_{top} = B - R_B(\cos\theta_B \vec{u} - \sin\theta_B \vec{n}), \quad B_{bottom} = B - R_B(\cos\theta_B \vec{u} + \sin\theta_B \vec{n})$$
-  5. **$C^1$ Tangent Vectors**:
-     Circle tangent pointing forward toward waist at $A_{top}$: $\vec{T}_{A,top} = \sin\theta_A \vec{u} - \cos\theta_A \vec{n}$.
-     Circle tangent pointing backward toward waist at $B_{top}$: $\vec{T}_{B,top} = -\sin\theta_B \vec{u} - \cos\theta_B \vec{n}$.
+  5. **$C^1$ Tangent Vectors & Endpoint Derivatives**:
+     Circle unit tangent at $A_{top}$ pointing forward toward B: $\vec{T}_{A,top} = \sin\theta_A \vec{u} - \cos\theta_A \vec{n}$.
+     Circle unit tangent at $B_{top}$ pointing forward toward B: $\vec{T}_{B,top} = \sin\theta_B \vec{u} + \cos\theta_B \vec{n}$.
+     Tangent vector at $B_{top}$ pointing backward into the bridge toward A: $-\vec{T}_{B,top} = -\sin\theta_B \vec{u} - \cos\theta_B \vec{n}$.
   6. **Control Points**:
      Calculated directly as positive scalar multiples of the tangent vectors:
-     $$CP1_{top} = A_{top} + L_A \vec{T}_{A,top}, \quad CP2_{top} = B_{top} + L_B \vec{T}_{B,top}$$
-     where handle length $L = \min(\text{span} \times 0.35, R_{min} \times 1.4)$.
+     $$CP1_{top} = A_{top} + L \vec{T}_{A,top}, \quad CP2_{top} = B_{top} - L \vec{T}_{B,top}$$
+     where handle length $L = \min((d - R_A - R_B) \times 0.45, \min(R_A, R_B) \times 1.2)$.
+     This guarantees true $C^1$ continuity: $(CP1_{top} - A_{top}) \cdot (A_{top} - A) = 0$ and $(B_{top} - CP2_{top}) \cdot (B_{top} - B) = 0$.
   7. **Bilateral Reflection**:
-     The lower curve control points are exact normal reflections of the upper curve across $\vec{u}$:
-     $$CP1_{bottom} = B_{bottom} + L_B(-\sin\theta_B \vec{u} + \cos\theta_B \vec{n})$$
-     $$CP2_{bottom} = A_{bottom} + L_A(\sin\theta_A \vec{u} + \cos\theta_A \vec{n})$$
-     guaranteeing $y_{bottom}(x) = -y_{top}(x)$ in edge-local coordinates.
+     The lower curve is an exact normal reflection of the upper curve across $\vec{u}$:
+     $$(CP1_{bottom} - A) \cdot \vec{n} = -((CP1_{top} - A) \cdot \vec{n}), \quad (CP2_{bottom} - A) \cdot \vec{n} = -((CP2_{top} - A) \cdot \vec{n})$$
+     with identical axial projections, guaranteeing $y_{bottom}(x) = -y_{top}(x)$ in edge-local coordinates.
 
 ### 3. Font Standardization & Monospace Boundary
 - **UI Typography**:
-  - Primary font stack: `'Helvetica Neue', Helvetica, -apple-system, BlinkMacSystemFont, Arial, sans-serif` for brand, headings, and body.
-  - Secondary font stack: `'Helvetica Neue', 'Helvetica Light', 'HelveticaNeue-Light', Arial, sans-serif; font-weight: 300` for metadata, tags, and timestamps.
-  - Canvas node labels: Standardized to the Helvetica sans stack; hardcoded `JetBrains Mono` reference in `GraphCanvas.tsx` is removed.
+  - Primary font stack: `'Helvetica Neue', Helvetica, -apple-system, BlinkMacSystemFont, Arial, sans-serif` for brand, headings, body, and **canvas project node label pills**.
+  - Secondary font stack: `'Helvetica Neue Light', 'Helvetica Neue', 'Helvetica Light', -apple-system, BlinkMacSystemFont, Arial, sans-serif; font-weight: 300` for metadata, tags, and timestamps (falls back cleanly to Arial with `font-weight: 300` on Windows/Linux).
+  - Web font removal: `@fontsource-variable/space-grotesk` and `@fontsource-variable/jetbrains-mono` imports are removed from `src/main.tsx`. `GraphCanvas.tsx` standardizes label pills to `'500 12px "Helvetica Neue", Helvetica, -apple-system, BlinkMacSystemFont, Arial, sans-serif'` and eliminates `document.fonts.load(...)` mono blocking.
 - **Monospace Boundary**:
-  - Monospace stack: `Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace`.
+  - Monospace stack: `Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace` (falls back to Consolas on Windows and Liberation Mono on Linux; exact glyph metrics are not expected to be pixel-identical across platforms).
   - Scoped strictly to:
     1) `TerminalSimulator.tsx` (preserving strict character grid alignment in CLI output tables)
     2) Real-time rAF coordinate ticker (`X: --- Y: ---`)
@@ -130,8 +141,9 @@ flowchart TD
 - **CSP Compliance**: Served from `'self'` via `<script src="/theme-init.js"></script>`, fully compliant with `script-src 'self'`.
 
 ### 5. Drawer Link Tab Retirement & Elevated Actions
-- **Drawer Tabs**: The legacy `Link` tab is eliminated from `tabs`.
-- **Primary Actions**: `Code ↗` and `Visit ↗` are permanently elevated into the sticky header directly beneath the project title.
+- **Drawer Tabs**: The legacy `Link` tab (`preview-tab-link`) is retired and completely removed from the tablist (`role="tablist"`).
+- **Primary Actions**: `Code ↗` (repository URL) and `Visit ↗` (live demo/deployment URL) are permanently elevated into the sticky header directly beneath the project title.
+- **Reference Links**: Any secondary or non-repository linkouts (external documentation or writeups) are placed contextually in the Project Overview / Details section.
 - **Preview Modalities**: The remaining content tabs (`Media`, `Terminal`) sit in a distinct rounded segmented container (`bg-[var(--color-surface-container)] rounded-full p-1`) with $\ge 44\text{px}$ touch targets.
 
 ## Risks / Trade-offs

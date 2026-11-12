@@ -1,19 +1,19 @@
 ## 1. Test Scaffolding (TDD)
 
-- [ ] 1.1 Scaffold unit test `src/utils/bridgeGeometry.test.ts` verifying bilateral reflection symmetry, collinear tangent derivatives, and close-node distance guards ($d \le R_A + R_B$)
-- [ ] 1.2 Scaffold unit test `src/utils/graphPlanarity.test.ts` verifying 0 segment crossings across all 9 edges for `PLANAR_NODE_SEEDS` both initially and at resting equilibrium (300 ticks)
+- [ ] 1.1 Scaffold unit test `src/utils/bridgeGeometry.test.ts` verifying bilateral reflection symmetry, collinear tangent derivatives ($(CP1_{top} - A_{top}) \cdot (A_{top} - A) = 0$ and $(B_{top} - CP2_{top}) \cdot (B_{top} - B) = 0$), and close-node distance guards ($d \le R_A + R_B$)
+- [ ] 1.2 Scaffold unit test `src/utils/graphPlanarity.test.ts` verifying 0 segment crossings across all 9 edges for `PLANAR_NODE_SEEDS` scaled to desktop and mobile viewports, and after 300 ticks of unperturbed d3-force simulation
 - [ ] 1.3 Scaffold unit test `src/data/profile.test.ts` verifying Brown University bio copy and URL protocols (`mailto:`, `https:`)
 - [ ] 1.4 Scaffold unit test `src/data/projects.test.ts` verifying mandatory non-empty `shortTitle: string` for all 6 projects
 - [ ] 1.5 Scaffold unit test in `src/utils/edgeConfig.test.ts` and update `src/utils/csp.ts` (`SPEC_CSP`) to include `frame-src 'self' https://drive.google.com;`
 - [ ] 1.6 Scaffold E2E tests in `e2e/portfolio.spec.ts` for default Light theme, header item sequence (`About`, `GitHub`, `Graph`/`Grid`, `Dark`/`Light`, `Filters`), and theme persistence
 - [ ] 1.7 Scaffold E2E tests for About modal DOM structure (Brown University bio, top contact links, no subtitle, no focus areas)
-- [ ] 1.8 Scaffold E2E tests for `ProjectDrawer` segmented tabs track, elevated `Code ↗` and `Visit ↗` buttons, and absence of legacy `preview-tab-link`
+- [ ] 1.8 Scaffold E2E tests for `ProjectDrawer` segmented tabs track, elevated `Code ↗` and `Visit ↗` buttons, absence of legacy `preview-tab-link`, and contextual reference links in Overview
 
 ## 2. Mathematical Geometry & Planar Topology
 
-- [ ] 2.1 Implement `src/utils/bridgeGeometry.ts` with tangent-continuous Bézier curves, bilateral reflection symmetry, and close-node distance guards
+- [ ] 2.1 Implement `src/utils/bridgeGeometry.ts` with tangent-continuous Bézier curves, bilateral reflection symmetry, and close-node distance guards ($d \le R_A + R_B$)
 - [ ] 2.2 Implement `src/data/graphSeeds.ts` exporting authoritative `PLANAR_NODE_SEEDS` with Sandwave nested inside the $K_4$ triangle
-- [ ] 2.3 Wire `computeBridgeGeometry` into `src/components/GraphCanvas.tsx` replacing previous heuristic bridge drawing
+- [ ] 2.3 Wire `computeBridgeGeometry` into `src/components/GraphCanvas.tsx` replacing previous heuristic bridge drawing, handling null for close nodes cleanly
 
 ## 3. Candidate Profile & Infrastructure Configuration
 
@@ -46,7 +46,7 @@
 ## 7. Elevated Actions & Drawer Segmented Tabs
 
 - [ ] 7.1 Elevate `Code ↗` and `Visit ↗` buttons into sticky header of `src/components/ProjectDrawer.tsx`
-- [ ] 7.2 Implement distinct segmented container track for `Media` and `Terminal` tabs with $\ge 44\text{px}$ touch targets, and retire the legacy `Link` tab in `src/components/ProjectDrawer.tsx`
+- [ ] 7.2 Implement distinct segmented container track for `Media` and `Terminal` tabs with $\ge 44\text{px}$ touch targets, retire the legacy `Link` tab completely, and route reference linkouts into the Project Details overview in `src/components/ProjectDrawer.tsx`
 - [ ] 7.3 Enable `pointer-events-auto` on `src/components/NodeHoverCard.tsx` with 150ms transfer zone and direct action buttons
 - [ ] 7.4 Embed 16:9 thumbnails and terminal specimen fallback in `src/components/ListView.tsx`
 

@@ -4,10 +4,10 @@
 - `npm run test:unit`:
   - `src/utils/bridgeGeometry.test.ts`:
     - Asserts bilateral reflection symmetry across arbitrary rotated node positions: $n(CP1_{bottom}) = -n(CP2_{top})$ and $n(CP2_{bottom}) = -n(CP1_{top})$ within $10^{-6}$.
-    - Asserts $C^1$ endpoint derivatives: $(CP1_{top} - A_{top})$ is collinear with the perimeter tangent vector at $A_{top}$, and $(B_{top} - CP2_{top})$ is collinear with the perimeter tangent vector at $B_{top}$.
+    - Asserts $C^1$ endpoint derivatives: initial tangent handle vector $(CP1_{top} - A_{top})$ has dot product zero with radius $(A_{top} - A)$, and terminal handle vector $(B_{top} - CP2_{top})$ has dot product zero with radius $(B_{top} - B)$.
     - Asserts `computeBridgeGeometry` returns `null` when distance $d \le R_A + R_B$.
   - `src/utils/graphPlanarity.test.ts`:
-    - Asserts `countCrossings(PLANAR_NODE_SEEDS, edges) === 0` across all 9 undirected graph edges.
+    - Asserts `countCrossings(scaleSeeds(PLANAR_NODE_SEEDS, width, height), edges) === 0` across all 9 undirected graph edges on both desktop (1440x900) and mobile (393x852) viewports.
     - Simulates 300 ticks of unperturbed d3-force with weak seed homing (`strength: 0.02`) and asserts 0 edge crossings at resting equilibrium.
   - `src/data/profile.test.ts`:
     - Asserts canonical Brown University bio statement matches verbatim.

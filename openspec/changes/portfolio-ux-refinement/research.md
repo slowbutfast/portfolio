@@ -12,17 +12,20 @@
   - *"make node connections more symmetric: bilateral symmetry along the center-to-center axis (or normal-mirrored Bézier control points)"*
   - *"make sure these design changes are documented within the global DESIGN.md"*
 
-- **Evaluator Audits 1, 2 & 3 (2026-11-12)**:
-  - Authoritative planar seeds require Sandwave to be nested strictly inside the $K_4$ triangle (`open-dungeon`, `transcribe-plus`, `attention-max`) to eliminate initial line intersections.
-  - Bézier bridges require true $C^1$ tangent continuity at circle perimeters (control points collinear with circle tangents), waist clamping, and close-node distance guards ($d \le R_A + R_B$) to prevent inverted geometry.
-  - Retiring the drawer `Link` tab eliminates redundant navigation since `Code ↗` and `Visit ↗` are permanently elevated into the sticky header.
+- **Evaluator Audits 1, 2, 3 & 4 (2026-11-12)**:
+  - Authoritative planar seeds require Sandwave to be nested strictly inside the $K_4$ triangle (`open-dungeon`, `transcribe-plus`, `attention-max`) to eliminate initial line intersections across all 9 links.
+  - Planarity scope must be strictly defined: initial scaled layout and reduced-motion layout guarantee 0 edge crossings, while weak seed-homing forces (`strength: 0.02`) guide unperturbed simulation to a crossing-free resting equilibrium.
+  - Bézier bridges require true $C^1$ tangent continuity at circle perimeters (control points collinear with circle tangents), bilateral reflection symmetry, waist clamping, and close-node distance guards ($d \le R_A + R_B$) to prevent inverted geometry.
+  - Retiring the drawer `Link` tab eliminates redundant navigation since `Code ↗` and `Visit ↗` are permanently elevated into the sticky header, while non-repository linkouts reside in the Project Details overview.
   - Light mode contrast tokens require hardening (`--color-muted: #525257`, `--color-outline: #71717a`) to pass WCAG AAA and AA UI boundaries on `#eae9e5` and `#f6f6f4`.
+  - Contrast token `#3d7fff` at 3.4:1 against `#ffffff` satisfies WCAG 2.1 SC 1.4.11 for non-text UI boundaries and focus rings, but must not be used for normal body text on white.
+  - Canvas typography standardizes node label pills to the Helvetica sans font stack, removing webfont package dependencies (`@fontsource-variable/*`) and canvas `document.fonts.load(...)` mono blocking.
   - First-paint theme flash for returning dark users must be prevented via `public/theme-init.js`.
 
 ### Raised but not acted on
 
 - **Complete removal of interactive physics graph on mobile**: Kept graph accessible at all times via header toggle and bottom sheet inspector.
-- **Pure Helvetica for code/terminals**: Monospace font is retained as Menlo for technical accuracy in `TerminalSimulator` ASCII tables and coordinate displays.
+- **Pure Helvetica for code/terminals**: Monospace font is retained as Menlo with standard platform fallbacks for technical accuracy in `TerminalSimulator` ASCII tables and coordinate displays.
 
 ## Glossary
 
@@ -39,7 +42,7 @@
 
 | Source | What it establishes | Licence | Accessed |
 | :--- | :--- | :--- | :--- |
-| Graph Embedding & Planarity for $K_4$ | A straight-line planar drawing of $K_4$ is achieved by embedding one vertex strictly in the interior of the triangle formed by the other three | Graph theory | 2026-11-12 |
+| Graph Embedding & Planarity for $K_4$ | A straight-line planar drawing of $K_4$ is achieved by embedding one vertex strictly in the interior of the triangle formed by the other three, as 4 vertices in convex position always cross | Graph theory | 2026-11-12 |
 | Hermite & Bézier Tangent Continuity ($C^1$) | A Bézier curve leaves a circle with $C^1$ smoothness if and only if its initial control vector is collinear with the circle tangent at the anchor point | Differential geometry | 2026-11-12 |
 | Google Drive Embed & Access Documentation | Google Drive file preview can be embedded using `https://drive.google.com/file/d/<id>/preview`. File requires General Access set to "Anyone with the link can view" | Google Terms of Service | 2026-11-12 |
 | MDN Content Security Policy: `frame-src` | Controls valid sources for nested browsing contexts such as `<iframe>`. Missing entry causes browser console security block when `default-src 'self'` is specified | W3C / MDN Open Doc | 2026-11-12 |
@@ -48,10 +51,10 @@
 
 | Option | Decision | Reason | Date |
 | :--- | :--- | :--- | :--- |
-| Menlo for Monospace | Adopted | High legibility, native monospace font with clean fallbacks for CLI terminals and data displays | 2026-11-12 |
-| Helvetica / Helvetica Light for UI | Adopted | Clean Swiss modernist typography hierarchy across headings, body, and secondary metadata | 2026-11-12 |
-| Nested Planar $K_4$ Seeds | Adopted | Eliminates all edge crossings on initial render and resting states | 2026-11-12 |
-| $C^1$ Tangent-Continuous Fluid Bridges | Adopted | Guarantees exact bilateral reflection symmetry with zero lopsided bulging and smooth circle fillets | 2026-11-12 |
+| Menlo for Monospace | Adopted | High legibility, native monospace font with clean fallbacks (`Consolas`, `Liberation Mono`) for CLI terminals and data displays | 2026-11-12 |
+| Helvetica / Helvetica Light for UI | Adopted | Clean Swiss modernist typography hierarchy across headings, body, metadata, and canvas node labels | 2026-11-12 |
+| Nested Planar $K_4$ Seeds | Adopted | Eliminates all edge crossings on initial render and resting states across all 9 links | 2026-11-12 |
+| $C^1$ Tangent-Continuous Fluid Bridges | Adopted | Guarantees exact bilateral reflection symmetry with zero lopsided bulging, smooth circle fillets, and close-node overlap guards ($d \le R_A + R_B$) | 2026-11-12 |
 | `public/theme-init.js` | Adopted | Synchronous blocking script prevents dark-user flash before first paint without violating CSP | 2026-11-12 |
 
 ## Patterns adopted
@@ -66,6 +69,7 @@
 | :--- | :--- | :--- | :--- | :--- |
 | $K_4$ planar seeds have zero intersections | 0 crossings | Geometric intersection check of all 9 edge segments with Sandwave at (0.56, 0.55) | 2026-11-12 | stable |
 | Hardened light contrast tokens pass AAA | 6.4:1 & 3.96:1 | WCAG contrast formula of `#525257` and `#71717a` against `#eae9e5` and `#f6f6f4` | 2026-11-12 | stable |
+| Non-text token `#3d7fff` passes SC 1.4.11 | 3.4:1 | Measured contrast of `#3d7fff` against `#ffffff` (exceeds 3.0:1 requirement for non-text UI components) | 2026-11-12 | stable |
 | Runtime environment is React 19.3 | True | Inspected `package.json` (`react: ^19.0.0`, lockfile resolved `19.3.0`) | 2026-11-12 | stable |
 | CSP allows `public/theme-init.js` | True | External script from `'self'` executes under `script-src 'self'` | 2026-11-12 | stable |
 

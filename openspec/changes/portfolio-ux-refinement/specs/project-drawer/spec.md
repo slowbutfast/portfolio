@@ -18,7 +18,7 @@ The system SHALL display an accessible inspection drawer (`role="dialog"`, `aria
 ## ADDED Requirements
 
 ### Requirement: Elevated primary repository and live project actions
-The system SHALL display permanent primary action links for `Code ↗` (GitHub repository) and, when `liveUrl` is declared, `Visit ↗` (live deployment or web demo) pinned in the sticky header directly below the project title, providing descriptive accessible names (e.g. `aria-label="OpenDungeon source code, opens in new tab"`) with `aria-hidden="true"` arrows. The legacy `Link` tab SHALL be retired from the preview tablist, ensuring primary repository and demo links never require a tab switch to discover.
+The system SHALL display permanent primary action links for `Code ↗` (GitHub repository) and, when `liveUrl` is declared, `Visit ↗` (live deployment or web demo) pinned in the sticky header directly below the project title, providing descriptive accessible names (e.g. `aria-label="OpenDungeon source code, opens in new tab"`) with `aria-hidden="true"` arrows. The legacy `Link` tab (`data-testid="preview-tab-link"`) SHALL be retired and completely removed from the preview tablist (`role="tablist"`), ensuring primary repository and demo links never require a tab switch to discover. Any non-repository reference linkouts (such as external articles or documentation) SHALL be rendered contextually within the Project Overview / Details section rather than as a standalone preview tab.
 
 #### Scenario: User inspects a project with a live URL
 - **WHEN** the inspector drawer opens for a project with `liveUrl` declared
