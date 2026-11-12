@@ -51,23 +51,21 @@ The system SHALL apply a custom attractive force to directly connected neighbor 
 - **THEN** node H is unpinned (`H.fx = null; H.fy = null`), simulation alphaTarget cools to 0, and the state returns to `idle`.
 
 ### Requirement: Reduced motion accessibility
-The system SHALL respect the user's `prefers-reduced-motion` browser setting by pausing continuous force simulation, placing nodes in a static circular layout, and immediately rendering final vector and typography geometries without playing the initial write-in or velocity coasting animations.
+The system SHALL respect the user's `prefers-reduced-motion` browser setting by pausing continuous force simulation and rendering the static graph directly from the authoritative planar seeds scaled to the viewport, with zero edge crossings and no coasting or write-in animations.
 
 #### Scenario: User has reduced motion enabled
 - **WHEN** `prefers-reduced-motion: reduce` is active
-- **THEN** continuous force simulation is paused, nodes are placed in a static legible circular layout, initial stroke write-in is bypassed, and all nodes/labels render immediately in their resting state.
+- **THEN** continuous force simulation is paused, nodes render at their scaled planar seed positions with zero edge crossings, and all nodes and labels appear immediately in their resting state.
+### Requirement: Canvas label typography and native font rendering
+The system SHALL render canvas node label pills with `'500 12px "Helvetica Neue", Helvetica, -apple-system, BlinkMacSystemFont, Arial, sans-serif'` and paint them without blocking on a webfont load, eliminating `document.fonts.load(...)` gates for the removed variable mono face.
 
-### Requirement: Technical drafting canvas rendering and typography font gate
-The system SHALL render graph nodes and edges as an engineering technical drafting specimen, initializing physics simulation and vector geometries immediately on mount, while gating canvas typography drawing on `document.fonts.load('12px "JetBrains Mono Variable"')` with immediate repaint upon resolution.
-
-#### Scenario: Typography rendering with font loading gate
+#### Scenario: Typography rendering without a webfont gate
 - **WHEN** the canvas simulation initializes
-- **THEN** node circles, links, and crosshairs begin rendering immediately, while textual labels and coordinate badges await `document.fonts.load('12px "JetBrains Mono Variable"')` before painting with the custom variable font.
+- **THEN** node circles, bridges, and label pills paint immediately with the native Helvetica sans stack, with no wait for a webfont promise.
 
-#### Scenario: Technical drafting node anatomy
+#### Scenario: Canvas node anatomy
 - **WHEN** nodes are painted onto the 2D canvas
-- **THEN** each node renders with a center crosshair (`+`), a primary filled circle ($r = 18\text{px}$), and an outer concentric 1px hairline guide ring ($r + 6\text{px}$) decorated with 4 cardinal tick marks (0°, 90°, 180°, 270°), replacing any legacy multi-ring overlays.
-
+- **THEN** each node renders as a flat circular primitive with radius 22px and a background-matched label pill in the Helvetica sans stack, without crosshairs or decorative guide rings.
 ### Requirement: Focal-only relational projection vectors and distance callouts
 The system SHALL restrict relational projection vectors and edge distance callouts exclusively to the hovered or focused node, preventing hot-path rendering degradation across non-focal nodes.
 
@@ -87,8 +85,63 @@ The system SHALL animate node guide ring strokes from 0 to $2\pi$ over 400ms usi
 - **THEN** outer guide rings trace their circumference from 0 to $2\pi$ before settling into static hairline rings.
 
 ### Requirement: Invariant interaction hit testing boundary
-The system SHALL preserve the interaction hit-testing radius strictly at the canonical physics radius ($r = 18\text{px}$), ensuring that outer decorative concentric rings ($r + 6\text{px}$) do not alter the pointer interaction state machine.
+The system SHALL preserve the interaction hit-testing radius at the canonical node radius (`r = 22px`), so visual label pills do not alter the pointer interaction state machine.
 
-#### Scenario: Pointer enters outer decorative guide boundary
-- **WHEN** the pointer moves within the $r + 6\text{px}$ visual ring but remains outside the $18\text{px}$ physics radius
-- **THEN** the node does NOT enter the hover state until the pointer breaches the true $18\text{px}$ threshold.
+#### Scenario: Pointer enters the label pill but not the node circle
+- **WHEN** the pointer moves within a node's label pill but remains outside the 22px physics radius
+- **THEN** the node does NOT enter the hover state until the pointer breaches the circle threshold.
+### Requirement: Authoritative planar graph seed embedding and homing force
+The system SHALL initialize graph simulation nodes from the authoritative normalized planar coordinate map (`PLANAR_NODE_SEEDS`), scaled to container dimensions $(width, height)$ via $(x = \text{seed}.x \times width, y = \text{seed}.y \times height)$, across the 9 undirected graph links derived from shared tags in `projects.ts`:
+1. `open-dungeon` &mdash; `agentic-resume-builder`
+2. `open-dungeon` &mdash; `pict-climate-risk-viz-chatbot`
+3. `open-dungeon` &mdash; `transcribe-plus`
+4. `open-dungeon` &mdash; `sandwave-sim`
+5. `open-dungeon` &mdash; `attention-max`
+6. `pict-climate-risk-viz-chatbot` &mdash; `transcribe-plus`
+7. `transcribe-plus` &mdash; `sandwave-sim`
+8. `transcribe-plus` &mdash; `attention-max`
+9. `sandwave-sim` &mdash; `attention-max`
+
+| Project ID | Normalized $(x, y)$ | Role in Planar Embedding |
+| :--- | :--- | :--- |
+| `agentic-resume-builder` | `(0.18, 0.50)` | Degree-1 leaf node left of OpenDungeon; zero edge crossings |
+| `open-dungeon` | `(0.40, 0.48)` | Degree-5 hub forming the left vertex of the $K_4$ triangle |
+| `pict-climate-risk-viz-chatbot` | `(0.56, 0.22)` | Top vertex connected to OpenDungeon and Transcribe+ |
+| `transcribe-plus` | `(0.72, 0.42)` | Right vertex of the $K_4$ triangle |
+| `sandwave-sim` | `(0.56, 0.55)` | Embedded strictly inside the interior of $\triangle(\text{open-dungeon}, \text{transcribe-plus}, \text{attention-max})$ |
+| `attention-max` | `(0.52, 0.80)` | Bottom vertex of the $K_4$ triangle |
+
+The system SHALL guarantee that:
+1. **Initial Mount Layout**: Node coordinates scaled to any positive canvas dimensions ($width > 0, height > 0$) have strictly 0 segment crossings across all 9 links.
+2. **Reduced-Motion Layout**: The static layout renders directly from these scaled planar seeds with 0 edge crossings.
+3. **Resting Simulation State**: The dynamic physics simulation applies weak homing forces (`seedX`/`seedY` with `strength: 0.02`) toward scaled seed positions, ensuring the unperturbed resting equilibrium maintains 0 edge crossings.
+4. **Interactive Boundaries**: Active user dragging is permitted to temporarily displace nodes. Once released, the seed-homing forces guide the graph back to its planar resting equilibrium.
+
+#### Scenario: Canvas graph initializes on first load
+- **WHEN** the 2D canvas mounts with dynamic physics enabled on any viewport (e.g. 1440x900 desktop or 393x852 mobile)
+- **THEN** simulation nodes initialize at the scaled planar seed positions, with zero edge crossings between any of the 9 connection links.
+
+#### Scenario: Reduced motion is enabled
+- **WHEN** `prefers-reduced-motion: reduce` is active
+- **THEN** static node positions are rendered directly from the scaled planar seeds with zero edge crossings.
+
+#### Scenario: Physics simulation settles from initial seeds
+- **WHEN** the physics simulation runs unperturbed from initial seeds for 300 ticks
+- **THEN** the resting equilibrium maintains zero edge crossings between any of the 9 connection links.
+
+### Requirement: Bilateral tangent-continuous fluid bridge geometry
+The system SHALL construct connection bridges between nodes using pure bilateral geometry across the center-to-center axis:
+- Anchors $A_{top}, A_{bottom}$ on circle A and $B_{top}, B_{bottom}$ on circle B are placed at spread angles $\pm \theta$ relative to unit direction $\vec{u} = \frac{B - A}{\|B - A\|}$.
+- Control points leave circle circumferences along exact circle tangent rays:
+  $$CP1_{top} = A_{top} + L_A \vec{T}_{A,top}, \quad CP2_{top} = B_{top} + L_B \vec{T}_{B,top}$$
+  where $\vec{T}_{A,top} = \sin\theta_A \vec{u} - \cos\theta_A \vec{n}$ and $\vec{T}_{B,top} = -\sin\theta_B \vec{u} - \cos\theta_B \vec{n}$, guaranteeing true $C^1$ tangent continuity at both circle boundaries ($(CP1_{top} - A_{top}) \cdot (A_{top} - A) = 0$ and $(B_{top} - CP2_{top}) \cdot (B_{top} - B) = 0$).
+- The bottom boundary curve is an exact mathematical reflection of the top curve across $\vec{u}$ ($y_{bottom} = -y_{top}$ in edge-local coordinates).
+- Close-node guard: when center distance $d \le R_A + R_B$, bridge calculation returns `null` and rendering is bypassed to prevent inverted or crossed geometry.
+
+#### Scenario: Rendering bridge between adjacent nodes
+- **WHEN** the canvas draws a connection between two nodes with $d > R_A + R_B$
+- **THEN** the bridge renders with bilaterally symmetric top and bottom curves, smooth $C^1$ tangent continuity at circle circumferences, and an hourglass waist cinch.
+
+#### Scenario: Two nodes overlap during drag
+- **WHEN** a user drags node A until its center is within $R_A + R_B$ of node B
+- **THEN** `computeBridgeGeometry` returns `null` and the bridge is omitted cleanly without visual artifacts or inverted curves.

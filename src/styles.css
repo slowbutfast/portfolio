@@ -2,12 +2,42 @@
 
 @theme {
   --font-sans:
-    'Helvetica Neue', Helvetica, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Helvetica, -apple-system, BlinkMacSystemFont, Arial,
     sans-serif;
-  --font-mono: 'JetBrains Mono Variable', monospace;
+  --font-secondary:
+    'Helvetica Neue Light', 'Helvetica Light', 'Helvetica Neue', Helvetica,
+    -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+  --font-mono:
+    Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 }
 
+/*
+ * Light is the default palette: theme-init.js sets data-theme before first
+ * paint, while a missing attribute still resolves to the warm paper theme.
+ */
 :root {
+  color-scheme: light;
+  --color-bg: #f6f6f4;
+  --color-surface: #ffffff;
+  --color-surface-container: #eae9e5;
+  --color-text: #0a0a0c;
+  /* 6.4:1 on #eae9e5 and 7.7:1 on #ffffff (AAA text). */
+  --color-muted: #525257;
+  /* 3.96:1 on #eae9e5, satisfying non-text UI boundaries (WCAG 1.4.11). */
+  --color-outline: #71717a;
+  --color-divider: #c7c7cc;
+  --color-accent: #003399;
+  --color-brand: #003399;
+  --color-node-unvisited: #0a0a0c;
+  --color-node-visited: #003399;
+  --color-connection: #000000;
+  --color-success: #15803d;
+  --color-error: #b91c1c;
+  --color-amber: #a16207;
+  font-family: var(--font-sans);
+}
+
+[data-theme='dark'] {
   color-scheme: dark;
   --color-bg: #0a0a0c;
   --color-surface: #121316;
@@ -24,27 +54,6 @@
   --color-success: #22c55e;
   --color-error: #ef4444;
   --color-amber: #eab308;
-  font-family: var(--font-sans);
-}
-
-[data-theme='light'] {
-  color-scheme: light;
-  --color-bg: #f6f6f4;
-  --color-surface: #ffffff;
-  --color-surface-container: #eae9e5;
-  --color-text: #0a0a0c;
-  --color-muted: #6c6c70;
-  /* Interactive boundaries stay at >= 3:1 against the warm paper. */
-  --color-outline: #8e8e93;
-  --color-divider: #c7c7cc;
-  --color-accent: #003399;
-  --color-brand: #003399;
-  --color-node-unvisited: #0a0a0c;
-  --color-node-visited: #003399;
-  --color-connection: #000000;
-  --color-success: #15803d;
-  --color-error: #b91c1c;
-  --color-amber: #a16207;
 }
 
 html,
@@ -76,8 +85,9 @@ body {
   border: 1px solid var(--color-outline);
   border-radius: 9999px;
   padding: 0.35rem 0.75rem;
+  font-family: var(--font-secondary);
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: 300;
   line-height: 1;
   color: var(--color-muted);
   background-color: transparent;

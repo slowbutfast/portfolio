@@ -3,25 +3,30 @@ import {
   forceManyBody,
   forceLink,
   forceCollide,
-  forceX,
-  forceY,
   type Simulation,
   type SimulationLinkDatum,
   type ForceManyBody,
-  type ForceX,
-  type ForceY,
 } from 'd3-force';
 import type { GraphNode } from '../types/portfolio';
 
 export type SimState = 'idle' | 'hover' | 'drag' | 'coasting';
 
+/** Input node shape accepted by the headless simulation. */
+export interface SimulationNode {
+  id: string;
+  /** Human-readable canvas label; defaults to the id when omitted. */
+  label?: string;
+}
+
 export interface SimulationOptions {
-  nodes: { id: string }[];
+  nodes: SimulationNode[];
   links: { source: string; target: string }[];
   width: number;
   height: number;
   /** Optional deterministic seed positions keyed by node id. */
   initialPositions?: Record<string, [number, number]>;
+  /** Optional normalized planar seeds, scaled to the viewport on create/resize. */
+  seeds?: Record<string, { x: number; y: number }>;
   radius?: number;
 }
 
@@ -45,10 +50,11 @@ export interface GraphSimulation {
 const NODE_RADIUS = 22;
 const BOUNDARY_MARGIN = 48;
 const COLLIDE_RADIUS = 36;
-const LINK_DISTANCE = 210;
-const LINK_STRENGTH = 0.05;
-const CENTER_STRENGTH = 0.035;
-const CHARGE_SCALE = 0.65;
+const LINK_DISTANCE = 180;
+const LINK_STRENGTH = 0.015;
+/** Weak homing keeps the graph in its planar basin without pinning nodes. */
+const SEED_STRENGTH = 0.02;
+const CHARGE_SCALE = 0.3;
 const MAX_FLING = 15;
 const VELOCITY_DECAY_IDLE = 0.4;
 const VELOCITY_DECAY_COAST = 0.18;
@@ -79,8 +85,28 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
   const { width, height, radius = NODE_RADIUS } = opts;
   const initialRadius = Math.min(width, height) * 0.28;
 
+  // Homing targets: normalized seeds scaled to the viewport. Nodes without a
+  // seed keep their explicit initial position (or canvas center as a fallback),
+  // which preserves the deterministic ring used by headless physics tests.
+  const targets = new Map<string, [number, number]>();
+  const recomputeTargets = (w: number, h: number) => {
+    for (const node of opts.nodes) {
+      const seed = opts.seeds?.[node.id];
+      if (seed) {
+        targets.set(node.id, [seed.x * w, seed.y * h]);
+        continue;
+      }
+      const explicit = opts.initialPositions?.[node.id];
+      if (explicit) targets.set(node.id, explicit);
+      else targets.set(node.id, [w / 2, h / 2]);
+    }
+  };
+  recomputeTargets(width, height);
+
   const nodes: GraphNode[] = opts.nodes.map((n, i) => {
-    const seed = opts.initialPositions?.[n.id];
+    const seed = opts.seeds?.[n.id]
+      ? targets.get(n.id)
+      : opts.initialPositions?.[n.id];
     let x: number;
     let y: number;
     if (seed) {
@@ -91,10 +117,37 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
       x = width / 2 + initialRadius * Math.cos(angle);
       y = height / 2 + initialRadius * Math.sin(angle);
     }
-    return { id: n.id, label: n.id, radius, x, y, vx: 0, vy: 0, fx: null, fy: null };
+    return {
+      id: n.id,
+      label: n.label ?? n.id,
+      radius,
+      x,
+      y,
+      vx: 0,
+      vy: 0,
+      fx: null,
+      fy: null,
+    };
   });
 
   const links: SimulationLinkDatum<GraphNode>[] = opts.links.map((l) => ({ ...l }));
+
+  // Custom weak homing forces. Two explicit axes keep the planar basin of
+  // attraction while allowing drag and fling gestures to move a node.
+  const seedForceX = (alpha: number): void => {
+    const k = SEED_STRENGTH * alpha;
+    for (const node of nodes) {
+      const target = targets.get(node.id);
+      if (target) node.vx = (node.vx ?? 0) + (target[0] - node.x) * k;
+    }
+  };
+  const seedForceY = (alpha: number): void => {
+    const k = SEED_STRENGTH * alpha;
+    for (const node of nodes) {
+      const target = targets.get(node.id);
+      if (target) node.vy = (node.vy ?? 0) + (target[1] - node.y) * k;
+    }
+  };
 
   const sim = forceSimulation<GraphNode>(nodes)
     .force(
@@ -111,8 +164,8 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
         .strength(LINK_STRENGTH),
     )
     .force('collide', forceCollide<GraphNode>().radius(COLLIDE_RADIUS))
-    .force('x', forceX<GraphNode>(width / 2).strength(CENTER_STRENGTH))
-    .force('y', forceY<GraphNode>(height / 2).strength(CENTER_STRENGTH))
+    .force('seedX', seedForceX)
+    .force('seedY', seedForceY)
     .stop();
 
   let state: SimState = 'idle';
@@ -172,7 +225,7 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
       return;
     }
     // Re-hovering the already-pinned node is a no-op; without this guard every
-    // pointermove re-pins the node and re-reheats the simulation.
+    // pointermove re-pins the node and re-heats the simulation.
     if (hoveredNode === node) return;
     // Unpin the previous node before pinning the new one, otherwise its fx/fy
     // stay set and it remains frozen after the pointer moves away.
@@ -241,9 +294,10 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
   }
 
   function resize(nw: number, nh: number): void {
-    (sim.force('x') as ForceX<GraphNode> | undefined)?.x(nw / 2);
-    (sim.force('y') as ForceY<GraphNode> | undefined)?.y(nh / 2);
-    (sim.force('charge') as ForceManyBody<GraphNode> | undefined)?.strength(chargeStrength(nw, nh));
+    recomputeTargets(nw, nh);
+    (sim.force('charge') as ForceManyBody<GraphNode> | undefined)?.strength(
+      chargeStrength(nw, nh),
+    );
     sim.force('boundary', createBoundaryForce(nw, nh, BOUNDARY_MARGIN, nodes));
     sim.alpha(0.2).restart();
   }

@@ -5,23 +5,22 @@
 Manages the verified project portfolio data, runtime schemas, and automated derivation of graph links based on shared technical tags.
 ## Requirements
 ### Requirement: Verified project metadata catalog and preview mapping
-The system SHALL maintain a typed dataset in `src/data/projects.ts` using `satisfies ProjectData[]` to guarantee compile-time verification across all 6 projects with concrete preview mappings, paradigm tags, and authentic, bundler-imported content-hashed asset sources:
+The system SHALL maintain a typed dataset in `src/data/projects.ts` using `satisfies ProjectData[]` to guarantee compile-time verification across all 6 projects with concrete preview mappings, paradigm tags, full descriptive titles, mandatory non-empty `shortTitle: string` entries for graph nodes, and authentic asset sources:
 
-| Project ID | Paradigm Tags | Previews | Asset Source |
-| :--- | :--- | :--- | :--- |
-| `open-dungeon` | `Express`, `Vanilla JS`, `LLM`, `Agent Tooling` | `terminal`, `screenshot`, `linkout` | Captured real unit tests, real 1280×720 canvas screenshot (`src/assets/screenshots/open-dungeon.png`), live linkout |
-| `agentic-resume-builder` | `Agent Tooling`, `LaTeX` | `terminal` | Real CLI outputs (`--help`, `--schema`, `--list`, `--lint`) |
-| `pict-climate-risk-viz-chatbot` | `Express`, `LLM`, `Geospatial` | `screenshot`, `linkout` | Real 1920×1080 bivariate risk map (`src/assets/screenshots/pict-climate-risk-viz-chatbot.png`), repository link |
-| `transcribe-plus` | `Express`, `Vanilla JS`, `Audio` | `video`, `terminal`, `linkout` | Bundled `src/assets/clip.mp4` imported via Vite, real `npm test` output |
-| `sandwave-sim` | `Vanilla JS`, `Audio` | `screenshot`, `terminal`, `linkout` | Real 1280×720 Chladni plate canvas screenshot (`src/assets/screenshots/sandwave-sim.png`), real `npm test` output, live linkout |
-| `attention-max` | `Vanilla JS`, `WebExtension` | `screenshot`, `terminal`, `linkout` | Real 700×1040 extension popup UI screenshot (`src/assets/screenshots/attention-max.png`), real `npm test` output, repository link |
+| Project ID | Mandatory Short Title | Paradigm Tags | Previews | Asset Source |
+| :--- | :--- | :--- | :--- | :--- |
+| `open-dungeon` | `OpenDungeon` | `Express`, `Vanilla JS`, `LLM`, `Agent Tooling` | `terminal`, `screenshot`, `linkout` | Real unit tests, real 1280×720 canvas screenshot, live linkout |
+| `agentic-resume-builder` | `Resume Builder` | `Agent Tooling`, `LaTeX` | `terminal` | Real CLI outputs (`--help`, `--schema`, `--list`, `--lint`) |
+| `pict-climate-risk-viz-chatbot` | `Climate Risk` | `Express`, `LLM`, `Geospatial` | `screenshot`, `linkout` | Real 1920×1080 bivariate risk map, repository link |
+| `transcribe-plus` | `Transcribe+` | `Express`, `Vanilla JS`, `Audio` | `video`, `terminal`, `linkout` | Bundled `src/assets/clip.mp4` imported via Vite, real `npm test` output |
+| `sandwave-sim` | `Sandwave` | `Vanilla JS`, `Audio` | `screenshot`, `terminal`, `linkout` | Real 1280×720 Chladni plate canvas screenshot, real `npm test` output, live linkout |
+| `attention-max` | `AttentionMax` | `Vanilla JS`, `WebExtension` | `screenshot`, `terminal`, `linkout` | Real 700×1040 extension popup UI screenshot, real `npm test` output, repository link |
 
 #### Scenario: Loading the project catalog
 - **WHEN** the portfolio initializes
-- **THEN** the system loads the project catalog containing the 6 verified projects with their typed previews, paradigm tags, and metadata.
-
+- **THEN** the system loads all 6 projects, verifying that every project defines a non-empty `shortTitle: string`.
 ### Requirement: Controlled tag vocabulary and tag-derived edge generation
-The system SHALL derive undirected graph edges between projects if and only if they share one or more controlled paradigm tags from a strict union (`LLM`, `Express`, `Vanilla JS`, `Audio`, `Agent Tooling`, `LaTeX`, `Geospatial`, `WebExtension`), with link spring strength set to 0.05 so the degree-5 node (`open-dungeon`) floats freely without pulling the graph into a central cluster.
+The system SHALL derive undirected graph edges between projects if and only if they share one or more controlled paradigm tags from a strict union (`LLM`, `Express`, `Vanilla JS`, `Audio`, `Agent Tooling`, `LaTeX`, `Geospatial`, `WebExtension`), with a weak link spring strength (0.015) that does not overpower planar seed homing so the degree-5 node (`open-dungeon`) floats freely without pulling the graph into a central cluster.
 
 #### Scenario: Projects share controlled paradigm tags
 - **WHEN** project A and project B share at least one controlled paradigm tag
@@ -62,3 +61,13 @@ The system SHALL inject the portfolio site build commit SHA via a build-time glo
 - **WHEN** the application builds in an environment lacking a `.git` repository (such as Vercel CLI tarball deploys)
 - **THEN** the build does not throw an unhandled exception, falling back gracefully to `VERCEL_GIT_COMMIT_SHA` or `'dev'`.
 
+### Requirement: Grid card visual thumbnails and terminal specimen fallback
+The system SHALL display a 16:9 visual preview inside each `ListView` card (using `loading="lazy"` with explicit aspect ratio to prevent cumulative layout shift), displaying the video or screenshot where available, and rendering an authentic terminal CLI specimen fallback (`>_ prompt [CLI Specimen]`) for projects declaring only terminal demos (`agentic-resume-builder`), while styling the catalog index numeral as a clean, understated monospaced stamp (`text-lg font-mono text-[var(--color-muted)]`).
+
+#### Scenario: Rendering Grid card with screenshot or video
+- **WHEN** the user switches to Grid view and views a project with visual previews (e.g. OpenDungeon, Transcribe Plus, Sandwave Sim)
+- **THEN** a responsive 16:9 thumbnail renders above the project summary with lazy loading enabled.
+
+#### Scenario: Rendering Grid card for terminal-only project
+- **WHEN** the user views the card for `agentic-resume-builder` in Grid view
+- **THEN** a dark terminal container displays the command prompt in monospaced cyan typography with `[CLI Specimen]` badge without broken image placeholders.

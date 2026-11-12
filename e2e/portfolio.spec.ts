@@ -41,6 +41,35 @@ async function useLightTheme(page: Page) {
   });
 }
 
+async function useDarkTheme(page: Page) {
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem('portfolio_theme', 'dark');
+    } catch {
+      // ignore storage denial
+    }
+  });
+}
+
+const HEADER_ORDER = [
+  'nav-about',
+  'nav-github',
+  'view-toggle',
+  'theme-toggle',
+  'controls-dropdown-trigger',
+];
+
+async function headerOrder(page: Page): Promise<string[]> {
+  return page.evaluate((ids) => {
+    const nodes = Array.from(
+      document.querySelectorAll<HTMLElement>('header [data-testid]'),
+    );
+    return nodes
+      .map((node) => node.dataset.testid ?? '')
+      .filter((id) => ids.includes(id));
+  }, HEADER_ORDER);
+}
+
 /**
  * Focus the semantic nav to pan the camera onto a node, then hover the canvas
  * center. The node is pinned by hover so the preview card stays visible.
@@ -73,12 +102,68 @@ test.describe('portfolio graph SPA', () => {
     await expect(page.getByTestId('nav-about')).toBeVisible();
     await expect(page.getByTestId('nav-github')).toBeVisible();
     await expect(page.getByTestId('view-toggle')).toHaveText('Grid');
+    await expect(page.getByTestId('theme-toggle')).toBeVisible();
     await expect(page.getByTestId('controls-dropdown-trigger')).toBeVisible();
 
     await openFilters(page);
     await expect(page.getByTestId('search-input')).toBeVisible();
-    await expect(page.getByTestId('theme-toggle')).toBeVisible();
     expect(errors).toEqual([]);
+  });
+
+  test('first visit defaults to the Light color scheme', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    await expect(page.locator('meta[name="color-scheme"]')).toHaveAttribute(
+      'content',
+      'light dark',
+    );
+    expect(errors).toEqual([]);
+  });
+
+  test('theme-init applies a stored dark preference before the app mounts', async ({ page }) => {
+    await useDarkTheme(page);
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  });
+
+  test('document metadata uses the canonical candidate identity', async ({ page }) => {
+    await page.goto('/');
+    await expect(page).toHaveTitle(
+      'Gregory Lazatin — Software Engineer & Creative Technologist',
+    );
+    const metadata = await page.evaluate(() => ({
+      description: document
+        .querySelector('meta[name="description"]')
+        ?.getAttribute('content'),
+      ogTitle: document.querySelector('meta[property="og:title"]')?.getAttribute('content'),
+      ogDescription: document
+        .querySelector('meta[property="og:description"]')
+        ?.getAttribute('content'),
+      ogUrl: document.querySelector('meta[property="og:url"]')?.getAttribute('content'),
+      ogImage: document.querySelector('meta[property="og:image"]')?.getAttribute('content'),
+      twitterCard: document
+        .querySelector('meta[name="twitter:card"]')
+        ?.getAttribute('content'),
+    }));
+    for (const value of Object.values(metadata)) {
+      expect(value, JSON.stringify(metadata)).toBeTruthy();
+    }
+    expect(metadata.ogTitle).toContain('Gregory Lazatin');
+    expect(metadata.twitterCard).toBe('summary_large_image');
+  });
+
+  test('header controls follow the canonical top-right sequence', async ({ page }) => {
+    await page.goto('/');
+    expect(await headerOrder(page)).toEqual(HEADER_ORDER);
+    await expect(page.getByTestId('theme-toggle')).toHaveText(/^(Dark|Light)$/);
+    await expect(page.getByTestId('top-scrim')).toBeVisible();
+
+    // The theme toggle lives in the header, not inside the Filters dropdown.
+    await openFilters(page);
+    await expect(
+      page.getByTestId('controls-dropdown').getByTestId('theme-toggle'),
+    ).toHaveCount(0);
   });
 
   test('list view renders 6 cards and a card click opens the project drawer', async ({ page }) => {
@@ -92,6 +177,27 @@ test.describe('portfolio graph SPA', () => {
     await expect(page.getByTestId('project-drawer')).toBeVisible();
     await expect(page.getByTestId('project-drawer')).toHaveAttribute('aria-modal', 'true');
     expect(errors).toEqual([]);
+  });
+
+  test('grid cards render 16:9 thumbnails and a terminal specimen fallback', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await page.getByTestId('view-toggle').click();
+
+    const mediaCard = page.getByTestId('card-open-dungeon');
+    await expect(mediaCard.locator('img')).toBeVisible();
+    await expect(mediaCard.locator('img')).toHaveAttribute('loading', 'lazy');
+    await expect(
+      mediaCard.locator('img').locator('xpath=..'),
+    ).toHaveClass(/aspect-video/);
+
+    const terminalCard = page.getByTestId('card-agentic-resume-builder');
+    await expect(page.getByTestId('terminal-specimen-agentic-resume-builder')).toBeVisible();
+    await expect(page.getByTestId('terminal-specimen-agentic-resume-builder')).toContainText(
+      '[CLI Specimen]',
+    );
+    await expect(terminalCard.locator('img')).toHaveCount(0);
   });
 
   test('terminal command chip executes and displays captured output', async ({ page }) => {
@@ -114,6 +220,65 @@ test.describe('portfolio graph SPA', () => {
     await page.goto('/#/p/agentic-resume-builder');
     await expect(page.getByTestId('project-drawer')).toBeVisible();
     await expect(page.getByTestId('command-chip').first()).toBeVisible();
+  });
+
+  test('drawer elevates Code/Visit and uses a segmented Media/Terminal track', async ({
+    page,
+  }) => {
+    await page.goto('/#/p/open-dungeon');
+    await expect(page.getByTestId('project-drawer')).toBeVisible();
+
+    const track = page.getByTestId('preview-tabs-track');
+    await expect(track).toBeVisible();
+    await expect(track).toHaveClass(/rounded-full/);
+    await expect(track).toHaveClass(/bg-\[var\(--color-surface-container\)\]/);
+    await expect(page.getByTestId('preview-tab-media')).toBeVisible();
+    // The legacy Link tab is retired.
+    await expect(page.getByTestId('preview-tab-link')).toHaveCount(0);
+
+    await expect(page.getByTestId('drawer-code')).toBeVisible();
+    await expect(page.getByTestId('drawer-code')).toHaveAttribute(
+      'href',
+      'https://github.com/slowbutfast/open-dungeon',
+    );
+    await expect(page.getByTestId('drawer-visit')).toBeVisible();
+    await expect(page.getByTestId('drawer-visit')).toHaveAttribute(
+      'href',
+      'https://open-dungeon-three.vercel.app/',
+    );
+
+    // Contextual reference linkouts now live in the Overview section.
+    await expect(page.getByTestId('drawer-overview')).toBeVisible();
+    await expect(page.getByTestId('overview-link-0')).toBeVisible();
+    await expect(page.getByTestId('overview-link-0')).toHaveAttribute(
+      'href',
+      'https://open-dungeon-three.vercel.app/',
+    );
+
+    // A single-modality project still shows its track and no Link tab.
+    await page.goto('/#/p/agentic-resume-builder');
+    await expect(page.getByTestId('preview-tabs-track')).toBeVisible();
+    await expect(page.getByTestId('preview-tab-terminal')).toBeVisible();
+    await expect(page.getByTestId('preview-tab-link')).toHaveCount(0);
+    await expect(page.getByTestId('drawer-code')).toBeVisible();
+    await expect(page.getByTestId('drawer-visit')).toHaveCount(0);
+  });
+
+  test('mobile drawer docks as an 85dvh bottom sheet', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'mobile', 'bottom-sheet layout is mobile-only');
+    await page.goto('/#/p/open-dungeon');
+    const drawer = page.getByTestId('project-drawer');
+    await expect(drawer).toBeVisible();
+    await expect(drawer).toHaveClass(/max-h-\[85dvh\]/);
+    await expect(drawer).toHaveClass(/bottom-0/);
+    await expect(drawer).toHaveClass(/rounded-t-2xl/);
+    const box = await drawer.boundingBox();
+    const viewport = page.viewportSize();
+    expect(box).not.toBeNull();
+    expect(viewport).not.toBeNull();
+    if (box && viewport) {
+      expect(Math.round(box.y + box.height)).toBe(viewport.height);
+    }
   });
 
   test('LLM tag pill dims non-matching projects in the semantic nav', async ({ page }) => {
@@ -167,7 +332,11 @@ test.describe('portfolio graph SPA', () => {
 
   test('theme switch persists across reloads', async ({ page }) => {
     await page.goto('/');
-    await openFilters(page);
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    await page.getByTestId('theme-toggle').click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await page.getByTestId('theme-toggle').click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
     await page.reload();
@@ -193,9 +362,26 @@ test.describe('portfolio graph SPA', () => {
     await expect(modal).toBeVisible();
     await expect(modal).toHaveAttribute('role', 'dialog');
     await expect(modal).toHaveAttribute('aria-modal', 'true');
-    await expect(modal).toContainText('Creative Technologist');
-    await expect(modal).toContainText('LLM agent tooling');
+    await expect(modal).toContainText(
+      'Gregory Lazatin is currently a Junior at Brown University studying Computer Science.',
+    );
+    await expect(modal).not.toContainText('Creative Technologist');
+    await expect(modal).not.toContainText('Focus areas');
+    await expect(modal).not.toContainText('LLM agent tooling');
+
+    await expect(page.getByTestId('about-email')).toHaveAttribute(
+      'href',
+      'mailto:gregory.lazatin2006@gmail.com',
+    );
+    await expect(page.getByTestId('about-linkedin')).toHaveAttribute(
+      'href',
+      'https://www.linkedin.com/in/gregory-lazatin/',
+    );
     await expect(page.getByTestId('about-github')).toHaveAttribute('href', GITHUB_URL);
+    await expect(page.getByTestId('about-resume')).toHaveAttribute(
+      'href',
+      /drive\.google\.com\/file\/.+\/view/,
+    );
 
     await page.keyboard.press('Escape');
     await expect(modal).toHaveCount(0);
@@ -206,6 +392,22 @@ test.describe('portfolio graph SPA', () => {
     await page.getByTestId('about-close').click();
     await expect(modal).toHaveCount(0);
     expect(errors).toEqual([]);
+  });
+
+  test('About modal click-to-loads the sandboxed Google Drive resume preview', async ({
+    page,
+  }) => {
+    await page.goto('/#/about');
+    await expect(page.getByTestId('about-modal')).toBeVisible();
+    await expect(page.getByTestId('resume-preview-iframe')).toHaveCount(0);
+    await page.getByTestId('about-resume-preview-trigger').click();
+    const frame = page.getByTestId('resume-preview-iframe');
+    await expect(frame).toBeVisible();
+    await expect(frame).toHaveAttribute(
+      'src',
+      /drive\.google\.com\/file\/.+\/preview/,
+    );
+    await expect(frame).toHaveAttribute('sandbox', /allow-scripts/);
   });
 
   test('#/about deep link opens the modal and backdrop dismisses it', async ({ page }) => {
@@ -232,8 +434,40 @@ test.describe('portfolio graph SPA', () => {
     const box = await hoverCenteredNode(page);
     await expect(page.getByTestId('hover-card-title')).toHaveText('OpenDungeon');
     await expect(page.getByTestId('node-hover-card')).toContainText('Click to inspect');
+    await expect(page.getByTestId('hover-code')).toHaveAttribute(
+      'href',
+      'https://github.com/slowbutfast/open-dungeon',
+    );
+    await expect(page.getByTestId('hover-visit')).toBeVisible();
     await page.mouse.move(box.x + 10, box.y + box.height - 10);
     await expect(page.getByTestId('node-hover-card')).toHaveCount(0);
+  });
+
+  test('hover card survives a 150ms pointer transfer and dismisses on drag', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'hover previews are desktop-only');
+    await page.goto('/');
+    await hoverCenteredNode(page);
+    const card = page.getByTestId('node-hover-card');
+    await expect(card).toBeVisible();
+
+    const cardBox = await card.boundingBox();
+    if (!cardBox) throw new Error('hover card has no bounding box');
+    await page.mouse.move(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
+    await page.waitForTimeout(300);
+    await expect(card).toBeVisible();
+    await expect(page.getByTestId('hover-code')).toBeVisible();
+
+    // Returning to the node and starting a drag dismisses the card immediately.
+    const canvas = page.getByTestId('graph-canvas');
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error('graph canvas has no bounding box');
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await expect(card).toBeVisible();
+    await page.mouse.down();
+    await expect(card).toHaveCount(0);
+    await page.mouse.up();
   });
 
   test('canvas selection anchors the inspector beside the node', async ({ page }, testInfo) => {
@@ -249,6 +483,7 @@ test.describe('portfolio graph SPA', () => {
   });
 
   test('accessibility: graph view has zero WCAG A/AA violations (dark)', async ({ page }) => {
+    await useDarkTheme(page);
     await page.goto('/');
     await expect(page.getByTestId('graph-canvas')).toBeVisible();
     const results = await new AxeBuilder({ page }).withTags(axeTags()).analyze();
@@ -259,6 +494,7 @@ test.describe('portfolio graph SPA', () => {
   });
 
   test('accessibility: list view has zero WCAG A/AA violations (dark)', async ({ page }) => {
+    await useDarkTheme(page);
     await page.goto('/');
     await page.getByTestId('view-toggle').click();
     await expect(page.getByTestId('card-open-dungeon')).toBeVisible();
@@ -270,6 +506,7 @@ test.describe('portfolio graph SPA', () => {
   });
 
   test('accessibility: open drawer has zero WCAG A/AA violations (dark)', async ({ page }) => {
+    await useDarkTheme(page);
     await page.goto('/#/p/open-dungeon');
     await expect(page.getByTestId('project-drawer')).toBeVisible();
     const results = await new AxeBuilder({ page }).withTags(axeTags()).analyze();
@@ -292,6 +529,7 @@ test.describe('portfolio graph SPA', () => {
   });
 
   test('accessibility: About modal has zero WCAG A/AA violations (dark)', async ({ page }) => {
+    await useDarkTheme(page);
     await page.goto('/#/about');
     await expect(page.getByTestId('about-modal')).toBeVisible();
     const results = await new AxeBuilder({ page }).withTags(axeTags()).analyze();
@@ -315,6 +553,7 @@ test.describe('portfolio graph SPA', () => {
 
   test('accessibility: hover media card has zero WCAG A/AA violations (dark)', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'hover previews are desktop-only');
+    await useDarkTheme(page);
     await page.goto('/');
     await hoverCenteredNode(page);
     const results = await new AxeBuilder({ page }).withTags(axeTags()).analyze();

@@ -4,7 +4,7 @@
  * deployed response headers are both compared against this single constant.
  */
 export const SPEC_CSP =
-  "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'";
+  "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; connect-src 'self'; frame-src 'self' https://drive.google.com; object-src 'none'; frame-ancestors 'none'; base-uri 'self'";
 
 export type CspDirectives = Map<string, string[]>;
 

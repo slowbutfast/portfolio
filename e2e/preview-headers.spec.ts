@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { IMMUTABLE_CACHE_CONTROL, SPEC_CSP, cspEquals } from '../src/utils/csp';
+import { SPEC_CSP, cspEquals } from '../src/utils/csp';
 
 /**
  * Asserts the headers a real Vercel deployment serves against the
@@ -29,27 +29,16 @@ test.describe('served edge headers', () => {
     expect(headers['permissions-policy']).toBe('camera=(), microphone=(), geolocation=()');
   });
 
-  test('serves every font as an immutable woff2 asset', async ({ page }) => {
-    const fonts: Array<{ url: string; status: number; type: string; cache: string }> = [];
+  test('serves no bundled webfont assets after the native-font migration', async ({ page }) => {
+    const fonts: string[] = [];
     page.on('response', (response) => {
       const url = response.url();
       if (!url.split('?')[0].endsWith('.woff2')) return;
-      const headers = response.headers();
-      fonts.push({
-        url,
-        status: response.status(),
-        type: headers['content-type'] ?? '',
-        cache: headers['cache-control'] ?? '',
-      });
+      fonts.push(url);
     });
     await page.goto('/');
     await page.evaluate(() => document.fonts.ready);
-    expect(fonts.length, 'expected at least one .woff2 request').toBeGreaterThan(0);
-    for (const font of fonts) {
-      expect(font.status, font.url).toBe(200);
-      expect(font.type, font.url).toContain('font/woff2');
-      expect(font.cache, font.url).toBe(IMMUTABLE_CACHE_CONTROL);
-    }
+    expect(fonts, 'native Helvetica/Menlo stacks should not request webfonts').toEqual([]);
   });
 
   test('does not long-cache the entry document', async ({ request }) => {

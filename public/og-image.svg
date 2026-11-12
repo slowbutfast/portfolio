@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title">
+  <title id="title">Gregory Lazatin — Software Engineer &amp; Creative Technologist</title>
+  <rect width="1200" height="630" fill="#f6f6f4"/>
+  <g fill="none" stroke="#000" stroke-width="14" opacity="0.92">
+    <path d="M330 210 C 420 120, 560 120, 640 210"/>
+    <path d="M330 420 C 420 510, 560 510, 640 420"/>
+    <path d="M330 210 C 330 270, 330 360, 330 420"/>
+    <path d="M640 210 C 640 270, 640 360, 640 420"/>
+  </g>
+  <circle cx="330" cy="210" r="42" fill="#0a0a0c"/>
+  <circle cx="640" cy="210" r="42" fill="#0a0a0c"/>
+  <circle cx="330" cy="420" r="42" fill="#003399"/>
+  <circle cx="640" cy="420" r="42" fill="#003399"/>
+  <circle cx="485" cy="315" r="42" fill="#3d7fff"/>
+  <text x="740" y="270" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="54" font-weight="700" fill="#0a0a0c">Gregory Lazatin</text>
+  <text x="740" y="322" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="26" font-weight="300" fill="#525257">Software Engineer · Autonomous Agents &amp; Graphics</text>
+  <text x="740" y="382" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="22" font-weight="400" fill="#525257">Brown University · Computer Science</text>
+  <rect x="740" y="430" width="300" height="4" fill="#003399"/>
+</svg>

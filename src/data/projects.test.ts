@@ -33,6 +33,23 @@ describe('project catalog contract', () => {
     }
   });
 
+  it('declares a mandatory non-empty shortTitle on all 6 projects', () => {
+    expect(projects).toHaveLength(6);
+    for (const p of projects) {
+      expect(typeof p.shortTitle, `${p.id} shortTitle type`).toBe('string');
+      expect(p.shortTitle.trim().length, `${p.id} shortTitle empty`).toBeGreaterThan(0);
+      expect(p.shortTitle.length, `${p.id} shortTitle too long`).toBeLessThanOrEqual(16);
+    }
+    expect(projects.map((p) => p.shortTitle)).toEqual([
+      'OpenDungeon',
+      'Resume Builder',
+      'Climate Risk',
+      'Transcribe+',
+      'Sandwave',
+      'AttentionMax',
+    ]);
+  });
+
   it('preserves the pinned catalog order and ids', () => {
     expect(projects.map((p) => p.id)).toEqual([
       'open-dungeon',
