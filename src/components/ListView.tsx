@@ -1,5 +1,5 @@
 import { MonitorPlay, Terminal, Image as ImageIcon, ExternalLink } from 'lucide-react';
-import type { ProjectData } from '../types/portfolio';
+import type { Preview, ProjectData } from '../types/portfolio';
 import { formatIndex } from '../utils/drafting';
 
 interface ListViewProps {
@@ -10,7 +10,8 @@ interface ListViewProps {
 
 function previewIcons(project: ProjectData) {
   const icons = [];
-  if (project.terminalDemo) icons.push(<Terminal key="term" className="h-3.5 w-3.5" aria-hidden="true" />);
+  if (project.terminalDemo)
+    icons.push(<Terminal key="term" className="h-3.5 w-3.5" aria-hidden="true" />);
   if (project.previews.some((p) => p.kind === 'video'))
     icons.push(<MonitorPlay key="video" className="h-3.5 w-3.5" aria-hidden="true" />);
   if (project.previews.some((p) => p.kind === 'screenshot'))
@@ -18,6 +19,63 @@ function previewIcons(project: ProjectData) {
   if (project.previews.some((p) => p.kind === 'linkout') || project.liveUrl)
     icons.push(<ExternalLink key="link" className="h-3.5 w-3.5" aria-hidden="true" />);
   return icons;
+}
+
+function CardPreview({ project }: { project: ProjectData }) {
+  const video = project.previews.find(
+    (preview): preview is Extract<Preview, { kind: 'video' }> => preview.kind === 'video',
+  );
+  const screenshot = project.previews.find(
+    (preview): preview is Extract<Preview, { kind: 'screenshot' }> =>
+      preview.kind === 'screenshot',
+  );
+
+  if (video) {
+    return (
+      <div className="aspect-video w-full overflow-hidden rounded-xl bg-[var(--color-surface-container)]">
+        <video
+          src={video.src}
+          poster={video.poster}
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          aria-label={`${project.title} preview`}
+          className="h-full w-full object-cover"
+        />
+      </div>
+    );
+  }
+
+  if (screenshot) {
+    return (
+      <div className="aspect-video w-full overflow-hidden rounded-xl bg-[var(--color-surface-container)]">
+        <img
+          src={screenshot.src}
+          alt={project.title}
+          loading="lazy"
+          className="h-full w-full object-cover"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      data-testid={`terminal-specimen-${project.id}`}
+      className="flex aspect-video w-full flex-col justify-between rounded-xl border border-[#27272a] bg-[#08080a] p-4 text-[#7dd3fc]"
+    >
+      <div className="flex items-center justify-between font-secondary text-[10px] font-light uppercase tracking-[0.18em] text-[#a1a1aa]">
+        <span>&gt;_ prompt</span>
+        <span className="rounded-full border border-[#27272a] px-2 py-0.5 text-[#7dd3fc]">
+          [CLI Specimen]
+        </span>
+      </div>
+      <span className="truncate font-mono text-xs">
+        {project.terminalDemo?.prompt ?? `${project.id} --help`}
+      </span>
+    </div>
+  );
 }
 
 export function ListView({ projects, dimmedIds, onSelect }: ListViewProps) {
@@ -42,16 +100,17 @@ export function ListView({ projects, dimmedIds, onSelect }: ListViewProps) {
                   wide ? 'md:col-span-2' : ''
                 } ${dimmed ? 'opacity-30' : 'opacity-100'}`}
               >
-                <div className="flex items-start justify-between gap-4">
-                  <span
-                    aria-hidden="true"
-                    className="select-none font-sans text-[64px] font-extrabold leading-none tracking-tighter text-[var(--color-divider)] transition-colors group-hover:text-[var(--color-outline)] md:text-[96px]"
-                  >
+                <div className="flex items-center justify-between gap-4">
+                  <span className="select-none font-mono text-lg text-[var(--color-muted)]">
                     {index}
                   </span>
                   <span className="flex items-center gap-1.5 text-[var(--color-muted)]">
                     {previewIcons(project)}
                   </span>
+                </div>
+
+                <div className="mt-4">
+                  <CardPreview project={project} />
                 </div>
 
                 <h2 className="mt-4 text-xl font-semibold leading-tight text-[var(--color-text)]">

@@ -35,6 +35,8 @@ export type Preview =
 export interface ProjectData {
   id: string;
   title: string;
+  /** Compact graph/canvas label. Required so nodes never fall back to raw ids. */
+  shortTitle: string;
   summary: string;
   /** Curated uppercase engineering classification, e.g. "AGENTIC ... // ...". */
   classification: string;
@@ -43,6 +45,22 @@ export interface ProjectData {
   liveUrl?: string;
   previews: Preview[];
   terminalDemo?: TerminalDemo;
+}
+
+/**
+ * Single source of truth for candidate identity, contact endpoints, and
+ * canonical page metadata.
+ */
+export interface CandidateProfile {
+  name: string;
+  tagline: string;
+  title: string;
+  bio: string;
+  email: string;
+  linkedin: string;
+  github: string;
+  resumeUrl: string;
+  resumeEmbedUrl: string;
 }
 
 /** Runtime node shape consumed by the d3-force simulation. */

@@ -1,5 +1,6 @@
-import { ChevronDown, Moon, RotateCcw, Search, Sun } from 'lucide-react';
+import { ChevronDown, RotateCcw, Search } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { candidateProfile } from '../data/profile';
 import type { ParadigmTag, ThemeMode } from '../types/portfolio';
 
 type ViewMode = 'graph' | 'list';
@@ -59,6 +60,12 @@ export function ControlsOverlay({
 
   return (
     <div ref={rootRef} className="pointer-events-none absolute inset-0 z-40">
+      {/* Progressive scrim keeps header text legible when Grid cards scroll under it. */}
+      <div
+        aria-hidden="true"
+        data-testid="top-scrim"
+        className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-[var(--color-bg)] via-[var(--color-bg)]/80 to-transparent md:h-28"
+      />
       <header
         className="pointer-events-auto absolute inset-x-0 top-0 flex flex-wrap items-center gap-x-4 gap-y-1"
         style={{
@@ -76,15 +83,15 @@ export function ControlsOverlay({
           }}
           className="text-base font-bold tracking-tight text-[var(--color-text)] transition-colors hover:text-[var(--color-accent)] md:text-lg"
         >
-          Gregory Lazatin
+          {candidateProfile.name}
         </button>
 
-        <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs md:gap-x-6">
+        <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1 font-secondary text-xs font-light md:gap-x-6">
           <button type="button" data-testid="nav-about" onClick={onOpenAbout} className={bareText}>
             About
           </button>
           <a
-            href="https://github.com/slowbutfast"
+            href={candidateProfile.github}
             target="_blank"
             rel="noreferrer"
             data-testid="nav-github"
@@ -100,6 +107,16 @@ export function ControlsOverlay({
             className={bareText}
           >
             {view === 'graph' ? 'Grid' : 'Graph'}
+          </button>
+          <button
+            type="button"
+            data-testid="theme-toggle"
+            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            aria-pressed={theme === 'dark'}
+            onClick={onToggleTheme}
+            className={bareText}
+          >
+            {theme === 'dark' ? 'Light' : 'Dark'}
           </button>
 
           <div className="relative">
@@ -139,7 +156,7 @@ export function ControlsOverlay({
                     onChange={(event) => onSearchChange(event.target.value)}
                     placeholder="Search projects…"
                     aria-label="Search projects"
-                    className="min-h-11 w-full rounded-full border border-[var(--color-outline)] bg-[var(--color-bg)] py-2 pl-9 pr-3 font-mono text-xs text-[var(--color-text)] outline-none transition-colors placeholder:text-[var(--color-muted)] focus:border-[var(--color-accent)] md:min-h-9"
+                    className="min-h-11 w-full rounded-full border border-[var(--color-outline)] bg-[var(--color-bg)] py-2 pl-9 pr-3 text-xs text-[var(--color-text)] outline-none transition-colors placeholder:text-[var(--color-muted)] focus:border-[var(--color-accent)] md:min-h-9"
                   />
                 </label>
 
@@ -164,25 +181,7 @@ export function ControlsOverlay({
                   })}
                 </div>
 
-                <div className="mt-4 flex items-center justify-between gap-2 border-t border-[var(--color-divider)] pt-3">
-                  <button
-                    type="button"
-                    data-testid="theme-toggle"
-                    aria-label={
-                      theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'
-                    }
-                    aria-pressed={theme === 'light'}
-                    onClick={onToggleTheme}
-                    className="fluid-pill min-h-11 md:min-h-0"
-                  >
-                    {theme === 'dark' ? (
-                      <Sun className="h-4 w-4" aria-hidden="true" />
-                    ) : (
-                      <Moon className="h-4 w-4" aria-hidden="true" />
-                    )}
-                    {theme === 'dark' ? 'Light' : 'Dark'}
-                  </button>
-
+                <div className="mt-4 flex items-center justify-end gap-2 border-t border-[var(--color-divider)] pt-3">
                   <button
                     type="button"
                     data-testid="reset-filters"

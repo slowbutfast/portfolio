@@ -47,6 +47,13 @@ describe('vercel.json matches the edge-deployment spec', () => {
     expect(parseCsp(csp).get('script-src')).toEqual(["'self'"]);
   });
 
+  it('allows only self and Google Drive frames', () => {
+    const csp = headerValue(globalRule, 'Content-Security-Policy') as string;
+    expect(parseCsp(csp).get('frame-src')).toEqual(["'self'", 'https://drive.google.com']);
+    expect(csp).toContain("frame-src 'self' https://drive.google.com;");
+    expect(cspEquals(csp, SPEC_CSP)).toBe(true);
+  });
+
   it('serves the other specified security headers', () => {
     expect(headerValue(globalRule, 'X-Content-Type-Options')).toBe('nosniff');
     expect(headerValue(globalRule, 'X-Frame-Options')).toBe('DENY');

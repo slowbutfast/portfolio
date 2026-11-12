@@ -1,15 +1,23 @@
+import { ExternalLink, GitBranch } from 'lucide-react';
 import type { Preview, ProjectData } from '../types/portfolio';
 
 interface NodeHoverCardProps {
   project: ProjectData;
   position: { x: number; y: number };
+  onPointerEnter?: () => void;
+  onPointerLeave?: () => void;
 }
 
 type MediaPreview = Extract<Preview, { kind: 'video' | 'screenshot' }>;
 
-export function NodeHoverCard({ project, position }: NodeHoverCardProps) {
+export function NodeHoverCard({
+  project,
+  position,
+  onPointerEnter,
+  onPointerLeave,
+}: NodeHoverCardProps) {
   const cardWidth = 320;
-  const cardHeight = 280;
+  const cardHeight = 330;
   const margin = 20;
   const left = Math.min(
     Math.max(margin, position.x + 28),
@@ -31,7 +39,9 @@ export function NodeHoverCard({ project, position }: NodeHoverCardProps) {
   return (
     <div
       data-testid="node-hover-card"
-      className="pointer-events-none fixed z-30 w-[320px] overflow-hidden rounded-2xl border border-[var(--color-outline)] bg-[var(--color-surface)]/95 p-3.5 text-[var(--color-text)] shadow-2xl backdrop-blur-md"
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
+      className="pointer-events-auto fixed z-30 w-[320px] overflow-hidden rounded-2xl border border-[var(--color-outline)] bg-[var(--color-surface)]/95 p-3.5 text-[var(--color-text)] shadow-2xl backdrop-blur-md"
       style={{ left, top }}
     >
       {video ? (
@@ -66,7 +76,7 @@ export function NodeHoverCard({ project, position }: NodeHoverCardProps) {
         >
           {project.title}
         </h3>
-        <span className="shrink-0 font-mono text-[10px] font-semibold text-[var(--color-accent)]">
+        <span className="shrink-0 font-secondary text-[10px] font-light text-[var(--color-accent)]">
           Click to inspect ↗
         </span>
       </div>
@@ -79,11 +89,38 @@ export function NodeHoverCard({ project, position }: NodeHoverCardProps) {
         {project.tags.map((tag) => (
           <span
             key={tag}
-            className="rounded-full border border-[var(--color-outline)] px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] text-[var(--color-muted)]"
+            className="rounded-full border border-[var(--color-outline)] px-2 py-0.5 font-secondary text-[9px] font-light uppercase tracking-[0.12em] text-[var(--color-muted)]"
           >
             {tag}
           </span>
         ))}
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <a
+          href={project.repo}
+          target="_blank"
+          rel="noreferrer"
+          data-testid="hover-code"
+          aria-label={`${project.title} source code, opens in new tab`}
+          className="fluid-pill min-h-11 gap-1 md:min-h-0"
+        >
+          <GitBranch className="h-3.5 w-3.5" aria-hidden="true" />
+          Code <span aria-hidden="true">↗</span>
+        </a>
+        {project.liveUrl && (
+          <a
+            href={project.liveUrl}
+            target="_blank"
+            rel="noreferrer"
+            data-testid="hover-visit"
+            aria-label={`${project.title} live demo, opens in new tab`}
+            className="fluid-pill min-h-11 gap-1 md:min-h-0"
+          >
+            <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+            Visit <span aria-hidden="true">↗</span>
+          </a>
+        )}
       </div>
     </div>
   );

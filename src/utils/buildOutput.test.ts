@@ -17,9 +17,11 @@ describe('production build output', () => {
     if (requireDist) expect(hasDist, 'run `npm run build` before this test').toBe(true);
   });
 
-  it.skipIf(!hasDist)('emits at least one .woff2 font as a separate asset', () => {
-    const fonts = readdirSync(assets).filter((f) => f.endsWith('.woff2'));
-    expect(fonts.length).toBeGreaterThan(0);
+  it.skipIf(!hasDist)('ships no bundled webfonts after the native-font migration', () => {
+    const fonts = readdirSync(assets).filter(
+      (f) => f.endsWith('.woff2') || f.endsWith('.woff') || f.endsWith('.ttf'),
+    );
+    expect(fonts).toEqual([]);
   });
 
   it.skipIf(!hasDist)('never inlines font data as a data: URI', () => {

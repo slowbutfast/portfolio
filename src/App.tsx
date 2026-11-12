@@ -22,9 +22,9 @@ const ALL_TAGS = Array.from(new Set<ParadigmTag>(projects.flatMap((p) => p.tags)
 
 function readStoredTheme(): ThemeMode {
   try {
-    return localStorage.getItem('portfolio_theme') === 'light' ? 'light' : 'dark';
+    return localStorage.getItem('portfolio_theme') === 'dark' ? 'dark' : 'light';
   } catch {
-    return 'dark';
+    return 'light';
   }
 }
 
@@ -53,6 +53,7 @@ export default function App() {
   const [hoverState, setHoverState] = useState<HoverState>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
   const selectedIdRef = useRef<string | null>(null);
+  const hoverDismissRef = useRef<number | null>(null);
 
   const selected = selectedId ? getProjectById(selectedId) ?? null : null;
 
@@ -61,7 +62,7 @@ export default function App() {
     () =>
       projects.map((project) => ({
         id: project.id,
-        label: project.title,
+        label: project.shortTitle,
         radius: 22,
         x: 0,
         y: 0,
@@ -108,13 +109,36 @@ export default function App() {
     return dimmed;
   }, [matchesFilters]);
 
+  const clearHoverDismissal = useCallback(() => {
+    if (hoverDismissRef.current !== null) {
+      window.clearTimeout(hoverDismissRef.current);
+      hoverDismissRef.current = null;
+    }
+  }, []);
+
+  const scheduleHoverDismiss = useCallback(() => {
+    clearHoverDismissal();
+    hoverDismissRef.current = window.setTimeout(() => {
+      hoverDismissRef.current = null;
+      setHoverState(null);
+    }, 150);
+  }, [clearHoverDismissal]);
+
+  const dismissHover = useCallback(() => {
+    clearHoverDismissal();
+    setHoverState(null);
+  }, [clearHoverDismissal]);
+
+  useEffect(() => clearHoverDismissal, [clearHoverDismissal]);
+
   const openAbout = useCallback(() => {
     setIsAboutOpen(true);
+    clearHoverDismissal();
     setHoverState(null);
     if (window.location.hash !== '#/about') {
       window.location.hash = '#/about';
     }
-  }, []);
+  }, [clearHoverDismissal]);
 
   const closeAbout = useCallback(() => {
     setIsAboutOpen(false);
@@ -125,35 +149,48 @@ export default function App() {
 
   const handleHoverNode = useCallback(
     (project: ProjectData | null, position: CanvasAnchor | null) => {
-      setHoverState(project && position ? { project, position } : null);
+      if (project && position) {
+        clearHoverDismissal();
+        setHoverState({ project, position });
+        return;
+      }
+      // A 150ms grace period lets the pointer travel from a node into the
+      // interactive hover card before the card is dismissed.
+      scheduleHoverDismiss();
     },
-    [],
+    [clearHoverDismissal, scheduleHoverDismiss],
   );
 
   const handleResolveAnchor = useCallback((id: string, anchor: CanvasAnchor) => {
     if (selectedIdRef.current === id) setDrawerAnchor(anchor);
   }, []);
 
-  const openProject = useCallback((id: string, anchor?: CanvasAnchor) => {
-    if (!getProjectById(id)) return;
-    setIsAboutOpen(false);
-    setHoverState(null);
-    if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) {
-      triggerRef.current = document.activeElement;
-    }
-    setVisitedIds((previous) => {
-      if (previous.has(id)) return previous;
-      const next = new Set(previous);
-      next.add(id);
-      return next;
-    });
-    selectedIdRef.current = id;
-    setSelectedId(id);
-    setDrawerAnchor(anchor ?? null);
-    if (window.location.hash !== `#/p/${id}`) {
-      window.location.hash = `#/p/${id}`;
-    }
-  }, []);
+  const openProject = useCallback(
+    (id: string, anchor?: CanvasAnchor) => {
+      if (!getProjectById(id)) return;
+      setIsAboutOpen(false);
+      dismissHover();
+      if (
+        document.activeElement instanceof HTMLElement &&
+        document.activeElement !== document.body
+      ) {
+        triggerRef.current = document.activeElement;
+      }
+      setVisitedIds((previous) => {
+        if (previous.has(id)) return previous;
+        const next = new Set(previous);
+        next.add(id);
+        return next;
+      });
+      selectedIdRef.current = id;
+      setSelectedId(id);
+      setDrawerAnchor(anchor ?? null);
+      if (window.location.hash !== `#/p/${id}`) {
+        window.location.hash = `#/p/${id}`;
+      }
+    },
+    [dismissHover],
+  );
 
   const closeDrawer = useCallback(() => {
     selectedIdRef.current = null;
@@ -241,6 +278,7 @@ export default function App() {
             visitedIds={visitedIds}
             initialSelectedId={selectedId}
             onHoverNode={handleHoverNode}
+            onCanvasDragStart={dismissHover}
             onResolveAnchor={handleResolveAnchor}
             onSelect={openProject}
           />
@@ -282,7 +320,12 @@ export default function App() {
       </nav>
 
       {hoverState && !selectedId && !isAboutOpen && (
-        <NodeHoverCard project={hoverState.project} position={hoverState.position} />
+        <NodeHoverCard
+          project={hoverState.project}
+          position={hoverState.position}
+          onPointerEnter={clearHoverDismissal}
+          onPointerLeave={scheduleHoverDismiss}
+        />
       )}
 
       <AboutModal isOpen={isAboutOpen} onClose={closeAbout} />

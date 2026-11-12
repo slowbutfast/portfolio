@@ -29,6 +29,7 @@ export const projects = [
   {
     id: 'open-dungeon',
     title: 'OpenDungeon',
+    shortTitle: 'OpenDungeon',
     summary:
       'Generative text-adventure engine with a 20-tool MCP server and an OAuth-gated multiplayer canvas.',
     classification: 'GENERATIVE ADVENTURE // MCP RUNTIME',
@@ -45,6 +46,7 @@ export const projects = [
   {
     id: 'agentic-resume-builder',
     title: 'Agentic Resume Builder',
+    shortTitle: 'Resume Builder',
     summary:
       'Python CLI that renders tailored LaTeX resumes from structured YAML via an argparse-driven build pipeline.',
     classification: 'AGENTIC DOCUMENT PIPELINE // LaTeX',
@@ -56,6 +58,7 @@ export const projects = [
   {
     id: 'pict-climate-risk-viz-chatbot',
     title: 'PICT Climate Risk Viz',
+    shortTitle: 'Climate Risk',
     summary:
       'Geospatial climate-risk chat and raster visualization built on an Express backend with React 19.',
     classification: 'GEOSPATIAL CLIMATE INTELLIGENCE // RASTER VIZ',
@@ -77,6 +80,7 @@ export const projects = [
   {
     id: 'transcribe-plus',
     title: 'Transcribe Plus',
+    shortTitle: 'Transcribe+',
     summary:
       'Local transcription workspace with a Vite + Express 5 monorepo and an offline product demo video.',
     classification: 'LOCAL AUDIO TRANSCRIPTION // MONOREPO',
@@ -92,6 +96,7 @@ export const projects = [
   {
     id: 'sandwave-sim',
     title: 'Sandwave Sim',
+    shortTitle: 'Sandwave',
     summary:
       'Vanilla JS Chladni plate acoustic simulator rendering nodal-line sand patterns with Web Audio.',
     classification: 'ACOUSTIC PHYSICS SIMULATION // CHLADNI PLATES',
@@ -107,6 +112,7 @@ export const projects = [
   {
     id: 'attention-max',
     title: 'Attention Max',
+    shortTitle: 'AttentionMax',
     summary:
       'Firefox MV3 extension that gamifies focus sessions with a popup timer and an options dashboard.',
     classification: 'FOCUS PROTOCOL EXTENSION // MV3',

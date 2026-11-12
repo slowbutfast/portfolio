@@ -50,6 +50,43 @@ function freshSim() {
   });
 }
 
+describe('graphSimulation seed homing', () => {
+  it('accepts a display label and initializes from scaled planar seeds', () => {
+    const sim = createSimulation({
+      nodes: [{ id: 'open-dungeon', label: 'OpenDungeon' }],
+      links: [],
+      width: 1000,
+      height: 500,
+      seeds: { 'open-dungeon': { x: 0.4, y: 0.48 } },
+    });
+
+    const node = sim.findNode('open-dungeon')!;
+    expect(node.label).toBe('OpenDungeon');
+    expect(node.x).toBeCloseTo(400, 6);
+    expect(node.y).toBeCloseTo(240, 6);
+
+    sim.destroy();
+  });
+
+  it('re-scales seed targets when the viewport resizes', () => {
+    const sim = createSimulation({
+      nodes: [{ id: 'open-dungeon' }],
+      links: [],
+      width: 1000,
+      height: 500,
+      seeds: { 'open-dungeon': { x: 0.4, y: 0.48 } },
+    });
+
+    sim.resize(2000, 1000);
+    for (let tick = 0; tick < 40; tick += 1) sim.tick();
+    const node = sim.findNode('open-dungeon')!;
+    expect(node.x).toBeGreaterThan(450);
+    expect(node.y).toBeGreaterThan(270);
+
+    sim.destroy();
+  });
+});
+
 describe('graphSimulation hover pinning', () => {
   it('pins the hovered node and unpins it when the pointer leaves', () => {
     const sim = freshSim();

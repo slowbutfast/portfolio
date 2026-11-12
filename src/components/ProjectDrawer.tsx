@@ -1,12 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ExternalLink, GitBranch, Link2, X } from 'lucide-react';
+import { ExternalLink, GitBranch, X } from 'lucide-react';
 import type { Preview, ProjectData } from '../types/portfolio';
 import { projects } from '../data/projects';
 import { formatIndex } from '../utils/drafting';
 import { TerminalSimulator } from './TerminalSimulator';
 import { MediaView } from './MediaView';
 
-type TabKind = 'terminal' | 'media' | 'link';
+type TabKind = 'terminal' | 'media';
 
 interface DrawerTab {
   kind: TabKind;
@@ -42,6 +42,7 @@ export function ProjectDrawer({ project, anchor, onClose }: ProjectDrawerProps) 
   const [activeTab, setActiveTab] = useState<TabKind | null>(null);
   const [displayTitle, setDisplayTitle] = useState(project.title);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+  const [isSheet, setIsSheet] = useState(false);
 
   const catalogIndex = projects.findIndex((p) => p.id === project.id);
   const safeIndex = catalogIndex >= 0 ? catalogIndex : 0;
@@ -56,9 +57,8 @@ export function ProjectDrawer({ project, anchor, onClose }: ProjectDrawerProps) 
     if (project.previews.some((p) => p.kind === 'video' || p.kind === 'screenshot')) {
       list.push({ kind: 'media', label: 'Media' });
     }
-    if (project.previews.some((p) => p.kind === 'linkout') || project.liveUrl) {
-      list.push({ kind: 'link', label: 'Link' });
-    }
+    // The legacy Link tab is retired: Code and Visit live in the sticky header
+    // and contextual linkouts render inside the Overview section.
     return list;
   }, [project]);
 
@@ -97,12 +97,17 @@ export function ProjectDrawer({ project, anchor, onClose }: ProjectDrawerProps) 
     };
   }, [project.id, project.title]);
 
-  // Anchor the HUD card just beside the clicked node and clamp it to the
-  // viewport. Deep links and list selections fall back to a centered card.
+  // Anchor the HUD card beside the clicked node on desktop; on mobile the
+  // drawer becomes a bottom sheet and clears the inline coordinates.
   useLayoutEffect(() => {
     const place = () => {
       const panel = panelRef.current;
       if (!panel) return;
+      if (window.innerWidth < 768) {
+        setIsSheet(true);
+        return;
+      }
+      setIsSheet(false);
       const margin = 16;
       const width = panel.offsetWidth;
       const height = panel.offsetHeight;
@@ -172,6 +177,10 @@ export function ProjectDrawer({ project, anchor, onClose }: ProjectDrawerProps) 
   );
   const linkPreviews = project.previews.filter((p) => p.kind === 'linkout');
 
+  const panelClass = isSheet
+    ? 'fixed inset-x-0 bottom-0 z-50 flex max-h-[85dvh] w-full flex-col overflow-y-auto rounded-t-2xl border border-[var(--color-outline)] bg-[var(--color-surface)]/95 text-[var(--color-text)] shadow-2xl backdrop-blur-md'
+    : 'fixed z-50 flex max-h-[85dvh] w-[min(420px,calc(100vw-2rem))] flex-col overflow-y-auto rounded-2xl border border-[var(--color-outline)] bg-[var(--color-surface)]/95 text-[var(--color-text)] shadow-2xl backdrop-blur-md';
+
   return (
     <div className="fixed inset-0 z-40">
       <div
@@ -187,16 +196,18 @@ export function ProjectDrawer({ project, anchor, onClose }: ProjectDrawerProps) 
         aria-label={`${project.title} project details`}
         data-testid="project-drawer"
         style={
-          position
-            ? { left: position.left, top: position.top }
-            : { left: 0, top: 0, visibility: 'hidden' }
+          isSheet
+            ? undefined
+            : position
+              ? { left: position.left, top: position.top }
+              : { left: 0, top: 0, visibility: 'hidden' }
         }
-        className="fixed z-50 flex max-h-[85vh] w-[min(420px,calc(100vw-2rem))] flex-col overflow-y-auto rounded-2xl border border-[var(--color-outline)] bg-[var(--color-surface)]/95 text-[var(--color-text)] shadow-2xl backdrop-blur-md"
+        className={panelClass}
       >
         <header className="sticky top-0 z-10 border-b border-[var(--color-divider)] bg-[var(--color-surface)]/95 px-5 py-4 backdrop-blur-md">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <span className="inline-flex items-center rounded-full border border-[var(--color-outline)] px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted)]">
+              <span className="inline-flex items-center rounded-full border border-[var(--color-outline)] px-2.5 py-0.5 font-secondary text-[10px] font-light uppercase tracking-[0.18em] text-[var(--color-muted)]">
                 {indexLabel}
               </span>
 
@@ -222,6 +233,33 @@ export function ProjectDrawer({ project, anchor, onClose }: ProjectDrawerProps) 
               <p className="mt-2 text-sm leading-relaxed text-[var(--color-muted)]">
                 {project.summary}
               </p>
+
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <a
+                  href={project.repo}
+                  target="_blank"
+                  rel="noreferrer"
+                  data-testid="drawer-code"
+                  aria-label={`${project.title} source code, opens in new tab`}
+                  className="fluid-pill min-h-11 gap-1.5 md:min-h-0"
+                >
+                  <GitBranch className="h-3.5 w-3.5" aria-hidden="true" />
+                  Code <span aria-hidden="true">↗</span>
+                </a>
+                {project.liveUrl && (
+                  <a
+                    href={project.liveUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    data-testid="drawer-visit"
+                    aria-label={`${project.title} live demo, opens in new tab`}
+                    className="fluid-pill min-h-11 gap-1.5 md:min-h-0"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                    Visit <span aria-hidden="true">↗</span>
+                  </a>
+                )}
+              </div>
             </div>
             <button
               type="button"
@@ -238,33 +276,42 @@ export function ProjectDrawer({ project, anchor, onClose }: ProjectDrawerProps) 
         <div className="px-5 py-4">
           <div className="flex flex-wrap gap-2">
             {project.tags.map((tag) => (
-              <span key={tag} className="fluid-pill">
+              <span
+                key={tag}
+                className="fluid-pill border-[var(--color-outline)]/40 font-light text-[var(--color-muted)]"
+              >
                 {tag}
               </span>
             ))}
           </div>
 
-          {tabs.length > 1 && (
+          {tabs.length > 0 && (
             <div
               role="tablist"
               aria-label="Preview tabs"
-              className="mt-4 flex flex-wrap gap-1 border-b border-[var(--color-divider)] pb-2"
+              data-testid="preview-tabs-track"
+              className="mt-4 inline-flex items-center gap-1 rounded-full border border-[var(--color-divider)] bg-[var(--color-surface-container)] p-1"
             >
-              {tabs.map((tab) => (
-                <button
-                  key={tab.kind}
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === tab.kind}
-                  data-testid={`preview-tab-${tab.kind}`}
-                  onClick={() => setActiveTab(tab.kind)}
-                  className={`fluid-pill min-h-11 md:min-h-0 ${
-                    activeTab === tab.kind ? 'fluid-pill-active' : ''
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+              {tabs.map((tab) => {
+                const isActive = activeTab === tab.kind;
+                return (
+                  <button
+                    key={tab.kind}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
+                    data-testid={`preview-tab-${tab.kind}`}
+                    onClick={() => setActiveTab(tab.kind)}
+                    className={`inline-flex min-h-11 items-center justify-center rounded-full px-3.5 py-1.5 text-xs transition-all md:min-h-9 ${
+                      isActive
+                        ? 'bg-[var(--color-surface)] font-medium text-[var(--color-text)] shadow-sm'
+                        : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
             </div>
           )}
 
@@ -275,45 +322,41 @@ export function ProjectDrawer({ project, anchor, onClose }: ProjectDrawerProps) 
             {activeTab === 'media' && mediaPreviews.length > 0 && (
               <MediaView previews={mediaPreviews} />
             )}
-            {activeTab === 'link' && (
-              <ul className="flex flex-col gap-2">
-                <li>
-                  <a
-                    href={project.repo}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--color-outline)] px-3 py-2 font-mono text-xs text-[var(--color-muted)] transition-colors hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] md:min-h-0"
-                  >
-                    <GitBranch className="h-4 w-4" aria-hidden="true" /> {project.repo}
-                  </a>
-                </li>
-                {project.liveUrl && (
-                  <li>
+          </div>
+
+          <section
+            data-testid="drawer-overview"
+            aria-labelledby="drawer-overview-heading"
+            className="mt-5 border-t border-[var(--color-divider)] pt-4"
+          >
+            <h3
+              id="drawer-overview-heading"
+              className="font-secondary text-[10px] font-light uppercase tracking-[0.18em] text-[var(--color-muted)]"
+            >
+              Overview
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-[var(--color-muted)]">
+              {project.classification}
+            </p>
+            {linkPreviews.length > 0 && (
+              <ul className="mt-3 flex flex-col gap-2">
+                {linkPreviews.map((preview, index) => (
+                  <li key={`${preview.url}-${index}`}>
                     <a
-                      href={project.liveUrl}
+                      href={preview.url}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--color-outline)] px-3 py-2 font-mono text-xs text-[var(--color-muted)] transition-colors hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] md:min-h-0"
+                      data-testid={`overview-link-${index}`}
+                      className="fluid-pill min-h-11 gap-1.5 md:min-h-0"
                     >
-                      <ExternalLink className="h-4 w-4" aria-hidden="true" /> Launch live app
-                    </a>
-                  </li>
-                )}
-                {linkPreviews.map((p, i) => (
-                  <li key={i}>
-                    <a
-                      href={p.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--color-outline)] px-3 py-2 font-mono text-xs text-[var(--color-muted)] transition-colors hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] md:min-h-0"
-                    >
-                      <Link2 className="h-4 w-4" aria-hidden="true" /> {p.label}
+                      <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                      {preview.label} <span aria-hidden="true">↗</span>
                     </a>
                   </li>
                 ))}
               </ul>
             )}
-          </div>
+          </section>
         </div>
       </div>
     </div>

@@ -6,6 +6,8 @@ import {
 import type { GraphEdge } from '../utils/graphTopology';
 import type { GraphNode, ProjectData } from '../types/portfolio';
 import { getProjectById } from '../data/projects';
+import { PLANAR_NODE_SEEDS, scaleSeeds } from '../data/graphSeeds';
+import { computeBridgeGeometry } from '../utils/bridgeGeometry';
 import { createSimulation, type GraphSimulation } from '../physics/graphSimulation';
 
 interface GraphCanvasProps {
@@ -19,6 +21,7 @@ interface GraphCanvasProps {
     project: ProjectData | null,
     position: { x: number; y: number } | null,
   ) => void;
+  onCanvasDragStart?: () => void;
   onResolveAnchor?: (id: string, anchor: { x: number; y: number }) => void;
   onSelect: (id: string, anchor?: { x: number; y: number }) => void;
 }
@@ -42,20 +45,20 @@ interface FluidTokens {
 }
 
 const DEFAULT_TOKENS: FluidTokens = {
-  bg: '#0a0a0c',
-  surfaceContainer: '#18191e',
-  text: '#ffffff',
-  muted: '#8e8e93',
+  bg: '#f6f6f4',
+  surfaceContainer: '#eae9e5',
+  text: '#0a0a0c',
+  muted: '#525257',
   outline: '#71717a',
-  accent: '#3d7fff',
-  nodeUnvisited: '#ffffff',
-  nodeVisited: '#3d7fff',
-  connection: '#ffffff',
+  accent: '#003399',
+  nodeUnvisited: '#0a0a0c',
+  nodeVisited: '#003399',
+  connection: '#000000',
 };
 
-const MONO_FONT = '12px "JetBrains Mono Variable", monospace';
-const BRIDGE_MAX_DISTANCE = 480;
-const BRIDGE_MIN_HALF_WIDTH = 1.1;
+/** Canvas node labels use the same Swiss sans stack as the DOM interface. */
+const LABEL_FONT =
+  '500 12px "Helvetica Neue", Helvetica, -apple-system, BlinkMacSystemFont, Arial, sans-serif';
 
 function readToken(name: string, fallback: string): string {
   if (typeof window === 'undefined') return fallback;
@@ -78,65 +81,38 @@ function cacheTokens(): FluidTokens {
 }
 
 /**
- * Fuse two nearby circles with an organic meniscus bridge. The cubic fillets
- * attach flush to each circumference, flare at the contact tangent, and pinch
- * toward a waist under distance tension — ferrofluid under a magnetic field.
+ * Draw a bilateral ferrofluid bridge. The geometry is computed in pure math
+ * (`computeBridgeGeometry`); a null result means the circles touch or overlap,
+ * so the bridge is omitted instead of drawing inverted, crossing curves.
  */
 function drawFluidBridge(
   ctx: CanvasRenderingContext2D,
-  ax: number,
-  ay: number,
-  bx: number,
-  by: number,
-  radius: number,
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  radiusA: number,
+  radiusB: number,
   fillStyle: string,
   alpha: number,
 ): void {
-  const dx = bx - ax;
-  const dy = by - ay;
-  const distance = Math.hypot(dx, dy);
-  if (distance <= 0.001) return;
+  const geometry = computeBridgeGeometry(a, b, radiusA, radiusB);
+  if (!geometry) return;
 
-  const ux = dx / distance;
-  const uy = dy / distance;
-  const px = -uy;
-  const py = ux;
-
-  const tension = Math.max(0.12, 1 - distance / BRIDGE_MAX_DISTANCE);
-  const halfWidth = Math.max(BRIDGE_MIN_HALF_WIDTH, radius * 0.92 * tension);
-  const waist = halfWidth * tension;
-  const theta = Math.asin(Math.min(1, halfWidth / radius));
-  const reach = radius * Math.cos(theta);
-  const third = distance / 3;
-
-  const aTopX = ax + ux * reach + px * halfWidth;
-  const aTopY = ay + uy * reach + py * halfWidth;
-  const bTopX = bx - ux * reach + px * halfWidth;
-  const bTopY = by - uy * reach + py * halfWidth;
-  const aBottomX = ax + ux * reach - px * halfWidth;
-  const aBottomY = ay + uy * reach - py * halfWidth;
-  const bBottomX = bx - ux * reach - px * halfWidth;
-  const bBottomY = by - uy * reach - py * halfWidth;
+  const {
+    aTop,
+    aBottom,
+    bTop,
+    bBottom,
+    cp1Top,
+    cp2Top,
+    cp1Bottom,
+    cp2Bottom,
+  } = geometry;
 
   ctx.beginPath();
-  ctx.moveTo(aTopX, aTopY);
-  ctx.bezierCurveTo(
-    ax + ux * third + px * waist,
-    ay + uy * third + py * waist,
-    bx - ux * third + px * waist,
-    by - uy * third + py * waist,
-    bTopX,
-    bTopY,
-  );
-  ctx.lineTo(bBottomX, bBottomY);
-  ctx.bezierCurveTo(
-    bx - ux * third - px * waist,
-    by - uy * third - py * waist,
-    ax + ux * third - px * waist,
-    ay + uy * third - py * waist,
-    aBottomX,
-    aBottomY,
-  );
+  ctx.moveTo(aTop.x, aTop.y);
+  ctx.bezierCurveTo(cp1Top.x, cp1Top.y, cp2Top.x, cp2Top.y, bTop.x, bTop.y);
+  ctx.lineTo(bBottom.x, bBottom.y);
+  ctx.bezierCurveTo(cp2Bottom.x, cp2Bottom.y, cp1Bottom.x, cp1Bottom.y, aBottom.x, aBottom.y);
   ctx.closePath();
   ctx.fillStyle = fillStyle;
   ctx.globalAlpha = alpha;
@@ -151,6 +127,7 @@ export function GraphCanvas({
   visitedIds,
   initialSelectedId,
   onHoverNode,
+  onCanvasDragStart,
   onResolveAnchor,
   onSelect,
 }: GraphCanvasProps) {
@@ -161,7 +138,6 @@ export function GraphCanvas({
   const transformRef = useRef({ x: 0, y: 0, scale: 1 });
   const targetRef = useRef({ x: 0, y: 0 });
   const reduceMotionRef = useRef(false);
-  const fontsReadyRef = useRef(false);
   const tokensRef = useRef<FluidTokens>(DEFAULT_TOKENS);
   const staticPosRef = useRef<Map<string, [number, number]>>(new Map());
   const downPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -175,6 +151,8 @@ export function GraphCanvas({
   visitedRef.current = visitedIds;
   const onHoverNodeRef = useRef(onHoverNode);
   onHoverNodeRef.current = onHoverNode;
+  const onCanvasDragStartRef = useRef(onCanvasDragStart);
+  onCanvasDragStartRef.current = onCanvasDragStart;
   const onResolveAnchorRef = useRef(onResolveAnchor);
   onResolveAnchorRef.current = onResolveAnchor;
   const hoveredProjectIdRef = useRef<string | null>(null);
@@ -192,7 +170,7 @@ export function GraphCanvas({
     reduceMotionRef.current = reduceMotion;
     canHoverRef.current = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
-    const simNodes = nodes.map((n) => ({ id: n.id }));
+    const simNodes = nodes.map((n) => ({ id: n.id, label: n.label }));
     const simLinks = edges.map((e) => ({ source: e.source, target: e.target }));
 
     let width = Math.max(1, Math.round(container.getBoundingClientRect().width));
@@ -203,12 +181,17 @@ export function GraphCanvas({
     canvas.height = Math.round(height * dpr);
     sizeRef.current = { width, height, dpr };
 
+    // Both the first animation frame and the reduced-motion static layout start
+    // from the same authoritative planar embedding, scaled to the viewport.
+    const scaledSeeds = scaleSeeds(PLANAR_NODE_SEEDS, width, height);
+
     const sim = createSimulation({
       nodes: simNodes,
       links: simLinks,
       width,
       height,
-      initialPositions: reduceMotion ? staticRing(width, height, nodes) : undefined,
+      seeds: PLANAR_NODE_SEEDS,
+      initialPositions: scaledSeeds,
     });
     simRef.current = sim;
 
@@ -249,11 +232,10 @@ export function GraphCanvas({
         const isFocal = focalId !== null && (edge.source === focalId || edge.target === focalId);
         drawFluidBridge(
           ctx,
-          a[0],
-          a[1],
-          b[0],
-          b[1],
-          Math.min(ra, rb),
+          { x: a[0], y: a[1] },
+          { x: b[0], y: b[1] },
+          ra,
+          rb,
           isFocal ? tokens.accent : tokens.connection,
           isDim ? 0.12 : 1,
         );
@@ -281,24 +263,22 @@ export function GraphCanvas({
             : tokens.nodeUnvisited;
         ctx.fill();
 
-        if (fontsReadyRef.current) {
-          ctx.font = MONO_FONT;
-          const labelWidth = ctx.measureText(n.label).width;
-          const pillWidth = labelWidth + 16;
-          const pillHeight = 20;
-          const pillX = x - pillWidth / 2;
-          const pillY = y + n.radius + 8;
+        ctx.font = LABEL_FONT;
+        const labelWidth = ctx.measureText(n.label).width;
+        const pillWidth = labelWidth + 16;
+        const pillHeight = 20;
+        const pillX = x - pillWidth / 2;
+        const pillY = y + n.radius + 8;
 
-          ctx.beginPath();
-          ctx.roundRect(pillX, pillY, pillWidth, pillHeight, pillHeight / 2);
-          ctx.fillStyle = tokens.bg;
-          ctx.fill();
+        ctx.beginPath();
+        ctx.roundRect(pillX, pillY, pillWidth, pillHeight, pillHeight / 2);
+        ctx.fillStyle = tokens.bg;
+        ctx.fill();
 
-          ctx.fillStyle = isActive ? tokens.accent : tokens.text;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(n.label, x, pillY + pillHeight / 2);
-        }
+        ctx.fillStyle = isActive ? tokens.accent : tokens.text;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(n.label, x, pillY + pillHeight / 2);
       }
 
       ctx.restore();
@@ -330,10 +310,9 @@ export function GraphCanvas({
     };
 
     if (reduceMotion) {
-      const ring = staticRing(width, height, nodes);
-      staticPosRef.current = new Map(nodes.map((n) => [n.id, ring[n.id]]));
+      staticPosRef.current = new Map(nodes.map((n) => [n.id, scaledSeeds[n.id]]));
       for (const n of sim.nodes) {
-        const p = ring[n.id];
+        const p = scaledSeeds[n.id];
         if (p) {
           n.x = p[0];
           n.y = p[1];
@@ -350,19 +329,6 @@ export function GraphCanvas({
       render();
     });
 
-    // Canvas typography waits for the variable mono font; physics and bridges
-    // start immediately and repaint the moment the face resolves.
-    document.fonts
-      .load(MONO_FONT)
-      .then(() => {
-        fontsReadyRef.current = true;
-        render();
-      })
-      .catch(() => {
-        fontsReadyRef.current = true;
-        render();
-      });
-
     const resize = () => {
       const rect = container.getBoundingClientRect();
       width = Math.max(1, Math.round(rect.width));
@@ -374,10 +340,10 @@ export function GraphCanvas({
       canvas.style.height = `${height}px`;
       sizeRef.current = { width, height, dpr: d };
       if (reduceMotionRef.current) {
-        const ring = staticRing(width, height, nodes);
-        staticPosRef.current = new Map(nodes.map((n) => [n.id, ring[n.id]]));
+        const resizedSeeds = scaleSeeds(PLANAR_NODE_SEEDS, width, height);
+        staticPosRef.current = new Map(nodes.map((n) => [n.id, resizedSeeds[n.id]]));
         for (const n of sim.nodes) {
-          const p = ring[n.id];
+          const p = resizedSeeds[n.id];
           if (p) {
             n.x = p[0];
             n.y = p[1];
@@ -538,6 +504,7 @@ export function GraphCanvas({
     const node = hitNode(p.x, p.y);
     downPosRef.current = { x: p.x, y: p.y };
     if (node) {
+      onCanvasDragStartRef.current?.();
       (e.target as HTMLCanvasElement).setPointerCapture(e.pointerId);
       if (!reduceMotionRef.current) sim.dragStart(node);
     }
@@ -590,21 +557,4 @@ export function GraphCanvas({
       />
     </div>
   );
-}
-
-function staticRing(
-  width: number,
-  height: number,
-  nodeList: GraphNode[],
-): Record<string, [number, number]> {
-  const cx = width / 2;
-  const cy = height / 2;
-  const r = Math.min(width, height) * 0.3;
-  const ids = nodeList.map((n) => n.id);
-  const out: Record<string, [number, number]> = {};
-  ids.forEach((id, i) => {
-    const angle = (i / ids.length) * Math.PI * 2 - Math.PI / 2;
-    out[id] = [cx + r * Math.cos(angle), cy + r * Math.sin(angle)];
-  });
-  return out;
 }
