@@ -3,6 +3,10 @@ import { defineConfig, devices } from '@playwright/test';
 const baseURL = process.env.PREVIEW_URL ?? 'http://localhost:5199';
 const isPreview = Boolean(process.env.PREVIEW_URL);
 
+// Protected previews answer with Vercel's auth page unless the request carries
+// the project's "Protection Bypass for Automation" secret.
+const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+
 export default defineConfig({
   testDir: './e2e',
   timeout: 30_000,
@@ -13,9 +17,19 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: [['list']],
+  // Fails once with a clear message when a preview is behind the auth wall.
+  globalSetup: isPreview ? './e2e/global-setup.ts' : undefined,
   use: {
     baseURL,
-    trace: 'on-first-retry',
+    // Traces record request headers, so with a bypass secret in play they would
+    // leak it to anyone who can download the report. Keep them off in that case.
+    trace: bypassSecret ? 'off' : 'on-first-retry',
+    extraHTTPHeaders: bypassSecret
+      ? {
+          'x-vercel-protection-bypass': bypassSecret,
+          'x-vercel-set-bypass-cookie': 'true',
+        }
+      : undefined,
   },
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'] } },

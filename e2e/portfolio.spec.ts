@@ -82,6 +82,7 @@ test.describe('portfolio graph SPA', () => {
   });
 
   test('list view renders 6 cards and a card click opens the project drawer', async ({ page }) => {
+    const errors = trackErrors(page);
     await page.goto('/');
     await page.getByTestId('view-toggle').click();
     for (const id of PROJECT_IDS) {
@@ -90,14 +91,17 @@ test.describe('portfolio graph SPA', () => {
     await page.getByTestId('card-open-dungeon').click();
     await expect(page.getByTestId('project-drawer')).toBeVisible();
     await expect(page.getByTestId('project-drawer')).toHaveAttribute('aria-modal', 'true');
+    expect(errors).toEqual([]);
   });
 
   test('terminal command chip executes and displays captured output', async ({ page }) => {
+    const errors = trackErrors(page);
     await page.goto('/#/p/agentic-resume-builder');
     await expect(page.getByTestId('project-drawer')).toBeVisible();
     await expect(page.getByTestId('command-chip').first()).toBeVisible();
     await page.getByTestId('command-chip').first().click();
     await expect(page.getByTestId('terminal-output')).toContainText('exit code');
+    expect(errors).toEqual([]);
   });
 
   test('terminal tab is curated to the Resume Builder project', async ({ page }) => {
@@ -135,6 +139,7 @@ test.describe('portfolio graph SPA', () => {
   });
 
   test('deep link #/p/open-dungeon opens the drawer on load and closing clears the hash', async ({ page }) => {
+    const errors = trackErrors(page);
     await page.goto('/#/p/open-dungeon');
     await expect(page.getByTestId('project-drawer')).toBeVisible();
     await page.getByTestId('drawer-close').click();
@@ -142,6 +147,7 @@ test.describe('portfolio graph SPA', () => {
     await expect
       .poll(() => page.evaluate(() => window.location.hash))
       .toBe('');
+    expect(errors).toEqual([]);
   });
 
   test('unknown deep link slug is ignored without crashing', async ({ page }) => {
@@ -180,6 +186,7 @@ test.describe('portfolio graph SPA', () => {
   });
 
   test('About button opens the modal and Escape/close dismiss it', async ({ page }) => {
+    const errors = trackErrors(page);
     await page.goto('/');
     await page.getByTestId('nav-about').click();
     const modal = page.getByTestId('about-modal');
@@ -198,15 +205,18 @@ test.describe('portfolio graph SPA', () => {
     await expect(modal).toBeVisible();
     await page.getByTestId('about-close').click();
     await expect(modal).toHaveCount(0);
+    expect(errors).toEqual([]);
   });
 
   test('#/about deep link opens the modal and backdrop dismisses it', async ({ page }) => {
+    const errors = trackErrors(page);
     await page.goto('/#/about');
     const modal = page.getByTestId('about-modal');
     await expect(modal).toBeVisible();
     await page.getByTestId('about-backdrop').click({ position: { x: 5, y: 5 } });
     await expect(modal).toHaveCount(0);
     await expect.poll(() => page.evaluate(() => window.location.hash)).toBe('');
+    expect(errors).toEqual([]);
   });
 
   test('GitHub navigation and profile links point to slowbutfast', async ({ page }) => {
@@ -419,6 +429,9 @@ test.describe('portfolio graph SPA', () => {
   });
 
   test('pointer moves along the canvas edge cause zero React commits', async ({ page }) => {
+    // React production builds never call Profiler onRender, so this would pass
+    // vacuously against a deployed (production) build.
+    test.skip(Boolean(process.env.PREVIEW_URL), 'requires a development build (Profiler commits)');
     await page.goto('/');
     const canvas = page.getByTestId('graph-canvas');
     await expect(canvas).toBeVisible();

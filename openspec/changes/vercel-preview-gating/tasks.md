@@ -1,0 +1,45 @@
+## 1. Test Scaffolding (TDD)
+
+- [x] 1.1 Add `src/utils/commitHash.test.ts` with failing tests for the `resolveCommitHash` resolution order (Vercel SHA, git fallback, `dev`, empty string, short SHA, blank git output)
+- [x] 1.2 Add `vercel.json` guard tests (single `/assets/(.*)` immutable rule, CSP directive map equals the spec policy, required security headers, negative fixture for `'unsafe-inline'`) and a `package.json` build-script guard that fails until `build` typechecks first
+- [x] 1.3 Add a build-output guard test (at least one `.woff2` in `dist/assets/`, no `data:font` in built JS/CSS)
+- [x] 1.4 Scaffold `e2e/preview-headers.spec.ts` (skipped unless `PREVIEW_URL` is set) asserting served CSP as a directive set, the other security headers, font cache headers discovered from page load, root revalidation, and a 404 for a missing asset
+- [x] 1.5 Extend the drawer-open, deep-link, About, and terminal e2e tests to assert `trackErrors()` is empty, and skip the Profiler zero-commit test when `PREVIEW_URL` is set
+- [x] 1.6 Scaffold the `e2e/global-setup.ts` auth-wall pre-flight expectations (fails with a message naming `VERCEL_AUTOMATION_BYPASS_SECRET`)
+
+## 2. Build and Config
+
+- [x] 2.1 Implement `src/utils/commitHash.ts` and wire it into `vite.config.ts` with an `execSync` runner that cannot throw and suppresses git stderr
+- [x] 2.2 Change `package.json` `build` to `tsc --noEmit && vite build` and verify once that an injected type error fails it, then revert the error
+- [x] 2.3 Confirm `vercel.json` and `assetsInlineLimit: 0` already satisfy the guard tests; change them only if a guard fails
+- [x] 2.4 Run the build-output guard against a real `npm run build` and record the `.woff2` count and the `data:font` result
+
+## 3. Preview Access and Test Hardening
+
+- [x] 3.1 Update `playwright.config.ts`: when `VERCEL_AUTOMATION_BYPASS_SECRET` is set, add `extraHTTPHeaders` (`x-vercel-protection-bypass`, `x-vercel-set-bypass-cookie`) and force tracing off
+- [x] 3.2 Implement `e2e/global-setup.ts` (runs only when `PREVIEW_URL` is set) and register it in `playwright.config.ts`
+- [x] 3.3 Locally emulate the deployed headers (serve `dist/` with `vercel.json` headers) and run the e2e suite against it; record any CSP console errors as findings
+- [ ] 3.4 Make the scaffolded header spec pass against a protected preview (needs a deployment; blocked on Vercel access and bypass secret)
+- [ ] 3.5 Confirm Chromium reports a deliberate CSP violation as a `console` error on a deployment and record the result (blocked on a deployment)
+
+## 4. CI Workflows and Repository Settings
+
+- [x] 4.1 Add `ci.yml` (staged in `openspec/changes/vercel-preview-gating/workflows/` because writes to `.github/` are denied here; copy to `.github/workflows/`): on `pull_request`, Node 22, `npm ci`, `typecheck`, `test:unit`, Playwright browser install, `test:e2e`, upload report on failure
+- [x] 4.2 Add `preview.yml` (staged alongside `ci.yml`): on `deployment_status` success; branch on environment; checkout `deployment.sha`; run the preview suite (Preview) or header + load test (Production); post `preview-e2e` / `production-smoke` commit status; least-privilege permissions; per-SHA concurrency; no secret echo; no trace artifacts
+- [x] 4.3 Validate both workflows (actionlint if available, otherwise YAML parse) and grep for secret echoes
+- [ ] 4.4 Read Vercel project state through the Vercel MCP (project link, production branch, Deployment Protection, system-env exposure) and record findings (MCP access works; the Vercel project does not exist yet, waiting for the user to import it in the dashboard)
+- [ ] 4.5 Add the `VERCEL_AUTOMATION_BYPASS_SECRET` repository secret and land `ci.yml` and `preview.yml` on the default branch (user-owned: needs repository and Vercel dashboard access)
+- [ ] 4.6 After each context has reported once, mark `ci` and `preview-e2e` as required checks in branch protection (user-owned)
+
+## 5. Documentation
+
+- [x] 5.1 Update `README.md` deployment section: production branch, merge-to-promote flow, bypass-secret setup, Instant Rollback steps (including plan limits), rollback triggers, and header spot-check commands
+- [x] 5.2 Note the strict-CSP follow-up path in the README if task 3.3 or 3.4 finds the policy needs changing
+
+## 6. Verification & Empirical Audit
+
+- [x] 6.1 Run `npm run typecheck`, `npm run test:unit`, `npm run test:e2e`, and `npm run build`; record pass counts
+- [ ] 6.2 Push the branch, confirm the preview deployment triggers the gate, and record the run URL, commit status, and header assertion results (blocked on 4.4 and 4.5)
+- [ ] 6.3 Run the secret-leak scan over the preview run's logs and artifacts (blocked on 6.2)
+- [ ] 6.4 Perform an Instant Rollback drill on a non-critical deployment with the user's explicit approval (blocked on 4.4)
+- [ ] 6.5 Populate `verification.md` with the Requirement Adherence Matrix for both specs, the resolved unverified assumptions from `research.md`, and verbatim execution logs
