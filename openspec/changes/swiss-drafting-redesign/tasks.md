@@ -55,3 +55,14 @@
 - [x] P01.4 Refactor `src/components/GraphCanvas.tsx` to strip crosshairs/outer tick rings, render pure solid circular primitives, and implement organic ferrofluid meniscus bridges between connected nodes in proximity
 - [x] P01.5 Strip `.drafting-grid` from `src/components/ListView.tsx`
 - [x] P01.6 Update `e2e/portfolio.spec.ts` for clean tag rendering and run full regression suite (`typecheck`, `unit`, `e2e`, `@google/design.md lint`)
+
+## Patch 02: Fluid Minimalist & Organic Constructivist UI Refinement
+
+- [ ] P02.1 Update `DESIGN.md` to define Fluid Minimalist system (Helvetica, Klein Blue `#003399`, fluid pills, dual light/dark themes, metaball physics), ensuring 0 linter errors
+- [ ] P02.2 Update `src/styles.css` with Helvetica typography, dual light/dark color tokens, `cursor: crosshair`, and fluid pill styling
+- [ ] P02.3 Update `src/physics/graphSimulation.ts` to scale node radius ~20% (`r = 22px`), collision radius (36px), and link rest distance (210px)
+- [ ] P02.4 Redesign `src/components/ControlsOverlay.tsx` replacing top banner and coordinate ticker with a floating carat dropdown (`Filters ▾`) containing view toggle, search bar, stack filter pills, reset, and theme toggle
+- [ ] P02.5 Refactor `src/components/GraphCanvas.tsx` to implement tangent-continuous Bézier fillets with dynamic tension, pure white/black connections (no grayscale), background knockout pills for project titles, and visited node styling
+- [ ] P02.6 Redesign `src/components/ProjectDrawer.tsx` into a floating canvas HUD tooltip adjacent to the selected node (Option A), removing caption/classification clutter, restricting terminal to `agentic-resume-builder` only, and adopting circular/pill geometry
+- [ ] P02.7 Update `src/App.tsx` and `src/components/ListView.tsx` with theme state, visited tracking, sr-only h1, and fluid pill padding
+- [ ] P02.8 Update `e2e/portfolio.spec.ts` and verify full regression suite passes (`typecheck`, `unit`, `e2e`, axe WCAG A/AA, and `design.md lint`)

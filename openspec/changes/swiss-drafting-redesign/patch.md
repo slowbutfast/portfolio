@@ -14,4 +14,40 @@
   - `e2e/portfolio.spec.ts`: Update any assertions checking for crop marks or bracket tags while preserving all functional selectors.
 - **Expected Resolution**:
   The interface presents a deep, vast, unadorned black void where pure circular node primitives interact with organic magnetic fluid cohesion (ferrofluid behavior), framed by quiet, uncluttered Swiss typography. All unit, e2e, and lint tests pass.
-- **Status**: RESOLVED
+- **Status**: RESOLVED (commit `9b6841d`)
+
+### [PATCH-02] Fluid Minimalist & Organic Constructivist UI Refinement
+- **Date**: 2026-11-12 01:10:00 UTC
+- **Feedback Source**: User Design Direction & Visual Brain-Dump Review
+- **Reported Issue**:
+  > - Change secondary color from cyan to #003399 (International Klein Blue / classic cobalt).
+  > - Remove grayscale from node connections, keep connections pure white if connected.
+  > - Change cursor to crosshair (+).
+  > - Redesign UI: replace filter bar and search bar with a compact dropdown carat (▾); move graph/list view options into that dropdown.
+  > - Remove sys.portfolio title and bottom-left coordinate bar.
+  > - Make default view of nodes ~20% larger.
+  > - Alter animations to use tangent-continuous Bézier fillets / metaballs with dynamic tension and flared attachments.
+  > - Improve project titles readability over connections using a background knockout pill (Option 1).
+  > - Transform project view window into an interactive floating canvas HUD tooltip directly adjacent to the clicked node (Option A).
+  > - Remove caption "PL-04 // BUILD // 685c065 LOCAL AUDIO TRANSCRIPTION // MONOREPO".
+  > - Remove terminal pane for all projects except agentic-resume-builder.
+  > - Change default font for the whole website to Helvetica.
+  > - Add alternate light theme with off-white canvas (#f6f6f4) and black nodes.
+  > - Mark visited nodes with hyperlink cobalt scheme (Variant 1: #003399 in light, #3d7fff in dark).
+  > - Redesign general UI chips, buttons, menus to be circular and fluid (rounded-full).
+- **Root Cause**:
+  The user desires a fully distilled, fluid-constructivist aesthetic that merges Swiss typography (Helvetica, binary high contrast, radical reduction of persistent HUD furniture) with organic physics (ferrofluid metaballs, circular primitives, floating HUD inspector tooltips) and full theme versatility.
+- **Target Files**:
+  - `DESIGN.md`
+  - `src/styles.css`
+  - `src/types/portfolio.ts`
+  - `src/physics/graphSimulation.ts`
+  - `src/components/ControlsOverlay.tsx`
+  - `src/components/GraphCanvas.tsx`
+  - `src/components/ProjectDrawer.tsx`
+  - `src/components/ListView.tsx`
+  - `src/App.tsx`
+  - `e2e/portfolio.spec.ts`
+- **Expected Resolution**:
+  The portfolio operates in pure Fluid Minimalist mode with a clean void canvas, crosshair cursor, 20% larger circular nodes, pure binary connections, floating carat dropdown for filters/views/theme, floating video-game HUD inspector tooltip, background knockout title pills, Helvetica typography, and dual light/dark themes. All unit, e2e, and lint tests pass.
+- **Status**: PENDING
