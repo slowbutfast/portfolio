@@ -1,18 +1,18 @@
 ## 1. Test Scaffolding (TDD)
 
-- [ ] 1.1 Scaffold unit test `src/utils/bridgeGeometry.test.ts` verifying bilateral reflection symmetry, tangent angles, and close-node guards
-- [ ] 1.2 Scaffold unit test `src/utils/graphPlanarity.test.ts` verifying 0 segment crossings across all 9 edges for `PLANAR_NODE_SEEDS`
+- [ ] 1.1 Scaffold unit test `src/utils/bridgeGeometry.test.ts` verifying bilateral reflection symmetry, collinear tangent derivatives, and close-node distance guards ($d \le R_A + R_B$)
+- [ ] 1.2 Scaffold unit test `src/utils/graphPlanarity.test.ts` verifying 0 segment crossings across all 9 edges for `PLANAR_NODE_SEEDS` both initially and at resting equilibrium (300 ticks)
 - [ ] 1.3 Scaffold unit test `src/data/profile.test.ts` verifying Brown University bio copy and URL protocols (`mailto:`, `https:`)
 - [ ] 1.4 Scaffold unit test `src/data/projects.test.ts` verifying mandatory non-empty `shortTitle: string` for all 6 projects
 - [ ] 1.5 Scaffold unit test in `src/utils/edgeConfig.test.ts` and update `src/utils/csp.ts` (`SPEC_CSP`) to include `frame-src 'self' https://drive.google.com;`
 - [ ] 1.6 Scaffold E2E tests in `e2e/portfolio.spec.ts` for default Light theme, header item sequence (`About`, `GitHub`, `Graph`/`Grid`, `Dark`/`Light`, `Filters`), and theme persistence
 - [ ] 1.7 Scaffold E2E tests for About modal DOM structure (Brown University bio, top contact links, no subtitle, no focus areas)
-- [ ] 1.8 Scaffold E2E tests for `ProjectDrawer` segmented tabs track and elevated `Code ↗` and `Visit ↗` buttons
+- [ ] 1.8 Scaffold E2E tests for `ProjectDrawer` segmented tabs track, elevated `Code ↗` and `Visit ↗` buttons, and absence of legacy `preview-tab-link`
 
 ## 2. Mathematical Geometry & Planar Topology
 
 - [ ] 2.1 Implement `src/utils/bridgeGeometry.ts` with tangent-continuous Bézier curves, bilateral reflection symmetry, and close-node distance guards
-- [ ] 2.2 Implement `src/data/graphSeeds.ts` exporting `PLANAR_NODE_SEEDS` with Sandwave nested inside the $K_4$ triangle
+- [ ] 2.2 Implement `src/data/graphSeeds.ts` exporting authoritative `PLANAR_NODE_SEEDS` with Sandwave nested inside the $K_4$ triangle
 - [ ] 2.3 Wire `computeBridgeGeometry` into `src/components/GraphCanvas.tsx` replacing previous heuristic bridge drawing
 
 ## 3. Candidate Profile & Infrastructure Configuration
@@ -27,7 +27,7 @@
 - [ ] 4.1 Update `src/types/portfolio.ts` with mandatory `shortTitle: string` on `ProjectData` and `CandidateProfile` interface
 - [ ] 4.2 Add mandatory `shortTitle` to all 6 projects in `src/data/projects.ts`
 - [ ] 4.3 Extend `SimulationNode` in `src/physics/graphSimulation.ts` to accept `label?: string` and bind weak `seedX`/`seedY` homing forces (`strength: 0.02`)
-- [ ] 4.4 Update `GraphCanvas.tsx` to initialize simulation and static reduced-motion layout from scaled `PLANAR_NODE_SEEDS`
+- [ ] 4.4 Update `GraphCanvas.tsx` to initialize simulation and static reduced-motion layout from scaled `PLANAR_NODE_SEEDS`, and standardize label pills to the Helvetica sans font stack
 
 ## 5. Controls Overlay, Header & Theme Default
 
@@ -46,7 +46,7 @@
 ## 7. Elevated Actions & Drawer Segmented Tabs
 
 - [ ] 7.1 Elevate `Code ↗` and `Visit ↗` buttons into sticky header of `src/components/ProjectDrawer.tsx`
-- [ ] 7.2 Implement distinct segmented container track for `Media` and `Terminal` tabs with $\ge 44\text{px}$ touch targets in `src/components/ProjectDrawer.tsx`
+- [ ] 7.2 Implement distinct segmented container track for `Media` and `Terminal` tabs with $\ge 44\text{px}$ touch targets, and retire the legacy `Link` tab in `src/components/ProjectDrawer.tsx`
 - [ ] 7.3 Enable `pointer-events-auto` on `src/components/NodeHoverCard.tsx` with 150ms transfer zone and direct action buttons
 - [ ] 7.4 Embed 16:9 thumbnails and terminal specimen fallback in `src/components/ListView.tsx`
 

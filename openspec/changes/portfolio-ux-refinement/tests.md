@@ -3,11 +3,12 @@
 - `npm run typecheck`: Verifies compile-time type safety across all models (`CandidateProfile`, mandatory `shortTitle: string`, `SimulationNode` input types, `BridgeGeometry`).
 - `npm run test:unit`:
   - `src/utils/bridgeGeometry.test.ts`:
-    - Asserts bilateral symmetry across arbitrary rotated node positions: $n(CP1_{bottom}) = -n(CP2_{top})$ and $n(CP2_{bottom}) = -n(CP1_{top})$ within $10^{-6}$.
-    - Asserts control handles align with perimeter circle tangents.
+    - Asserts bilateral reflection symmetry across arbitrary rotated node positions: $n(CP1_{bottom}) = -n(CP2_{top})$ and $n(CP2_{bottom}) = -n(CP1_{top})$ within $10^{-6}$.
+    - Asserts $C^1$ endpoint derivatives: $(CP1_{top} - A_{top})$ is collinear with the perimeter tangent vector at $A_{top}$, and $(B_{top} - CP2_{top})$ is collinear with the perimeter tangent vector at $B_{top}$.
     - Asserts `computeBridgeGeometry` returns `null` when distance $d \le R_A + R_B$.
   - `src/utils/graphPlanarity.test.ts`:
     - Asserts `countCrossings(PLANAR_NODE_SEEDS, edges) === 0` across all 9 undirected graph edges.
+    - Simulates 300 ticks of unperturbed d3-force with weak seed homing (`strength: 0.02`) and asserts 0 edge crossings at resting equilibrium.
   - `src/data/profile.test.ts`:
     - Asserts canonical Brown University bio statement matches verbatim.
     - Asserts all contact URL protocols (`mailto:`, `https:`).
@@ -21,7 +22,7 @@
   - Header controls render in the canonical sequence: `About`, `GitHub ↗`, `Graph`/`Grid`, `Dark`/`Light`, `Filters ▾`.
   - Clicking `Dark`/`Light` toggles color scheme and persists to `localStorage`.
   - `AboutModal` dialog displays the Brown University bio and top-mounted contact links without subtitle or focus area tag pills.
-  - `ProjectDrawer` renders elevated `Code ↗` and `Visit ↗` buttons in the sticky header and houses preview modes in a segmented container track.
+  - `ProjectDrawer` renders elevated `Code ↗` and `Visit ↗` buttons in the sticky header, houses preview modes in a segmented container track, and omits the retired `Link` tab.
   - `NodeHoverCard` is interactive, maintaining visibility when transferring cursor within 150ms, and closing upon canvas drag.
   - `ListView` renders visual 16:9 thumbnails and provides an authentic terminal specimen fallback for `agentic-resume-builder`.
   - Mobile viewport (`393x852`) renders `ProjectDrawer` as a docked bottom sheet (`max-h-[85dvh]`).

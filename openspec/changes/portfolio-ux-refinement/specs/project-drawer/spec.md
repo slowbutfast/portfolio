@@ -18,11 +18,15 @@ The system SHALL display an accessible inspection drawer (`role="dialog"`, `aria
 ## ADDED Requirements
 
 ### Requirement: Elevated primary repository and live project actions
-The system SHALL display permanent primary action links for `Code ↗` (GitHub repository) and, when `liveUrl` is declared, `Visit ↗` (live deployment or web demo) pinned in the sticky header directly below the project title, providing descriptive accessible names (e.g. `aria-label="OpenDungeon source code, opens in new tab"`) with `aria-hidden="true"` arrows, removing redundant link pills from content tabs.
+The system SHALL display permanent primary action links for `Code ↗` (GitHub repository) and, when `liveUrl` is declared, `Visit ↗` (live deployment or web demo) pinned in the sticky header directly below the project title, providing descriptive accessible names (e.g. `aria-label="OpenDungeon source code, opens in new tab"`) with `aria-hidden="true"` arrows. The legacy `Link` tab SHALL be retired from the preview tablist, ensuring primary repository and demo links never require a tab switch to discover.
 
 #### Scenario: User inspects a project with a live URL
 - **WHEN** the inspector drawer opens for a project with `liveUrl` declared
-- **THEN** both `Code ↗` and `Visit ↗` appear in the sticky header below the title, with accessible descriptions and `target="_blank"`.
+- **THEN** both `Code ↗` and `Visit ↗` appear in the sticky header below the title, with accessible descriptions and `target="_blank"`, and no redundant `Link` tab appears in the tablist.
+
+#### Scenario: Drawer tablist contains only deep inspection modalities
+- **WHEN** the drawer renders preview tabs
+- **THEN** the tablist contains only `Media` and/or `Terminal` tabs, and does not render a redundant `Link` tab.
 
 ### Requirement: Segmented content preview tabs track
 The system SHALL format content preview tabs (`Media`, `Terminal`) within a distinct segmented container track (`bg-[var(--color-surface-container)] rounded-full p-1`), visually separating navigation modalities from metadata tags, with the active tab elevated via solid surface background and text contrast, and button targets providing $\ge 44\text{px}$ touch targets on mobile.

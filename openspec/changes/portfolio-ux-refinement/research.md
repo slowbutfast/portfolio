@@ -12,9 +12,10 @@
   - *"make node connections more symmetric: bilateral symmetry along the center-to-center axis (or normal-mirrored Bézier control points)"*
   - *"make sure these design changes are documented within the global DESIGN.md"*
 
-- **Evaluator Audits 1 & 2 (2026-11-12)**:
-  - Planar seeds require Sandwave to be nested strictly inside the $K_4$ triangle (`open-dungeon`, `transcribe-plus`, `attention-max`) to eliminate initial line intersections.
-  - Bézier bridges require true C1 tangent continuity at circle perimeters, waist clamping, and close-node distance guards to prevent inverted geometry.
+- **Evaluator Audits 1, 2 & 3 (2026-11-12)**:
+  - Authoritative planar seeds require Sandwave to be nested strictly inside the $K_4$ triangle (`open-dungeon`, `transcribe-plus`, `attention-max`) to eliminate initial line intersections.
+  - Bézier bridges require true $C^1$ tangent continuity at circle perimeters (control points collinear with circle tangents), waist clamping, and close-node distance guards ($d \le R_A + R_B$) to prevent inverted geometry.
+  - Retiring the drawer `Link` tab eliminates redundant navigation since `Code ↗` and `Visit ↗` are permanently elevated into the sticky header.
   - Light mode contrast tokens require hardening (`--color-muted: #525257`, `--color-outline: #71717a`) to pass WCAG AAA and AA UI boundaries on `#eae9e5` and `#f6f6f4`.
   - First-paint theme flash for returning dark users must be prevented via `public/theme-init.js`.
 
@@ -29,6 +30,7 @@
 | :--- | :--- | :--- |
 | `shortTitle` | Mandatory concise human string on `ProjectData` used for graph canvas node rendering (e.g., `Resume Builder`) | An optional property, or altering the canonical full title in metadata or inspector |
 | Bilateral Symmetry | Exact mathematical reflection of the lower bridge boundary curve across the edge centerline ($y_{bottom}(x) = -y_{top}(x)$) | Approximated or visually balanced curves with lopsided or asymmetric control handles |
+| $C^1$ Tangent Continuity | Endpoint derivatives of the Bézier curve are strictly collinear with the circle's perimeter tangent vector at the anchor | Control handles placed at arbitrary normal or axial offsets |
 | Planar Embedding | Graph vertex positioning where no edge segments cross or intersect each other | A rigid non-draggable static graph |
 | Seed Homing Force | Subtle d3-force positioning constraint (`strength: 0.02`) guiding nodes back to planar resting seeds after user drags | Rigidly pinning nodes or disabling physical momentum |
 | Candidate Profile | Dedicated data model (`src/data/profile.ts`) managing personal bio, contact endpoints, canonical tagline, and resume links | Storing personal contact data in `projects.ts` or project catalog |
@@ -37,8 +39,8 @@
 
 | Source | What it establishes | Licence | Accessed |
 | :--- | :--- | :--- | :--- |
-| Kuratowski's & Fáry's Theorems on Planar Graphs | $K_4$ is planar if and only if one vertex is embedded strictly in the interior of the cycle formed by the other three vertices | Mathematical theorem | 2026-11-12 |
-| Hermite & Bézier Tangent Continuity ($C^1$) | A Bézier curve leaves a circle with $C^1$ smoothness if and only if its initial control vector is parallel to the circle tangent at the anchor point | Differential geometry | 2026-11-12 |
+| Graph Embedding & Planarity for $K_4$ | A straight-line planar drawing of $K_4$ is achieved by embedding one vertex strictly in the interior of the triangle formed by the other three | Graph theory | 2026-11-12 |
+| Hermite & Bézier Tangent Continuity ($C^1$) | A Bézier curve leaves a circle with $C^1$ smoothness if and only if its initial control vector is collinear with the circle tangent at the anchor point | Differential geometry | 2026-11-12 |
 | Google Drive Embed & Access Documentation | Google Drive file preview can be embedded using `https://drive.google.com/file/d/<id>/preview`. File requires General Access set to "Anyone with the link can view" | Google Terms of Service | 2026-11-12 |
 | MDN Content Security Policy: `frame-src` | Controls valid sources for nested browsing contexts such as `<iframe>`. Missing entry causes browser console security block when `default-src 'self'` is specified | W3C / MDN Open Doc | 2026-11-12 |
 
@@ -46,10 +48,10 @@
 
 | Option | Decision | Reason | Date |
 | :--- | :--- | :--- | :--- |
-| Menlo for Monospace | Adopted | High legibility, native Apple font with clean fallbacks for CLI terminals and data displays | 2026-11-12 |
+| Menlo for Monospace | Adopted | High legibility, native monospace font with clean fallbacks for CLI terminals and data displays | 2026-11-12 |
 | Helvetica / Helvetica Light for UI | Adopted | Clean Swiss modernist typography hierarchy across headings, body, and secondary metadata | 2026-11-12 |
 | Nested Planar $K_4$ Seeds | Adopted | Eliminates all edge crossings on initial render and resting states | 2026-11-12 |
-| C1 Tangent-Continuous Fluid Bridges | Adopted | Guarantees exact bilateral reflection symmetry with zero lopsided bulging | 2026-11-12 |
+| $C^1$ Tangent-Continuous Fluid Bridges | Adopted | Guarantees exact bilateral reflection symmetry with zero lopsided bulging and smooth circle fillets | 2026-11-12 |
 | `public/theme-init.js` | Adopted | Synchronous blocking script prevents dark-user flash before first paint without violating CSP | 2026-11-12 |
 
 ## Patterns adopted
@@ -80,6 +82,7 @@
 | Naive circular seeds were planar | $K_4$ in convex position forces OpenDungeon-Sandwave and Transcribe-AttentionMax to cross at (0.57, 0.59) | Nested Sandwave interior seed layout with zero segment crossings |
 | Previous bridge math was symmetric | Control points did not follow circle tangents, creating lopsided pinch angles | Normal-mirrored Bézier control points aligned to circle perimeter tangents |
 | `--color-muted #6c6c70` passed AA on all light surfaces | Failed WCAG AA on `#eae9e5` (4.3:1) | Darkened to `#525257` (6.4:1, passing AAA) |
+| Drawer needed a Link tab | Redundant when Code and Visit are elevated to sticky header | Retired Link tab; elevated actions permanent in header |
 
 ## Links out
 
