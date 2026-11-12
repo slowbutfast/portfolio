@@ -174,9 +174,9 @@ describe('rest hourglass silhouette', () => {
     },
   );
 
-  it('targets 0.58 of the perimeter spread on a natural gap', () => {
+  it('targets 0.58 of the perimeter spread when the handle permits', () => {
     const a = { x: 100, y: 200 };
-    const distance = 400;
+    const distance = 58;
     const geometry = computeBridgeGeometry(a, { x: a.x + distance, y: a.y }, 22, 22, {
       restDistance: distance,
       sharedTagCount: 3,
@@ -186,25 +186,38 @@ describe('rest hourglass silhouette', () => {
     expect(geometry.waistWidth).toBeCloseTo(2 * geometry.halfWidth * REST_WAIST_RATIO, 5);
   });
 
+  it('clamps long-gap waists below the ratio target while staying concave', () => {
+    const a = { x: 100, y: 200 };
+    const distance = 400;
+    const geometry = computeBridgeGeometry(a, { x: a.x + distance, y: a.y }, 22, 22, {
+      restDistance: distance,
+      sharedTagCount: 3,
+    });
+    expect(geometry).not.toBeNull();
+    if (!geometry) return;
+    expect(geometry.waistWidth).toBeLessThan(2 * geometry.halfWidth * REST_WAIST_RATIO);
+    expect(geometry.waistWidth).toBeGreaterThanOrEqual(2);
+  });
+
   it('keeps the short-gap handle inside the C1 baseHandle bound', () => {
     const a = { x: 100, y: 200 };
-    // 45px center distance leaves a 1px free gap between the 22px circles.
-    const geometry = computeBridgeGeometry(a, { x: a.x + 45, y: a.y }, 22, 22, {
-      restDistance: 45,
+    // 60px center distance leaves a 16px free gap between the 22px circles.
+    const distance = 60;
+    const geometry = computeBridgeGeometry(a, { x: a.x + distance, y: a.y }, 22, 22, {
+      restDistance: distance,
       sharedTagCount: 6,
     });
     expect(geometry).not.toBeNull();
     if (!geometry) return;
-    const minRadius = 22;
-    const maxHandle = 1 * 0.45; // gap * HANDLE_GAP_RATIO
+    const maxHandle = (distance - 44) * 0.45; // gap * HANDLE_GAP_RATIO
     expect(geometry.handleForWaist).toBeGreaterThan(0);
     expect(geometry.handle).toBeGreaterThan(0);
     expect(geometry.handle).toBeLessThanOrEqual(maxHandle + 1e-9);
-    expect(geometry.handle).toBeLessThanOrEqual(minRadius * 1.2 + 1e-9);
     expect(geometry.waistWidth).toBeLessThan(2 * geometry.halfWidth);
+    expect(geometry.waistWidth).toBeGreaterThanOrEqual(2);
   });
 
-  it('thins from the rest waist to the 2px floor at 1.6x rest distance', () => {
+  it('never widens past the rest silhouette and stays C1-safe at 1.6x', () => {
     const a = { x: 100, y: 200 };
     const rest = 200;
     const restGeometry = computeBridgeGeometry(a, { x: a.x + rest, y: a.y }, 22, 22, {
@@ -222,7 +235,59 @@ describe('rest hourglass silhouette', () => {
     expect(stretched).not.toBeNull();
     if (!restGeometry || !stretched) return;
     expect(restGeometry.waistWidth).toBeGreaterThan(2);
-    expect(stretched.waistWidth).toBeCloseTo(2, 5);
+    expect(stretched.waistWidth).toBeLessThanOrEqual(restGeometry.waistWidth + 1e-6);
+    expect(stretched.waistWidth).toBeGreaterThanOrEqual(2);
+    const { n } = axes(a, { x: a.x + rest * SNAP_STRETCH_MULTIPLIER, y: a.y });
+    expect(normal(stretched.cp1Top, a, n)).toBeGreaterThanOrEqual(-EPSILON);
+    expect(normal(stretched.cp2Top, a, n)).toBeGreaterThanOrEqual(-EPSILON);
+  });
+});
+
+describe('handle-first concave silhouettes', () => {
+  it.each([
+    { label: 'short gap', distance: 52, sharedTagCount: 1, ra: 22, rb: 22 },
+    { label: 'long gap', distance: 420, sharedTagCount: 1, ra: 22, rb: 22 },
+    { label: 'degree-5 hub', distance: 420, sharedTagCount: 5, ra: 22, rb: 22 },
+    { label: 'degree-6 hub', distance: 420, sharedTagCount: 6, ra: 22, rb: 22 },
+    {
+      label: 'crowded unequal hub',
+      distance: 360,
+      sharedTagCount: 6,
+      ra: 18,
+      rb: 30,
+    },
+  ])('keeps all four control-point normal offsets non-negative ($label)', (testCase) => {
+    const a = { x: 100, y: 200 };
+    const b = { x: a.x + testCase.distance, y: a.y };
+    const geometry = computeBridgeGeometry(a, b, testCase.ra, testCase.rb, {
+      restDistance: testCase.distance,
+      sharedTagCount: testCase.sharedTagCount,
+    });
+    expect(geometry).not.toBeNull();
+    if (!geometry) return;
+    const { n } = axes(a, b);
+
+    expect(normal(geometry.cp1Top, a, n)).toBeGreaterThanOrEqual(-EPSILON);
+    expect(normal(geometry.cp2Top, a, n)).toBeGreaterThanOrEqual(-EPSILON);
+    expect(normal(geometry.cp1Bottom, a, n)).toBeLessThanOrEqual(EPSILON);
+    expect(normal(geometry.cp2Bottom, a, n)).toBeLessThanOrEqual(EPSILON);
+    expect(geometry.waist).toBeGreaterThan(0);
+    expect(geometry.waistWidth).toBeLessThan(2 * geometry.halfWidth);
+  });
+
+  it('uses a gap-proportional handle instead of a small radius cap', () => {
+    const a = { x: 100, y: 200 };
+    const distance = 420;
+    const gap = distance - 44;
+    const geometry = computeBridgeGeometry(a, { x: a.x + distance, y: a.y }, 22, 22, {
+      restDistance: distance,
+      sharedTagCount: 1,
+    });
+    expect(geometry).not.toBeNull();
+    if (!geometry) return;
+    const expectedHandle = Math.min(gap * 0.45, 22 * Math.tan(Math.PI / 6.2));
+    expect(geometry.handle).toBeCloseTo(expectedHandle, 5);
+    expect(geometry.handle).toBeGreaterThan(10);
   });
 });
 
@@ -243,11 +308,11 @@ describe('per-edge rest-normalized waist cinching', () => {
       expect(geometry).not.toBeNull();
       if (!geometry) continue;
       expect(geometry.baseWidth).toBe(14);
-      expect(geometry.waistWidth).toBeCloseTo(
-        2 * geometry.halfWidth * REST_WAIST_RATIO,
-        4,
+      expect(geometry.waistWidth).toBeLessThanOrEqual(
+        2 * geometry.halfWidth * REST_WAIST_RATIO + 1e-6,
       );
       expect(geometry.waistWidth).toBeLessThan(2 * geometry.halfWidth);
+      expect(geometry.waistWidth).toBeGreaterThanOrEqual(2);
     }
   });
 
@@ -270,7 +335,7 @@ describe('per-edge rest-normalized waist cinching', () => {
     expect(previous).toBeLessThan(14);
   });
 
-  it('matches the analytic cinching curve at a mid-drag distance', () => {
+  it('never exceeds the analytic target and never crosses the C1 floor', () => {
     const distance = 260;
     const geometry = computeBridgeGeometry(
       a,
@@ -281,8 +346,9 @@ describe('per-edge rest-normalized waist cinching', () => {
     );
     expect(geometry).not.toBeNull();
     if (!geometry) return;
-    const expected = bridgeWaistWidth(14, distance, rest, geometry.halfWidth);
-    expect(geometry.waistWidth).toBeCloseTo(expected, 4);
+    const target = bridgeWaistWidth(14, distance, rest, geometry.halfWidth);
+    expect(geometry.waistWidth).toBeLessThanOrEqual(target + 1e-6);
+    expect(geometry.waistWidth).toBeGreaterThanOrEqual(2);
   });
 });
 

@@ -40,7 +40,9 @@ The system SHALL manage node interactions through an explicit state machine (`id
 - **THEN** node H continues moving with inherited momentum and is NOT immediately re-pinned by the hover detector.
 
 ### Requirement: Dynamic hover gravitation wave
-The system SHALL gate both simulation hover physics (`sim.hover(node)`) and preview card opening behind a single `200ms` pointer dwell timer, cancelling the dwell timer and clearing hover synchronously on `pointerdown`, `dragStart`, `pointerleave`, `focusedId` change, `prefers-reduced-motion` transition, or while `state === 'coasting'`. Once dwell completes, the hovered node is pinned (`fx = x; fy = y`), and connected neighbors experience a slow ambient drift (`0 -> 0.025` ramp) outside a `110px` soft radial exclusion zone around the hovered node so neighbors gently part rather than snapping inward over the card.
+The system SHALL gate both simulation hover physics (`sim.hover(node)`) and preview card opening behind a single `200ms` pointer dwell timer, cancelling the dwell timer and clearing hover synchronously on `pointerdown`, `dragStart`, `pointerleave`, `focusedId` change, a bidirectional `prefers-reduced-motion` transition, or while `state === 'coasting'`. Once dwell completes, the hovered node is transiently pinned (`fx = x; fy = y`) without becoming a persistent user placement.
+
+The system SHALL render a purely visual deterministic ambient drift for every node with amplitude `3.5px`, updated at roughly `30fps`, paused while `document.hidden`, while the canvas is off-screen (`IntersectionObserver`), and under reduced motion. Rendering, pointer hit testing, and hover-card anchoring SHALL consume the same drift offset so the painted circle and its interactive target remain aligned. Ambient drift SHALL NOT exert any `d3-force` attraction or repulsion.
 
 #### Scenario: Pointer sweeps across a node without dwelling
 - **WHEN** the pointer crosses a node for less than `200ms` or while `state === 'coasting'`
@@ -48,11 +50,11 @@ The system SHALL gate both simulation hover physics (`sim.hover(node)`) and prev
 
 #### Scenario: Pointer dwells on a stationary node for 200ms
 - **WHEN** the pointer remains on node H for `200ms` in `idle` state
-- **THEN** `sim.hover(H)` pins node H, neighbors outside `110px` gently drift, and `NodeHoverCard` opens peripherally away from the canvas center using measured bounds.
+- **THEN** `sim.hover(H)` pins node H, the visual ambient drift continues within its `3.5px` bound, and `NodeHoverCard` opens peripherally away from the measured canvas center.
 
 #### Scenario: Pointer leaves or clicks a hovered node
 - **WHEN** the pointer leaves node H, presses `pointerdown`, or starts a drag
-- **THEN** the dwell timer is cancelled synchronously, node H is unpinned (unless user-pinned by a prior drag), `alphaTarget` cools to `0`, and `NodeHoverCard` closes.
+- **THEN** the dwell timer is cancelled synchronously, node H is unpinned while any soft home anchor remains, `alphaTarget` cools to `0`, and `NodeHoverCard` closes.
 
 ### Requirement: Reduced motion accessibility
 The system SHALL respect the user's `prefers-reduced-motion` browser setting by pausing continuous force simulation and rendering the static graph directly from the authoritative planar seeds scaled to the viewport, with zero edge crossings and no coasting or write-in animations.
@@ -121,7 +123,8 @@ The system SHALL guarantee that:
 1. **Initial Mount Layout**: Node coordinates scaled to any positive canvas dimensions ($width > 0, height > 0$) have strictly 0 segment crossings across all 13 links.
 2. **Reduced-Motion Layout**: The static layout renders directly from these scaled planar seeds with 0 edge crossings.
 3. **Resting Simulation State**: The dynamic physics simulation applies weak homing forces (`seedX`/`seedY` with `strength: 0.02`) toward scaled seed positions, ensuring the unperturbed resting equilibrium maintains 0 edge crossings on both desktop (1440×900) and mobile (393×852) viewports.
-4. **Persistent User Placement, Resize Scaling & Layout Reset**: When a user drags and releases a node, its final position persists as a user-pinned anchor (`fx/fy`) rather than snapping back to its initial seed. On viewport `resize(nw, nh)`, pinned `fx/fy` coordinates SHALL scale proportionally (`fx * (nw / prevWidth)`, `fy * (nh / prevHeight)`) and clamp within `[BOUNDARY_MARGIN, dim - BOUNDARY_MARGIN]`. Activating `"Reset layout"` unpins all user-placed nodes, restores all detached permanent edges, and re-heats `seedX`/`seedY` homing to return the graph to its planar equilibrium.
+4. **Soft User Placement, Resize Scaling & Layout Reset**: When a user drags and releases a node, its final position becomes a soft `(homeX, homeY)` anchor and d3's hard `fx/fy` pin is cleared. An alpha-independent damped spring settles the node toward that home without freezing the simulation. On viewport `resize(nw, nh)`, home anchors SHALL scale proportionally (`homeX * (nw / prevWidth)`, `homeY * (nh / prevHeight)`) and clamp within `[BOUNDARY_MARGIN, dim - BOUNDARY_MARGIN]`. Activating `"Reset layout"` clears all soft homes, restores all detached permanent edges, and re-heats `seedX`/`seedY` homing to return the graph to its planar equilibrium.
+5. **Ambient-Offset Planarity**: Applying the maximum visual ambient offset (`3.5px` per node, deterministic phases) to the scaled planar seeds SHALL preserve zero segment crossings on desktop (`1440×900`) and mobile (`393×852`) viewports.
 
 #### Scenario: Canvas graph initializes on first load
 - **WHEN** the 2D canvas mounts with dynamic physics enabled on any viewport (e.g. 1440x900 desktop or 393x852 mobile)
@@ -137,18 +140,23 @@ The system SHALL guarantee that:
 
 #### Scenario: User drags and places a node
 - **WHEN** the user drags a node to a new position and releases the pointer
-- **THEN** the node remains anchored at its user-placed position while non-dragged neighbors remain within `< 15px` displacement during the drag (`link` force zeroed on `dragNode` links during active drag).
+- **THEN** the node settles softly toward its user-placed home while d3's `fx/fy` remains `null`, and non-dragged neighbors remain within `< 15px` displacement during the drag without neighbor `fx/fy` pins.
 
 #### Scenario: User activates Reset layout
 - **WHEN** the user clicks `"Reset layout"` in the 3-dot dropdown menu
-- **THEN** all user-pinned `fx/fy` anchors are cleared, any detached permanent edges recover, and `seedX`/`seedY` homing restores the planar resting equilibrium.
+- **THEN** all soft home anchors are cleared, any detached permanent edges recover, and `seedX`/`seedY` homing restores the planar resting equilibrium.
+
+#### Scenario: Maximum ambient drift remains planar
+- **WHEN** every node is displaced by its maximum deterministic ambient drift offset on desktop or mobile
+- **THEN** the 13 permanent edges still have zero proper crossings.
 
 ### Requirement: Bilateral tangent-continuous fluid bridge geometry
 The system SHALL construct connection bridges between nodes using pure bilateral geometry across the center-to-center axis:
 - Semantic base width scales with shared tags: $W_{base}(n) = \min(R_A, R_B) \times 0.85$ clamped to $6 + 4(n - 1)\text{px}$ (where $n \ge 1$ is the number of shared tags).
-- Perimeter attachment spread uses wider organic fillets (`HALF_WIDTH_RATIO = 0.85` capped by `MAX_SPREAD_ANGLE = Math.PI / 6.2`) so adjacent bridges on degree-5/6 hubs remain separated.
-- Rest-waist ratio (`REST_WAIST_RATIO = 0.58`): for center distance $d \le L_{rest}(e)$, target waist width equals $0.58 \times (2 \cdot \text{averageHalf})$ (floored at `2px` and bounded on short gaps by `baseHandle` to preserve $C^1$ tangent continuity), producing a genuine concave hourglass silhouette at rest (`handleForWaist > 0`).
-- Stretch cinching: for $d > L_{rest}(e)$, waist width thins smoothly from the rest waist down to `2px` at $d_{snap}(e) = 1.6 \times L_{rest}(e)$.
+- Handle-first fillets: the cubic handle length is `HANDLE_GAP_RATIO * gap` scaled down by hub angular crowding to `min(R_A, R_B) * tan(MAX_SPREAD_ANGLE)` (`MAX_SPREAD_ANGLE = Math.PI / 6.2`). The old fixed `HANDLE_RADIUS_RATIO` cap is removed.
+- Perimeter spread and rest waist: per-endpoint spread angles `theta_i = atan(alpha * handle / R_i)`, capped by `MAX_SPREAD_ANGLE`, are solved by monotone bisection for the target ratio `REST_WAIST_RATIO = 0.58` at rest, smoothstepping toward zero at `d_snap(e) = 1.6 * L_rest(e)`.
+- C1 control-point guard: the solve clamps `alpha >= 1`, equivalently `handle <= R_i * tan(theta_i)`, so all four control-point normal offsets remain `>= 0` and the curves never cross the centerline. When the clamp wins at long gaps or hubs the waist is narrower than the `0.58` target but remains genuinely concave with `waistWidth < 2 * averageHalf`.
+- Sag is injected as a signed handle extension and clamped so it cannot push a control point across the centerline.
 - Anchors $A_{top}, A_{bottom}$ on circle A and $B_{top}, B_{bottom}$ on circle B are placed at spread angles $\pm \theta$ relative to unit direction $\vec{u} = \frac{B - A}{\|B - A\|}$.
 - Control points leave circle circumferences along exact circle tangent rays:
   $$CP1_{top} = A_{top} + L_A \vec{T}_{A,top}, \quad CP2_{top} = B_{top} + L_B \vec{T}_{B,top}$$
@@ -160,7 +168,7 @@ The system SHALL construct connection bridges between nodes using pure bilateral
 
 #### Scenario: Rendering bridge between adjacent nodes at rest
 - **WHEN** the canvas draws a connection between two nodes at equilibrium distance ($d \approx L_{rest}(e)$)
-- **THEN** the bridge renders with bilaterally symmetric concave hourglass curves (`waistWidth < 2 * averageHalf`, `handleForWaist > 0`), smooth $C^1$ tangent continuity, and smooth axis-aligned color gradient blending when endpoint colors differ.
+- **THEN** the bridge renders with bilaterally symmetric concave hourglass curves (`waistWidth < 2 * averageHalf`), all four control-point normal offsets `>= 0`, smooth $C^1$ tangent continuity, and smooth axis-aligned color gradient blending when endpoint colors differ.
 
 ### Requirement: Ferrofluid bridge underdamped harmonic momentum
 The system SHALL simulate physical mass, inertia, and viscosity across fluid connection bridges using a second-order underdamped harmonic oscillator ($\ddot{\delta} + 2\zeta\omega_n \dot{\delta} + \omega_n^2 \delta = F_{perp}$) with natural frequency $\omega_n = 14\text{ rad/s}$ and damping ratio $\zeta = 0.35$, driving lateral curve sag and waist wobble from endpoint acceleration, using fixed substep integration ($\delta t_{sub} \le 16\text{ms}$) with frame time clamped to $32\text{ms}$, satisfying the envelope bound $A(t) \le 1.10 \times \frac{A_0}{\sqrt{1 - \zeta^2}} e^{-\zeta \omega_n t}$, and bypassing all dynamic oscillations when `prefers-reduced-motion: reduce` is active.
@@ -176,9 +184,10 @@ The system SHALL simulate physical mass, inertia, and viscosity across fluid con
 ### Requirement: Drag-time meniscus snapping and elastic tether recovery
 The system SHALL manage bridge severance and recovery as follows:
 - Each edge $e$ defines an authoritative rest distance $L_{rest}(e)$ equal to the Euclidean distance between its scaled planar seeds.
-- When center distance exceeds `SNAP_MULTIPLIER` (`1.6`) $\times L_{rest}(e)$ during drag, the bridge detaches (`isDetached = true`) and emits a `220ms` visual `recoilProgress` (`1 -> 0`) drawing retracting fluid tips into both endpoint circles, while topological edges remain intact in the model.
+- When center distance exceeds `SNAP_MULTIPLIER` (`1.6`) $\times L_{rest}(e)$ during drag, the bridge detaches (`isDetached = true`) and records a render-clock `detachedAt` timestamp, while topological edges remain intact in the model.
+- Recoil is render-clock driven: `p = 1 - easeOutCubic((performance.now() - detachedAt) / 220)` draws retracting teardrop tips anchored to the live endpoint positions, independent of whether d3 alpha has cooled.
 - A rubber-band displacement function applies elastic drag resistance to pinned coordinates ($\vec{P}_{pinned} = \vec{P}_{anchor} + \frac{\vec{\Delta}}{\sqrt{1 + (\|\vec{\Delta}\| / R_{tether})^2}}$), preventing any node from being pulled infinitely off-canvas.
-- Upon pointer release (`dragEnd`), a `350ms` `reconnectCooldownUntil` prevents immediate visual pop-back; once the cooldown expires and distance drops to or below `RECONNECT_MULTIPLIER` (`1.25`) $\times L_{rest}(e)$ (or when `"Reset layout"` is invoked), the bridge smoothly reforms with a damped oscillation ripple.
+- Upon pointer release (`dragEnd`), a `350ms` render-clock `reconnectCooldownUntil` prevents immediate visual pop-back; once the timestamp passes and distance drops to or below `RECONNECT_MULTIPLIER` (`1.25`) $\times L_{rest}(e)$ (or when `"Reset layout"` is invoked), the bridge smoothly reforms with a damped oscillation ripple.
 
 #### Scenario: User drags a node beyond 1.6x snapping distance
 - **WHEN** a user drags a node until center distance exceeds $1.6 \times L_{rest}(e)$
@@ -189,7 +198,7 @@ The system SHALL manage bridge severance and recovery as follows:
 - **THEN** reconnection waits until the `350ms` cooldown expires before reforming the visual bridge.
 
 ### Requirement: Proximity-only visual webbing for non-edge pairs
-The system SHALL render transient proximity-only bridges exclusively between node pairs that do NOT share a permanent edge, using `computeBridgeGeometry` when $R_A + R_B < d < \text{PROXIMITY\_MAX\_DIST}$ (`96px`), tapering smoothly to zero waist/alpha at `PROXIMITY_MAX_DIST`, exerting zero `d3-force` attraction or repulsion, and drawing underneath permanent bridges and nodes in deterministic sorted-pair order.
+The system SHALL render transient proximity-only bridges exclusively between node pairs that do NOT share a permanent edge, using `computeBridgeGeometry` when $R_A + R_B < d < \text{PROXIMITY\_MAX\_DIST}$ (`96px`), fading in with a smoothstep over $[R_A + R_B, R_A + R_B + 12]$ px and tapering to zero alpha at `PROXIMITY_MAX_DIST`, exerting zero `d3-force` attraction or repulsion, and drawing underneath permanent bridges and nodes in deterministic sorted-pair order.
 
 #### Scenario: Non-edge nodes approach within proximity band
 - **WHEN** two non-linked nodes move within `96px` (and $> R_A + R_B$) center-to-center
@@ -200,7 +209,7 @@ The system SHALL render transient proximity-only bridges exclusively between nod
 - **THEN** no proximity bridge is drawn for that pair, preserving the snap cue until permanent-edge reconnection occurs.
 
 ### Requirement: Measured peripheral hover card placement
-The system SHALL position `NodeHoverCard` using measured card bounds (`ResizeObserver`) projected outward from the canvas center along `(nodeScreenPos - canvasCenter)` and clamped to viewport + safe-area margins (`20px`), with an inward fallback only when the outward quadrant clips on narrow viewports (`393x852`).
+The system SHALL position `NodeHoverCard` using measured card bounds (`ResizeObserver`) projected outward from the measured canvas-container center (`getBoundingClientRect()`), not the window center, along `(nodeScreenPos - canvasCenter)`, and clamped to viewport + safe-area margins (`20px`), with an inward fallback only when the outward quadrant clips on narrow viewports (`393x852`).
 
 #### Scenario: Hover card opens on desktop or mobile
 - **WHEN** `NodeHoverCard` opens for a node after the `200ms` dwell

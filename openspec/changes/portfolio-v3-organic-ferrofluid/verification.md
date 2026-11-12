@@ -194,3 +194,100 @@ npx playwright test e2e/portfolio.spec.ts --project=desktop
 ```
 
 Expected: `88 passed` across both projects with expected mobile/desktop skips, zero console errors, thick concave rest fillets, a peripheral hover card, and a 3-dot menu containing `Filters` + `Reset layout`.
+
+---
+
+# PATCH-01 Verification Addendum: Organic Curvature, Render-Clock Recoil & Soft Anchors
+
+## Status: RESOLVED
+
+- **Date**: 2026-11-12
+- **Patch**: `PATCH-01` (`patch.md`)
+- **Scope**: `src/utils/bridgeGeometry.ts`, `src/physics/graphSimulation.ts`, `src/components/GraphCanvas.tsx`, `src/App.tsx`, both graph-simulation specs, and the reproducing test files.
+- **Data preservation**: all `8` projects and `13` permanent edges remain intact; zero crossings are asserted at rest and at maximum ambient offset on desktop and mobile.
+
+## Requirement Adherence Audit Matrix (PATCH-01)
+
+| Reported Issue | Resolution | Verification |
+| :--- | :--- | :--- |
+| Bridges read as straight, sharp-edged tapers | Removed the `HANDLE_RADIUS_RATIO` cap. Handle length is now gap-proportional (`gap * 0.45`) capped by `min(R) * tan(MAX_SPREAD_ANGLE)`; per-endpoint spread is solved by monotone bisection against the 0.58 ratio target/1.6x smoothstep. `alpha >= 1` keeps all four control-point normal offsets `>= 0`. | `bridgeGeometry.test.ts::handle-first concave silhouettes` (short gap, long gap, degree-5/6 hubs, unequal crowded hub, gap-proportional handle); `rest hourglass silhouette` suite | **PASS** |
+| Recoil fixed-position and frozen when d3 cools | `BridgeLinkState.detachedAt` is a `performance.now()` render timestamp. `GraphCanvas` computes `p = 1 - easeOutCubic((now - detachedAt) / 220)` each frame and draws retracting teardrops anchored to live endpoint positions. | `graphSimulation.test.ts::uses render-clock detachedAt/reconnect timestamps...`; canvas visual inspection | **PASS** |
+| Hard `fx/fy` pins and frozen neighbors | Removed `userPinnedIds` and `dragNeighborPins`. `dragEnd` clears `fx/fy`, stores a soft `(homeX, homeY)` anchor, and an alpha-independent damped home spring settles the node. Drag charge strength is `0` and collide radius is `0.4 * R`; pointer motion lags by ~45ms. | `graphSimulation.test.ts::settles toward a soft home anchor...`, `scales and clamps soft home anchors...`, `keeps a non-dragged neighbor within <15px...` (asserts neighbor `fx/fy` stay `null`; measured `<12px`) | **PASS** |
+| Live reduced-motion transition incomplete | `handleMotionChange` is bidirectional: reducing freezes current positions into `staticPosRef`, stops the d3 timer/rAF, and dismisses hover; returning copies the frozen frame back, clears static state, reheats alpha, and resumes the render loop. | `e2e/portfolio.spec.ts::live reduced-motion transitions freeze and resume hover capability` | **PASS** |
+| Unmeasured `canvasCenter`, per-frame sorted ids, abrupt proximity edge | `GraphCanvas` reports `getBoundingClientRect()` center through `onCanvasCenterChange`; `App` forwards it to `NodeHoverCard`. Sorted node ids and permanent-edge keys are hoisted. Proximity alpha fades with smoothstep over `[R_A + R_B, R_A + R_B + 12]`. | `e2e/portfolio.spec.ts::hover card stays inside...` (desktop + 393x852); render-loop code review; unit planarity tests | **PASS** |
+| Visual-only ambient drift | Deterministic `ambientDriftOffset(id, timeMs)` with `3.5px` amplitude, updated at ~30fps, paused by `document.hidden`, `IntersectionObserver`, and reduced motion; render, `hitNode`, and `nodeScreenPoint` share the offset. No force is added. | `graphSimulation.test.ts::visual ambient drift` (determinism/bound and zero crossings at maximum offset on `1440x900` and `393x852`) | **PASS** |
+| Reconnect ripple | Detached bridges inject a bounded oscillator excitation when they reform; `previousDistance`/`previousVelocity` re-prime. | `graphSimulation.test.ts::uses render-clock detachedAt...` asserts oscillator amplitude after reconnect | **PASS** |
+
+## Reproducing Tests Added
+
+- `bridgeGeometry.test.ts`: non-negative normal offsets for all four control points across short gaps, long gaps, degree-5/6 hubs, and an unequal-radius crowded hub; gap-proportional handle; long-gap concave clamp; short-gap C1 bound; 1.6x C1-safe non-widening.
+- `graphSimulation.test.ts`: force-isolated drag with neighbor `fx/fy` asserted `null`; soft home settling and reset; resized home scaling; render-clock `detachedAt`/cooldown; reconnect ripple; deterministic ambient offset bound; zero crossings at maximum ambient offset on desktop and mobile.
+- `e2e/portfolio.spec.ts`: live reduced-motion transition freezes and resumes hover capability.
+
+## Empirical Execution Logs (PATCH-01)
+
+```text
+$ npm run typecheck
+> tsc --noEmit
+(exit 0, no diagnostics)
+```
+
+```text
+$ npm run test:unit
+ ✓ src/utils/graphPlanarity.test.ts (13 tests)
+ ✓ src/physics/graphSimulation.test.ts (30 tests)
+ ✓ src/utils/bridgeGeometry.test.ts (42 tests)
+ ...
+ Test Files  16 passed (16)
+      Tests  173 passed (173)
+```
+
+```text
+$ npm run build
+✓ 1959 modules transformed.
+dist/assets/index-hNbjGYMy.css    28.33 kB │ gzip:   6.13 kB
+dist/assets/index-B7x0goch.js    327.45 kB │ gzip: 104.28 kB
+✓ built in 5.45s
+```
+
+```text
+$ npm run test:e2e
+  22 skipped
+  88 passed (2.3m)
+```
+
+```text
+$ npx openspec validate --changes
+✓ change/portfolio-v3-organic-ferrofluid
+✓ change/vercel-preview-gating
+Totals: 2 passed, 0 failed (2 items)
+
+$ npx openspec validate --specs
+✓ spec/ambient-audio
+✓ spec/candidate-profile
+✓ spec/edge-deployment
+✓ spec/graph-simulation
+✓ spec/portfolio-controls
+✓ spec/project-catalog
+✓ spec/project-drawer
+Totals: 7 passed, 0 failed (7 items)
+```
+
+## Visual Checks (PATCH-01)
+
+- **Rest (`1440x900`)**: permanent bridges now flare into perimeters with non-negative control points and a narrower concave waist; no straight chord/hook artifacts.
+- **Hover**: card anchors from the measured canvas center; ambient drift is shared with hit testing so pointer targets stay aligned.
+- **Stretch/snap**: recoil teardrops retract into live endpoints on a render clock; a released bridge reforms with an oscillator ripple after the 350ms cooldown.
+- **Mobile (`393x852`)**: ambient-offset planarity and measured card clamping remain valid.
+- **Reduced motion**: live toggle freezes the current frame, clears hover, and resumes correctly when motion is re-enabled.
+
+## Metrics (PATCH-01)
+
+| Metric | Before patch | After patch |
+| :--- | :--- | :--- |
+| Unit tests | 164 | 173 |
+| E2E scenarios | 88 passed / 22 skipped | 88 passed / 22 skipped (transition test extended bidirectionally) |
+| Permanent edges | 13 | 13 |
+| Max ambient offset | none | `3.5px`, 0 crossings at desktop/mobile |
+| Neighbor follow-through | frozen via `fx/fy` | `< 12px` with neighbor `fx/fy === null` |
+| Recoil / cooldown clock | d3 tick-coupled | `performance.now()` render clock |

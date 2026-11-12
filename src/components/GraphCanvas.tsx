@@ -8,7 +8,12 @@ import type { GraphNode, ProjectData } from '../types/portfolio';
 import { getProjectById } from '../data/projects';
 import { PLANAR_NODE_SEEDS, scaleSeeds } from '../data/graphSeeds';
 import { computeBridgeGeometry, type BridgeOptions } from '../utils/bridgeGeometry';
-import { createSimulation, type GraphSimulation } from '../physics/graphSimulation';
+import {
+  ambientDriftOffset,
+  createSimulation,
+  RECOIL_MS,
+  type GraphSimulation,
+} from '../physics/graphSimulation';
 import type { AmbientSynth } from '../audio/ambientSynth';
 
 interface GraphCanvasProps {
@@ -28,6 +33,8 @@ interface GraphCanvasProps {
   onSelect: (id: string, anchor?: { x: number; y: number }) => void;
   /** Bumped by the 3-dot menu's "Reset layout" action. */
   layoutResetVersion?: number;
+  /** Measured canvas-container center for peripheral hover-card anchoring. */
+  onCanvasCenterChange?: (center: { x: number; y: number }) => void;
 }
 
 interface Size {
@@ -71,6 +78,16 @@ const PROXIMITY_MAX_DIST = 96;
 
 function edgeKey(source: string, target: string): string {
   return [source, target].sort().join('\u0000');
+}
+
+function smoothstep01(value: number): number {
+  const clamped = Math.min(1, Math.max(0, value));
+  return clamped * clamped * (3 - 2 * clamped);
+}
+
+function easeOutCubic(value: number): number {
+  const clamped = Math.min(1, Math.max(0, value));
+  return 1 - Math.pow(1 - clamped, 3);
 }
 
 function readToken(name: string, fallback: string): string {
@@ -154,26 +171,38 @@ function drawRecoilTips(
   if (distance <= 0.0001) return;
   const ux = dx / distance;
   const uy = dy / distance;
-  const tipRadius = 2 + 5 * progress;
+  const tipLength = 2 + 10 * progress;
+  const halfWidth = 1.5 + 2.5 * progress;
 
-  ctx.globalAlpha = alpha * 0.85 * progress;
+  ctx.globalAlpha = alpha * 0.9 * progress;
   ctx.fillStyle = color;
   for (const [origin, direction, radius] of [
     [a, { x: ux, y: uy }, radiusA],
     [b, { x: -ux, y: -uy }, radiusB],
   ] as const) {
-    const cx = origin.x + direction.x * radius;
-    const cy = origin.y + direction.y * radius;
+    // A teardrop whose tip points along the severed bridge and retracts toward
+    // the live endpoint as progress falls from 1 to 0.
+    const baseX = origin.x + direction.x * radius;
+    const baseY = origin.y + direction.y * radius;
+    const tipX = baseX + direction.x * tipLength;
+    const tipY = baseY + direction.y * tipLength;
+    const nx = -direction.y;
+    const ny = direction.x;
     ctx.beginPath();
-    ctx.ellipse(
-      cx,
-      cy,
-      tipRadius * 1.4,
-      tipRadius,
-      Math.atan2(direction.y, direction.x),
-      0,
-      Math.PI * 2,
+    ctx.moveTo(tipX, tipY);
+    ctx.quadraticCurveTo(
+      baseX + nx * halfWidth,
+      baseY + ny * halfWidth,
+      baseX,
+      baseY,
     );
+    ctx.quadraticCurveTo(
+      baseX - nx * halfWidth,
+      baseY - ny * halfWidth,
+      tipX,
+      tipY,
+    );
+    ctx.closePath();
     ctx.fill();
   }
 }
@@ -191,6 +220,7 @@ export function GraphCanvas({
   onResolveAnchor,
   onSelect,
   layoutResetVersion = 0,
+  onCanvasCenterChange,
 }: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -216,6 +246,11 @@ export function GraphCanvas({
   onCanvasDragStartRef.current = onCanvasDragStart;
   const onResolveAnchorRef = useRef(onResolveAnchor);
   onResolveAnchorRef.current = onResolveAnchor;
+  const onCanvasCenterChangeRef = useRef(onCanvasCenterChange);
+  onCanvasCenterChangeRef.current = onCanvasCenterChange;
+  const ambientOffsetRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const lastAmbientAtRef = useRef(0);
+  const visibleRef = useRef(true);
   const hoveredProjectIdRef = useRef<string | null>(null);
   const canHoverRef = useRef(false);
   const renderRef = useRef<() => void>(() => {});
@@ -263,9 +298,29 @@ export function GraphCanvas({
     });
     simRef.current = sim;
 
+    // Node ids and permanent-edge keys never change for this mount; hoist them
+    // out of the 60fps render loop.
+    const sortedNodeIds = sim.nodes.map((node) => node.id).sort();
+    const permanentEdgeKeys = new Set(edges.map((edge) => edgeKey(edge.source, edge.target)));
+
     const ctx = canvas.getContext('2d');
     let raf = 0;
     let disposed = false;
+
+    const visibilityObserver = new IntersectionObserver(
+      (entries) => {
+        visibleRef.current = entries[0]?.isIntersecting ?? true;
+        lastAmbientAtRef.current = 0;
+        wakeRef.current();
+      },
+      { threshold: 0 },
+    );
+    visibilityObserver.observe(container);
+    const handleVisibilityChange = () => {
+      lastAmbientAtRef.current = 0;
+      wakeRef.current();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     const render = () => {
       if (!ctx || disposed) return;
@@ -278,9 +333,32 @@ export function GraphCanvas({
       ctx.translate(t.x, t.y);
       ctx.scale(t.scale, t.scale);
 
+      const now = performance.now();
+      const ambientActive =
+        !reduceMotionRef.current && visibleRef.current && !document.hidden;
+      if (ambientActive) {
+        if (now - lastAmbientAtRef.current >= 1000 / 30) {
+          const offsets = new Map<string, { x: number; y: number }>();
+          for (const node of sim.nodes) {
+            offsets.set(node.id, ambientDriftOffset(node.id, now));
+          }
+          ambientOffsetRef.current = offsets;
+          lastAmbientAtRef.current = now;
+        }
+      } else if (ambientOffsetRef.current.size > 0) {
+        ambientOffsetRef.current = new Map();
+      }
+
       const active = reduceMotionRef.current
         ? staticPosRef.current
-        : new Map(sim.nodes.map((n) => [n.id, [n.x, n.y] as [number, number]]));
+        : new Map(
+            sim.nodes.map((n) => {
+              const offset = ambientActive
+                ? ambientOffsetRef.current.get(n.id) ?? { x: 0, y: 0 }
+                : { x: 0, y: 0 };
+              return [n.id, [n.x + offset.x, n.y + offset.y] as [number, number]];
+            }),
+          );
 
       const dimmed = dimmedRef.current;
       const focused = focusedRef.current;
@@ -294,12 +372,10 @@ export function GraphCanvas({
         if (visited.has(id) || nodesById.get(id)?.visited === true) return tokens.nodeVisited;
         return tokens.nodeUnvisited;
       };
-      const permanentEdgeKeys = new Set(edges.map((edge) => edgeKey(edge.source, edge.target)));
 
       // Zero-force proximity-only webbing for non-edge pairs. This pass paints
       // beneath permanent bridges and nodes, in deterministic sorted-pair order,
       // and skips every permanent edge so a detached bridge never duplicates.
-      const sortedNodeIds = [...active.keys()].sort();
       for (let i = 0; i < sortedNodeIds.length; i += 1) {
         for (let j = i + 1; j < sortedNodeIds.length; j += 1) {
           const sourceId = sortedNodeIds[i];
@@ -311,8 +387,11 @@ export function GraphCanvas({
           const distance = Math.hypot(a[0] - b[0], a[1] - b[1]);
           const ra = nodesById.get(sourceId)?.radius ?? 22;
           const rb = nodesById.get(targetId)?.radius ?? 22;
-          if (distance <= ra + rb || distance >= PROXIMITY_MAX_DIST) continue;
+          const contactDistance = ra + rb;
+          if (distance <= contactDistance || distance >= PROXIMITY_MAX_DIST) continue;
+          const fadeIn = smoothstep01((distance - contactDistance) / 12);
           const taper = 1 - distance / PROXIMITY_MAX_DIST;
+          if (fadeIn <= 0) continue;
           drawFluidBridge(
             ctx,
             { x: a[0], y: a[1] },
@@ -320,7 +399,7 @@ export function GraphCanvas({
             ra,
             rb,
             tokens.connection,
-            0.22 * taper,
+            0.22 * fadeIn * taper,
             { restDistance: distance, sharedTagCount: 1, sag: 0 },
           );
         }
@@ -341,6 +420,9 @@ export function GraphCanvas({
         const sourceColor = nodeColor(edge.source);
         const targetColor = nodeColor(edge.target);
         if (link?.isDetached && !reduceMotionRef.current) {
+          const age = link.detachedAt == null ? Number.POSITIVE_INFINITY : now - link.detachedAt;
+          const progress =
+            age >= RECOIL_MS ? 0 : 1 - easeOutCubic(age / RECOIL_MS);
           drawRecoilTips(
             ctx,
             { x: a[0], y: a[1] },
@@ -349,7 +431,7 @@ export function GraphCanvas({
             rb,
             isFocal ? tokens.accent : tokens.connection,
             isDim ? 0.12 : 1,
-            link.recoilProgress,
+            progress,
           );
           continue;
         }
@@ -429,20 +511,46 @@ export function GraphCanvas({
     const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     const hoverCapabilityQuery = window.matchMedia('(hover: hover) and (pointer: fine)');
     const handleMotionChange = () => {
-      reduceMotionRef.current = motionQuery.matches;
-      canHoverRef.current = !motionQuery.matches && hoverCapabilityQuery.matches;
-      if (!motionQuery.matches) return;
-      if (hoverDwellTimerRef.current !== null) {
-        window.clearTimeout(hoverDwellTimerRef.current);
-        hoverDwellTimerRef.current = null;
+      const reduced = motionQuery.matches;
+      reduceMotionRef.current = reduced;
+      canHoverRef.current = !reduced && hoverCapabilityQuery.matches;
+
+      if (reduced) {
+        if (hoverDwellTimerRef.current !== null) {
+          window.clearTimeout(hoverDwellTimerRef.current);
+          hoverDwellTimerRef.current = null;
+        }
+        hoverCandidateRef.current = null;
+        if (hoveredProjectIdRef.current !== null) {
+          hoveredProjectIdRef.current = null;
+          synthRef.current?.onNodeHover(false);
+          onHoverNodeRef.current?.(null, null);
+        }
+        simRef.current?.hover(null);
+        // Freeze the current graph in place, not the original planar seeds.
+        staticPosRef.current = new Map(
+          sim.nodes.map((node) => [node.id, [node.x, node.y] as [number, number]]),
+        );
+        ambientOffsetRef.current = new Map();
+        sim.sim.stop();
+        cancelAnimationFrame(raf);
+        raf = 0;
+        render();
+        return;
       }
-      hoverCandidateRef.current = null;
-      if (hoveredProjectIdRef.current !== null) {
-        hoveredProjectIdRef.current = null;
-        synthRef.current?.onNodeHover(false);
-        onHoverNodeRef.current?.(null, null);
+
+      // Returning to standard motion resumes from the frozen frame and restarts
+      // both the physics timer and the render loop.
+      for (const node of sim.nodes) {
+        const frozen = staticPosRef.current.get(node.id);
+        if (frozen) {
+          node.x = frozen[0];
+          node.y = frozen[1];
+        }
       }
-      simRef.current?.hover(null);
+      staticPosRef.current = new Map();
+      lastAmbientAtRef.current = 0;
+      sim.sim.alpha(Math.max(sim.sim.alpha(), 0.2)).restart();
       render();
       wakeRef.current();
     };
@@ -482,6 +590,8 @@ export function GraphCanvas({
       const dx = goal.x - t.x;
       const dy = goal.y - t.y;
       const cameraMoving = Math.abs(dx) > 0.05 || Math.abs(dy) > 0.05;
+      const ambientRunning =
+        !reduceMotionRef.current && visibleRef.current && !document.hidden;
       if (!reduceMotionRef.current) {
         t.x += dx * 0.12;
         t.y += dy * 0.12;
@@ -489,6 +599,7 @@ export function GraphCanvas({
       }
       if (
         !reduceMotionRef.current &&
+        !ambientRunning &&
         !cameraMoving &&
         sim.isIdle
       ) {
@@ -525,6 +636,10 @@ export function GraphCanvas({
       const rect = container.getBoundingClientRect();
       width = Math.max(1, Math.round(rect.width));
       height = Math.max(1, Math.round(rect.height));
+      onCanvasCenterChangeRef.current?.({
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      });
       const d = window.devicePixelRatio || 1;
       canvas.width = Math.round(width * d);
       canvas.height = Math.round(height * d);
@@ -555,6 +670,8 @@ export function GraphCanvas({
     return () => {
       disposed = true;
       observer.disconnect();
+      visibilityObserver.disconnect();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       themeObserver.disconnect();
       motionQuery.removeEventListener('change', handleMotionChange);
       cancelAnimationFrame(raf);
@@ -659,18 +776,30 @@ export function GraphCanvas({
     };
   };
 
+  /** Same live position used by the renderer, hit testing, and card anchors. */
+  const nodeVisualPosition = (node: GraphNode): { x: number; y: number } | undefined => {
+    const base = reduceMotionRef.current
+      ? staticPosRef.current.get(node.id)
+      : ([node.x, node.y] as [number, number]);
+    if (!base) return undefined;
+    const ambientActive =
+      !reduceMotionRef.current && visibleRef.current && !document.hidden;
+    const offset = ambientActive
+      ? ambientOffsetRef.current.get(node.id) ?? { x: 0, y: 0 }
+      : { x: 0, y: 0 };
+    return { x: base[0] + offset.x, y: base[1] + offset.y };
+  };
+
   const nodeScreenPoint = (node: GraphNode): { x: number; y: number } | undefined => {
     const canvas = canvasRef.current;
     if (!canvas) return undefined;
-    const pos = reduceMotionRef.current
-      ? staticPosRef.current.get(node.id)
-      : ([node.x, node.y] as [number, number]);
+    const pos = nodeVisualPosition(node);
     if (!pos) return undefined;
     const rect = canvas.getBoundingClientRect();
     const t = transformRef.current;
     return {
-      x: rect.left + pos[0] * t.scale + t.x,
-      y: rect.top + pos[1] * t.scale + t.y,
+      x: rect.left + pos.x * t.scale + t.x,
+      y: rect.top + pos.y * t.scale + t.y,
     };
   };
 
@@ -744,15 +873,9 @@ export function GraphCanvas({
   const hitNode = (wx: number, wy: number): GraphNode | null => {
     const sim = simRef.current;
     if (!sim) return null;
-    if (reduceMotionRef.current) {
-      for (const n of sim.nodes) {
-        const p = staticPosRef.current.get(n.id);
-        if (p && Math.hypot(wx - p[0], wy - p[1]) <= n.radius) return n;
-      }
-      return null;
-    }
     for (const n of sim.nodes) {
-      if (Math.hypot(wx - n.x, wy - n.y) <= n.radius) return n;
+      const pos = nodeVisualPosition(n);
+      if (pos && Math.hypot(wx - pos.x, wy - pos.y) <= n.radius) return n;
     }
     return null;
   };

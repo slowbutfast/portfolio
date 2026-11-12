@@ -592,14 +592,25 @@ test.describe('portfolio graph SPA', () => {
     await expect(page.getByTestId('node-hover-card')).toBeVisible();
   });
 
-  test('reduced-motion transition dismisses an open hover card', async ({ page }, testInfo) => {
+  test('live reduced-motion transitions freeze and resume hover capability', async ({
+    page,
+  }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'hover previews are desktop-only');
     await page.goto('/');
-    await hoverCenteredNode(page);
-    await expect(page.getByTestId('node-hover-card')).toBeVisible();
+    const box = await hoverCenteredNode(page);
+    const card = page.getByTestId('node-hover-card');
+    await expect(card).toBeVisible();
 
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await expect(page.getByTestId('node-hover-card')).toHaveCount(0);
+    await expect(card).toHaveCount(0);
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.waitForTimeout(350);
+    await expect(card).toHaveCount(0);
+
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.mouse.move(box.x + 12, box.y + box.height - 12);
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await expect(card).toBeVisible();
   });
 
   for (const viewport of [

@@ -53,6 +53,10 @@ export default function App() {
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [hoverState, setHoverState] = useState<HoverState>(null);
   const [layoutResetVersion, setLayoutResetVersion] = useState(0);
+  const [canvasCenter, setCanvasCenter] = useState(() => ({
+    x: window.innerWidth / 2,
+    y: window.innerHeight / 2,
+  }));
   const synth = useMemo(() => getAmbientSynth(), []);
   const [soundEnabled, setSoundEnabled] = useState(() => synth.isEnabled());
   const soundEnabledRef = useRef(soundEnabled);
@@ -315,6 +319,7 @@ export default function App() {
             onResolveAnchor={handleResolveAnchor}
             onSelect={openProject}
             layoutResetVersion={layoutResetVersion}
+            onCanvasCenterChange={setCanvasCenter}
           />
         ) : (
           <ListView
@@ -357,7 +362,7 @@ export default function App() {
         <NodeHoverCard
           project={hoverState.project}
           position={hoverState.position}
-          canvasCenter={{ x: window.innerWidth / 2, y: window.innerHeight / 2 }}
+          canvasCenter={canvasCenter}
           onPointerEnter={clearHoverDismissal}
           onPointerLeave={scheduleHoverDismiss}
         />

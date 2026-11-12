@@ -48,9 +48,9 @@ export interface BridgeGeometry {
   waistWidth: number;
   /** Signed clearance of the upper curve at its midpoint (positive = open waist). */
   waist: number;
-  /** Handle length targeted by the rest-waist ratio before clamping. */
+  /** Gap-proportional handle before sag extension. */
   handleForWaist: number;
-  /** Final C1 handle length after the short-gap base-handle clamp. */
+  /** Final C1 handle length after signed sag extension and clamping. */
   handle: number;
   restDistance: number;
   sag: number;
@@ -66,8 +66,6 @@ export const REST_WAIST_RATIO = 0.58;
 export const SNAP_STRETCH_MULTIPLIER = 1.6;
 /** Base handle length fraction of the free gap between the circles. */
 const HANDLE_GAP_RATIO = 0.45;
-/** Upper bound on handle length relative to the smaller radius. */
-const HANDLE_RADIUS_RATIO = 1.2;
 /** Meniscus never becomes thinner than this many pixels. */
 const MIN_WAIST_WIDTH = 2;
 
@@ -90,7 +88,7 @@ function mirrorAcrossAxis(point: Point, origin: Point, ux: number, uy: number): 
 
 /**
  * Semantic base width from shared tag count:
- * `min(R_A, R_B) * 0.65` clamped to `6 + 4 (n - 1)` px. A single shared tag
+ * `min(R_A, R_B) * 0.85` clamped to `6 + 4 (n - 1)` px. A single shared tag
  * yields the narrowest ribbon; additional shared tags thicken it.
  */
 export function bridgeBaseWidth(
@@ -104,9 +102,11 @@ export function bridgeBaseWidth(
 }
 
 /**
- * Rest-normalized cinching curve. At rest the bridge silhouettes into a concave
- * hourglass targeting `REST_WAIST_RATIO` of the perimeter spread, then necks
- * down to a minimum 2px meniscus at the 1.6x snap threshold.
+ * Target rest-normalized cinching curve. At rest the bridge targets
+ * `REST_WAIST_RATIO` of the perimeter spread, then smoothsteps toward the 2px
+ * floor at the 1.6x snap threshold. `computeBridgeGeometry` additionally
+ * clamps the actual waist against the non-negative control-point constraint,
+ * so long gaps can sit below this target.
  *
  * `averageHalf` is the mean normal attachment offset. Callers that only know
  * the semantic width can omit it; the default reconstructs equal-radius
@@ -123,7 +123,8 @@ export function bridgeWaistWidth(
   if (distance <= rest) return restWaist;
   const snap = SNAP_STRETCH_MULTIPLIER * rest;
   const progress = clamp((distance - rest) / Math.max(1, snap - rest), 0, 1);
-  return Math.max(MIN_WAIST_WIDTH, restWaist * Math.pow(1 - progress, 1.25));
+  const eased = progress * progress * (3 - 2 * progress);
+  return Math.max(MIN_WAIST_WIDTH, restWaist * (1 - eased));
 }
 
 /**
@@ -153,40 +154,108 @@ export function computeBridgeGeometry(
   const sag = Number.isFinite(options.sag) ? (options.sag as number) : 0;
   const baseWidth = bridgeBaseWidth(radiusA, radiusB, options.sharedTagCount);
 
-  // Attachment spread: a wide organic fillet proportional to the smaller
-  // radius, capped by the maximum hub angle so neighbouring bridges never
-  // merge. `baseWidth` remains the semantic tag-width used for sag scaling.
-  const targetHalf = Math.min(radiusA, radiusB) * HALF_WIDTH_RATIO;
-  const thetaA = Math.min(
-    Math.asin(clamp(targetHalf / radiusA, 0, 1)),
-    MAX_SPREAD_ANGLE,
+  const minRadius = Math.min(radiusA, radiusB);
+  const gap = Math.max(0, distance - radiusA - radiusB);
+  // Handle-first construction: the cubic handles scale with the free gap,
+  // capped by the maximum hub angle so crowd-limited bridges cannot push a
+  // control point across the centerline. Sag is injected as a signed handle
+  // extension later, preserving C1 tangency.
+  const handleForWaist = Math.min(
+    gap * HANDLE_GAP_RATIO,
+    minRadius * Math.tan(MAX_SPREAD_ANGLE),
   );
-  const thetaB = Math.min(
-    Math.asin(clamp(targetHalf / radiusB, 0, 1)),
-    MAX_SPREAD_ANGLE,
-  );
+  const handle = handleForWaist;
 
-  const halfA = radiusA * Math.sin(thetaA);
-  const halfB = radiusB * Math.sin(thetaB);
-  const halfWidth = Math.min(halfA, halfB);
-  const averageHalf = (halfA + halfB) / 2;
-  const waistWidth = bridgeWaistWidth(
-    baseWidth,
-    distance,
-    restDistance,
-    averageHalf,
+  // The rest ratio smoothsteps toward zero at the 1.6x snap distance.
+  const stretchProgress =
+    distance <= restDistance
+      ? 0
+      : clamp(
+          (distance - restDistance) /
+            Math.max(1, SNAP_STRETCH_MULTIPLIER * restDistance - restDistance),
+          0,
+          1,
+        );
+  const easedStretch =
+    stretchProgress * stretchProgress * (3 - 2 * stretchProgress);
+  const targetRatio = REST_WAIST_RATIO * (1 - easedStretch);
+
+  // Solve the shared spread scale alpha by monotone bisection:
+  //   theta_i = atan(alpha * handle / R_i), capped at MAX_SPREAD_ANGLE
+  //   waist = averageHalf - (3/8) * handle * (cos(theta_A) + cos(theta_B))
+  // alpha >= 1 keeps every control-point normal offset non-negative:
+  //   CP normal = R sin(theta) - handle cos(theta) >= 0.
+  const evaluateSpread = (alpha: number) => {
+    const thetaA = Math.min(
+      Math.max(0, Math.atan((alpha * handle) / radiusA)),
+      MAX_SPREAD_ANGLE,
+    );
+    const thetaB = Math.min(
+      Math.max(0, Math.atan((alpha * handle) / radiusB)),
+      MAX_SPREAD_ANGLE,
+    );
+    const halfA = radiusA * Math.sin(thetaA);
+    const halfB = radiusB * Math.sin(thetaB);
+    const averageHalf = (halfA + halfB) / 2;
+    const cosA = Math.cos(thetaA);
+    const cosB = Math.cos(thetaB);
+    const waist = averageHalf - (3 / 8) * handle * (cosA + cosB);
+    return { thetaA, thetaB, halfA, halfB, averageHalf, cosA, cosB, waist };
+  };
+
+  const maxAlpha = Math.min(
+    (radiusA * Math.tan(MAX_SPREAD_ANGLE)) / Math.max(handle, 1e-9),
+    (radiusB * Math.tan(MAX_SPREAD_ANGLE)) / Math.max(handle, 1e-9),
   );
+  const lowerAlpha = 1;
+  const upperAlpha = Math.max(lowerAlpha, maxAlpha);
+  const waistError = (alpha: number) => {
+    const state = evaluateSpread(alpha);
+    return state.waist - targetRatio * state.averageHalf;
+  };
+  let alpha = upperAlpha;
+  if (waistError(lowerAlpha) >= 0) {
+    alpha = lowerAlpha;
+  } else if (waistError(upperAlpha) <= 0) {
+    alpha = upperAlpha;
+  } else {
+    let low = lowerAlpha;
+    let high = upperAlpha;
+    for (let iteration = 0; iteration < 42; iteration += 1) {
+      const mid = (low + high) / 2;
+      if (waistError(mid) < 0) low = mid;
+      else high = mid;
+    }
+    alpha = (low + high) / 2;
+  }
+
+  const spread = evaluateSpread(alpha);
+  const { thetaA, thetaB, halfA, halfB, averageHalf, cosA, cosB, sinA, sinB } = {
+    ...spread,
+    sinA: Math.sin(spread.thetaA),
+    sinB: Math.sin(spread.thetaB),
+  };
+  const halfWidth = Math.min(halfA, halfB);
 
   // Narrow ribbons should breathe proportionally, not swing by a fixed number
   // of pixels. Clamp the scale so 4-6px bridges calm down and 14px+ bridges
   // keep their full momentum.
   const widthScale = Math.min(1.2, Math.max(0.5, baseWidth / 10));
   const scaledSag = sag * widthScale;
-
-  const cosA = Math.cos(thetaA);
-  const cosB = Math.cos(thetaB);
-  const sinA = Math.sin(thetaA);
-  const sinB = Math.sin(thetaB);
+  const waistDenominator = (3 / 8) * (cosA + cosB);
+  const sagHandle = waistDenominator > 0 ? -scaledSag / waistDenominator : 0;
+  // Positive sag pinches; never let it push a control point past the
+  // centerline. Negative sag bows outward and is always C1-safe.
+  const maxSafeHandle = Math.min(
+    radiusA * Math.tan(thetaA),
+    radiusB * Math.tan(thetaB),
+  );
+  const handleWithSag = clamp(
+    handle + sagHandle,
+    -Math.max(handle, maxSafeHandle),
+    Math.max(0, maxSafeHandle),
+  );
+  const waist = averageHalf - (3 / 8) * handleWithSag * (cosA + cosB);
 
   // Perimeter anchors. The normal component is mirrored exactly for the
   // bottom anchors, setting up the reflected lower curve.
@@ -201,48 +270,17 @@ export function computeBridgeGeometry(
   };
   const bBottom = mirrorAcrossAxis(bTop, a, ux, uy);
 
-  const gap = distance - radiusA - radiusB;
-  const baseHandle = Math.min(
-    Math.max(0, gap) * HANDLE_GAP_RATIO,
-    Math.min(radiusA, radiusB) * HANDLE_RADIUS_RATIO,
-  );
-  const waistDenominator = (3 / 8) * (cosA + cosB);
-  const desiredWaistHalf = waistWidth / 2;
-  // The midpoint normal offset of a symmetric cubic is
-  //   (hA + hB) / 2 - (3L / 8)(cosA + cosB) + (3/4) sag.
-  // Choose L to land exactly on the rest-normalized waist width, capped by the
-  // natural handle length.
-  const handleForWaist =
-    waistDenominator > 0
-      ? Math.max(0, (averageHalf - desiredWaistHalf) / waistDenominator)
-      : baseHandle;
-  // Inject lateral sag through the tangent-line handle length. Moving a handle
-  // off its tangent ray would break C1 continuity at the circle perimeter, so
-  // the sag is expressed as the only remaining degree of freedom: signed
-  // handle extension. Negative handles bow the ribbon outward.
-  const sagHandle = waistDenominator > 0 ? -scaledSag / waistDenominator : 0;
-  const maxPinchHandle =
-    waistDenominator > 0
-      ? (averageHalf - MIN_WAIST_WIDTH / 2) / waistDenominator
-      : baseHandle;
-  const handle = clamp(
-    handleForWaist + sagHandle,
-    -baseHandle,
-    Math.max(-baseHandle, Math.min(baseHandle, maxPinchHandle)),
-  );
-  const waist = averageHalf - (3 / 8) * handle * (cosA + cosB);
-
   // Circle tangents: rotate the radial vector by +/- 90 degrees.
   const tangentATop: Point = { x: sinA * ux - cosA * nx, y: sinA * uy - cosA * ny };
   const tangentBForward: Point = { x: sinB * ux + cosB * nx, y: sinB * uy + cosB * ny };
 
   const cp1Top: Point = {
-    x: aTop.x + handle * tangentATop.x,
-    y: aTop.y + handle * tangentATop.y,
+    x: aTop.x + handleWithSag * tangentATop.x,
+    y: aTop.y + handleWithSag * tangentATop.y,
   };
   const cp2Top: Point = {
-    x: bTop.x - handle * tangentBForward.x,
-    y: bTop.y - handle * tangentBForward.y,
+    x: bTop.x - handleWithSag * tangentBForward.x,
+    y: bTop.y - handleWithSag * tangentBForward.y,
   };
   const cp1Bottom = mirrorAcrossAxis(cp1Top, a, ux, uy);
   const cp2Bottom = mirrorAcrossAxis(cp2Top, a, ux, uy);
@@ -259,10 +297,10 @@ export function computeBridgeGeometry(
     distance,
     halfWidth,
     baseWidth,
-    waistWidth: Math.abs(waist) * 2,
+    waistWidth: Math.max(MIN_WAIST_WIDTH, Math.abs(waist) * 2),
     waist,
     handleForWaist,
-    handle,
+    handle: handleWithSag,
     restDistance,
     sag,
   };

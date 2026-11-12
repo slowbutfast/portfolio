@@ -26,3 +26,11 @@
 
 - [x] 5.1 Run `npm run typecheck`, `npm run test:unit`, `npm run build`, `npm run test:e2e`, and `npx openspec validate --changes`, verifying clean passes and capturing desktop (`1440x900`) and mobile (`393x852`) visual checks
 - [x] 5.2 Populate `verification.md` with Requirement Adherence Matrix, resolved assumptions, and verbatim execution logs
+
+## 6. PATCH-01: Organic Curvature, Render-Clock Recoil & Soft Anchors
+
+- [x] P01.1 Scaffold reproducing tests for non-negative control-point offsets, force-isolated drag (`< 15px` / `< 12px` follow-through without neighbor `fx/fy`), soft `home` settling, render-clock recoil/cooldown, live reduced-motion transitions, and ambient-offset planarity; confirm failure first
+- [x] P01.2 Replace the radius-capped bridge handle with gap-proportional handle-first geometry, monotone spread bisection, and the non-negative control-point guard
+- [x] P01.3 Replace hard user pins and neighbor freezing with soft `home` springs, isolated charge/collision footprint during drag, viscous pointer lag, and `performance.now()` recoil/cooldown timestamps plus reconnect ripple
+- [x] P01.4 Add render-clock teardrop recoil, smoothstep proximity fade, visual-only ~30fps ambient drift shared with hit testing, bidirectional reduced-motion transitions, hoisted sorted ids, and measured `canvasCenter`
+- [x] P01.5 Sync specs, run the full verification suite, update `verification.md`, resolve `PATCH-01` in `patch.md`, and push to PR #12
