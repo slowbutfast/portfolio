@@ -94,6 +94,16 @@ All rows verified against `master` at `de357c0` in the worktree on 2026-11-12 un
 | Vercel MCP access works for team `joeshmo` (`team_dYlLIM0vHe3anzqlJsfzbOjL`) | `list_projects` returned 4 projects | Vercel MCP `list_projects` after the user approved access | 2026-11-12 | decays |
 | No Vercel project exists for this repo | Projects present: `kintsugi-fracture`, `sandwave-sim`, `open-dungeon`, `transcribe-plus-frontend`; `list_projects` filtered by `repoUrl` returned none | Vercel MCP `list_projects` (filtered and unfiltered) | 2026-11-12 | decays |
 | Installed workflows equal the staged copies | `.github/workflows/ci.yml` and `preview.yml` identical to `openspec/changes/vercel-preview-gating/workflows/*` | `diff` | 2026-11-12 | decays |
+| Vercel project exists and is linked to `slowbutfast/portfolio` | `portfolio` (`prj_W6EpbJ3ZH6cxKxsQIhhGC45WFX8a`), framework `vite`, deployments carry `githubRepo: portfolio`, `githubOrg: slowbutfast`, `githubCommitRef: master`, target `production` | Vercel MCP `get_project`, `list_deployments` after the user imported it | 2026-11-12 | decays |
+| Production branch is `master` | Both production deployments are from `master`; the project record exposes no explicit branch field | `list_deployments` (`target: production`, `githubCommitRef: master`) | 2026-11-12 | decays |
+| Deployment Protection | `ssoProtection: { enabled: true, deploymentType: "all_except_custom_domains" }`, password protection off | Vercel MCP `get_project` | 2026-11-12 | decays |
+| Which URLs are protected | `portfolio-two-dusky-55.vercel.app` (production alias) returns 200 anonymously; the per-deployment URL and `portfolio-git-master-joeshmo.vercel.app` return 302 to `vercel.com/sso-api` | Anonymous `fetch` with `redirect: 'manual'` | 2026-11-12 | decays |
+| Project Node setting | `nodeVersion: "26.x"` in the project record, while `package.json` `engines.node` is `22.x` and CI uses 22 | Vercel MCP `get_project`; `package.json` | 2026-11-12 | decays |
+| Rollback candidates | Two READY production deployments: `dpl_5yUJ4YgWC2ULJAqjuq5Jv5Kyqh8m` (`b8bac53`, current) and `dpl_62cscbC3NGPzjS557tXx9ujth5mK` (`c386dd1`), both `isRollbackCandidate: true` | Vercel MCP `list_deployments` | 2026-11-12 | decays |
+| Real production edge matches the spec | `e2e/preview-headers.spec.ts` passes 5/5 against `https://portfolio-two-dusky-55.vercel.app` (CSP directive set equal to the spec, other security headers, immutable `.woff2`, entry document not long-cached, real 404) | `PREVIEW_URL=<prod> npx playwright test e2e/preview-headers.spec.ts --project=desktop` | 2026-11-12 | decays |
+| Strict CSP works with the app on the real edge | Full suite: 62 passed, 12 skipped, 0 failed, every console-error assertion green | `PREVIEW_URL=<prod> npx playwright test` | 2026-11-12 | decays |
+| Bypass secret created | `automation-bypass` secret with `isEnvVar: true`, note "GitHub Actions deployment-gate (vercel-preview-gating)" | Vercel MCP `update_project_protection_bypass` | 2026-11-12 | decays |
+| Workflow PR opened | PR #3 `ci/deployment-workflows` → `master`; first `ci` run pending at the time of writing | `gh pr create`, `gh pr checks 3` | 2026-11-12 | decays |
 
 ## Unverified assumptions
 
