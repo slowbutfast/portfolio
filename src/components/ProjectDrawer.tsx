@@ -22,6 +22,9 @@ interface ProjectDrawerProps {
 const SCRAMBLE_GLYPHS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/\\<>[]{}#$%&*+=';
 const SCRAMBLE_INTERVAL_MS = 83;
 const SCRAMBLE_TOTAL_MS = 350;
+/** Exponential tracking rate for the drawer's anchor lerp. */
+const DRAWER_TRACK_LAMBDA = 18;
+const DRAWER_SNAP_PX = 0.5;
 
 function scrambleTitle(target: string, progress: number): string {
   const revealed = Math.floor(target.length * progress);
@@ -43,6 +46,9 @@ export function ProjectDrawer({ project, anchor, onClose }: ProjectDrawerProps) 
   const [displayTitle, setDisplayTitle] = useState(project.title);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
   const [isSheet, setIsSheet] = useState(false);
+  const positionRef = useRef<{ left: number; top: number } | null>(null);
+  const targetRef = useRef<{ left: number; top: number } | null>(null);
+  const pointerRafRef = useRef(0);
 
   const catalogIndex = projects.findIndex((p) => p.id === project.id);
   const safeIndex = catalogIndex >= 0 ? catalogIndex : 0;
@@ -98,13 +104,28 @@ export function ProjectDrawer({ project, anchor, onClose }: ProjectDrawerProps) 
   }, [project.id, project.title]);
 
   // Anchor the HUD card beside the clicked node on desktop; on mobile the
-  // drawer becomes a bottom sheet and clears the inline coordinates.
+  // drawer becomes a bottom sheet and clears the inline coordinates. Desktop
+  // positions are tracked with a frame-rate independent exponential lerp and
+  // snapped to integer pixels at rest.
   useLayoutEffect(() => {
-    const place = () => {
-      const panel = panelRef.current;
-      if (!panel) return;
+    const panel = panelRef.current;
+    if (!panel) return;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let disposed = false;
+    let lastTime = performance.now();
+
+    const apply = (next: { left: number; top: number }, snap: boolean) => {
+      const value = snap
+        ? { left: Math.round(next.left), top: Math.round(next.top) }
+        : next;
+      positionRef.current = value;
+      setPosition(value);
+    };
+
+    const computeTarget = () => {
       if (window.innerWidth < 768) {
         setIsSheet(true);
+        targetRef.current = null;
         return;
       }
       setIsSheet(false);
@@ -115,16 +136,62 @@ export function ProjectDrawer({ project, anchor, onClose }: ProjectDrawerProps) 
       const preferredTop = anchor ? anchor.y - 40 : window.innerHeight / 2 - height / 2;
       const maxLeft = Math.max(margin, window.innerWidth - width - margin);
       const maxTop = Math.max(margin, window.innerHeight - height - margin);
-      setPosition({
+      targetRef.current = {
         left: Math.min(Math.max(margin, preferredLeft), maxLeft),
         top: Math.min(Math.max(margin, preferredTop), maxTop),
-      });
+      };
     };
+
+    const frame = (now: number) => {
+      pointerRafRef.current = 0;
+      if (disposed) return;
+      const target = targetRef.current;
+      const current = positionRef.current;
+      if (!target) return;
+      if (!current) {
+        apply(target, true);
+        return;
+      }
+      const dt = Math.min(0.05, Math.max(0, (now - lastTime) / 1000)) || 1 / 60;
+      lastTime = now;
+      const alpha = 1 - Math.exp(-DRAWER_TRACK_LAMBDA * dt);
+      const left = current.left + (target.left - current.left) * alpha;
+      const top = current.top + (target.top - current.top) * alpha;
+      if (Math.hypot(target.left - left, target.top - top) < DRAWER_SNAP_PX) {
+        apply(target, true);
+        return;
+      }
+      apply({ left, top }, false);
+      schedule();
+    };
+
+    const schedule = () => {
+      if (disposed || pointerRafRef.current !== 0) return;
+      pointerRafRef.current = requestAnimationFrame(frame);
+    };
+
+    const place = () => {
+      computeTarget();
+      if (reduced) {
+        if (targetRef.current) apply(targetRef.current, true);
+        return;
+      }
+      schedule();
+    };
+
+    computeTarget();
+    if (positionRef.current === null && targetRef.current) {
+      apply(targetRef.current, true);
+    }
+    lastTime = performance.now();
     place();
     window.addEventListener('resize', place);
     const resizeObserver = new ResizeObserver(place);
-    if (panelRef.current) resizeObserver.observe(panelRef.current);
+    resizeObserver.observe(panel);
     return () => {
+      disposed = true;
+      cancelAnimationFrame(pointerRafRef.current);
+      pointerRafRef.current = 0;
       window.removeEventListener('resize', place);
       resizeObserver.disconnect();
     };
@@ -235,17 +302,19 @@ export function ProjectDrawer({ project, anchor, onClose }: ProjectDrawerProps) 
               </p>
 
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <a
-                  href={project.repo}
-                  target="_blank"
-                  rel="noreferrer"
-                  data-testid="drawer-code"
-                  aria-label={`${project.title} source code, opens in new tab`}
-                  className="fluid-pill min-h-11 gap-1.5 md:min-h-0"
-                >
-                  <GitBranch className="h-3.5 w-3.5" aria-hidden="true" />
-                  Code <span aria-hidden="true">↗</span>
-                </a>
+                {project.repo && (
+                  <a
+                    href={project.repo}
+                    target="_blank"
+                    rel="noreferrer"
+                    data-testid="drawer-code"
+                    aria-label={`${project.title} source code, opens in new tab`}
+                    className="fluid-pill min-h-11 gap-1.5 md:min-h-0"
+                  >
+                    <GitBranch className="h-3.5 w-3.5" aria-hidden="true" />
+                    Code <span aria-hidden="true">↗</span>
+                  </a>
+                )}
                 {project.liveUrl && (
                   <a
                     href={project.liveUrl}

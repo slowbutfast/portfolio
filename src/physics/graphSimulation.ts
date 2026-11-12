@@ -8,6 +8,14 @@ import {
   type ForceManyBody,
 } from 'd3-force';
 import type { GraphNode } from '../types/portfolio';
+import {
+  bridgeOscillatorAmplitude,
+  createBridgeOscillatorState,
+  isBridgeOscillatorAtRest,
+  stepBridgeOscillator,
+  type BridgeOscillatorState,
+} from '../utils/bridgeOscillator';
+import { PLANAR_NODE_SEEDS } from '../data/graphSeeds';
 
 export type SimState = 'idle' | 'hover' | 'drag' | 'coasting';
 
@@ -20,7 +28,7 @@ export interface SimulationNode {
 
 export interface SimulationOptions {
   nodes: SimulationNode[];
-  links: { source: string; target: string }[];
+  links: { source: string; target: string; tags?: string[] }[];
   width: number;
   height: number;
   /** Optional deterministic seed positions keyed by node id. */
@@ -30,12 +38,28 @@ export interface SimulationOptions {
   radius?: number;
 }
 
+/** Per-edge state used by the bridge renderer and drag snapping. */
+export interface BridgeLinkState {
+  source: string;
+  target: string;
+  sharedTagCount: number;
+  /** Authoritative rest distance from the scaled planar seeds. */
+  restDistance: number;
+  /** True while the user has stretched this bridge past the snap threshold. */
+  isDetached: boolean;
+  oscillator: BridgeOscillatorState;
+  previousDistance: number;
+  previousVelocity: number;
+}
+
 export interface GraphSimulation {
   sim: Simulation<GraphNode, undefined>;
   nodes: GraphNode[];
   links: SimulationLinkDatum<GraphNode>[];
+  linkStates: BridgeLinkState[];
   state: SimState;
   hovered: GraphNode | null;
+  isIdle: boolean;
   tick(): void;
   poll(): void;
   resize(width: number, height: number): void;
@@ -44,12 +68,14 @@ export interface GraphSimulation {
   dragMove(x: number, y: number): void;
   dragEnd(): void;
   findNode(id: string): GraphNode | undefined;
+  findLink(source: string, target: string): BridgeLinkState | undefined;
+  restDistance(source: string, target: string): number;
   destroy(): void;
 }
 
 const NODE_RADIUS = 22;
 const BOUNDARY_MARGIN = 48;
-const COLLIDE_RADIUS = 36;
+const COLLIDE_RADIUS = 48;
 const LINK_DISTANCE = 180;
 const LINK_STRENGTH = 0.015;
 /** Weak homing keeps the graph in its planar basin without pinning nodes. */
@@ -59,6 +85,27 @@ const MAX_FLING = 15;
 const VELOCITY_DECAY_IDLE = 0.4;
 const VELOCITY_DECAY_COAST = 0.18;
 const COAST_RESTORE_SPEED = 0.5;
+const TICK_MS = 1000 / 60;
+/** Stretch past this multiple of the rest distance severs the visual bridge. */
+export const SNAP_MULTIPLIER = 2;
+/** A released bridge reforms once the nodes return within this multiple. */
+export const RECONNECT_MULTIPLIER = 1.4;
+/**
+ * Oscillator excitation scale: distance acceleration -> bridge displacement.
+ * Tuned against the 60Hz moderate/extreme fling profiles in
+ * graphSimulation.test.ts: scale 0.04 plus a ±2000 excitation clamp yields
+ * ~1.8px peak sag on a 120px/150ms fling and ~2.3px on a 260px/60ms fling.
+ */
+const EXCITATION_SCALE = 0.04;
+const MAX_EXCITATION = 2000;
+
+/** Clamp distance acceleration into the oscillator's displacement input. */
+export function bridgeExcitation(accelerationPxPerS2: number): number {
+  return Math.max(
+    -MAX_EXCITATION,
+    Math.min(MAX_EXCITATION, accelerationPxPerS2 * EXCITATION_SCALE),
+  );
+}
 
 function chargeStrength(width: number, height: number): number {
   return -Math.min(width, height) * CHARGE_SCALE;
@@ -79,6 +126,25 @@ function createBoundaryForce(
       else if (n.y > height - margin) n.vy = (n.vy ?? 0) - (n.y - (height - margin)) * k;
     }
   };
+}
+
+/**
+ * Rubber-band displacement. Pulling `target` away from `anchor` is cushioned so
+ * displacement asymptotes to the tether radius instead of running off-canvas:
+ *   P = anchor + delta / sqrt(1 + (|delta| / R)^2)
+ */
+export function rubberBandDisplacement(
+  anchor: { x: number; y: number },
+  target: { x: number; y: number },
+  tetherRadius: number,
+): { x: number; y: number } {
+  const dx = target.x - anchor.x;
+  const dy = target.y - anchor.y;
+  const distance = Math.hypot(dx, dy);
+  if (distance <= 0.0001) return { x: anchor.x, y: anchor.y };
+  const radius = Math.max(1, tetherRadius);
+  const scale = 1 / Math.sqrt(1 + (distance / radius) ** 2);
+  return { x: anchor.x + dx * scale, y: anchor.y + dy * scale };
 }
 
 export function createSimulation(opts: SimulationOptions): GraphSimulation {
@@ -132,6 +198,39 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
 
   const links: SimulationLinkDatum<GraphNode>[] = opts.links.map((l) => ({ ...l }));
 
+  const seeds = opts.seeds ?? PLANAR_NODE_SEEDS;
+
+  const restDistances = new Map<string, number>();
+  const linkKey = (a: string, b: string) => [a, b].sort().join('\u0000');
+  const recomputeRestDistances = (w: number, h: number) => {
+    restDistances.clear();
+    for (const link of opts.links) {
+      // Seed distances are normalized to a 1x1 box. Scale each axis by the
+      // container size (the seed map uses an affine embedding).
+      const a = seeds[link.source];
+      const b = seeds[link.target];
+      const scaled = a && b
+        ? Math.hypot((a.x - b.x) * w, (a.y - b.y) * h)
+        : LINK_DISTANCE;
+      restDistances.set(linkKey(link.source, link.target), Math.max(1, scaled));
+    }
+  };
+  recomputeRestDistances(width, height);
+
+  const linkStates: BridgeLinkState[] = opts.links.map((link) => {
+    const shared = link.tags?.length ?? 1;
+    return {
+      source: link.source,
+      target: link.target,
+      sharedTagCount: Math.max(1, shared),
+      restDistance: restDistances.get(linkKey(link.source, link.target)) ?? LINK_DISTANCE,
+      isDetached: false,
+      oscillator: createBridgeOscillatorState(),
+      previousDistance: 0,
+      previousVelocity: 0,
+    };
+  });
+
   // Custom weak homing forces. Two explicit axes keep the planar basin of
   // attraction while allowing drag and fling gestures to move a node.
   const seedForceX = (alpha: number): void => {
@@ -160,7 +259,11 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
       'link',
       forceLink<GraphNode, SimulationLinkDatum<GraphNode>>(links)
         .id((d) => d.id)
-        .distance(LINK_DISTANCE)
+        .distance((link) => {
+          const s = (link.source as GraphNode).id ?? (link.source as unknown as string);
+          const t = (link.target as GraphNode).id ?? (link.target as unknown as string);
+          return restDistances.get(linkKey(String(s), String(t))) ?? LINK_DISTANCE;
+        })
         .strength(LINK_STRENGTH),
     )
     .force('collide', forceCollide<GraphNode>().radius(COLLIDE_RADIUS))
@@ -172,9 +275,86 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
   let hoveredNode: GraphNode | null = null;
   let dragNode: GraphNode | null = null;
   let coastingNode: GraphNode | null = null;
+  let dragAnchor = { x: 0, y: 0 };
+  let tetherRadius = Math.max(120, Math.min(width, height) * 0.75);
   const dragSamples: { x: number; y: number; t: number }[] = [];
 
   sim.force('boundary', createBoundaryForce(width, height, BOUNDARY_MARGIN, nodes));
+
+  const nodeById = (id: string): GraphNode | undefined => nodes.find((n) => n.id === id);
+
+  /** Current center distance for a link, using live node positions. */
+  const linkDistance = (link: BridgeLinkState): number => {
+    const a = nodeById(link.source);
+    const b = nodeById(link.target);
+    if (!a || !b) return 0;
+    const ax = a === dragNode && a.fx != null ? a.fx : a.x;
+    const ay = a === dragNode && a.fy != null ? a.fy : a.y;
+    const bx = b === dragNode && b.fx != null ? b.fx : b.x;
+    const by = b === dragNode && b.fy != null ? b.fy : b.y;
+    return Math.hypot(ax - bx, ay - by);
+  };
+
+  const updateLinkTopology = (): void => {
+    for (const link of linkStates) {
+      const distance = linkDistance(link);
+      // Visual severance is only possible while dragging. At rest, or after a
+      // release once the nodes are back inside the reconnect radius, every
+      // topological edge remains present.
+      if (state === 'drag') {
+        if (distance > SNAP_MULTIPLIER * link.restDistance) link.isDetached = true;
+        else if (distance <= RECONNECT_MULTIPLIER * link.restDistance) link.isDetached = false;
+      } else if (
+        link.isDetached &&
+        (distance <= RECONNECT_MULTIPLIER * link.restDistance ||
+          (state === 'idle' && distance <= SNAP_MULTIPLIER * link.restDistance))
+      ) {
+        // Settled recovery is the invariant backstop: once coasting ends, no
+        // topological edge may remain permanently hidden. Bound it to the snap
+        // radius so a bridge cannot pop back while the node is still far away.
+        link.isDetached = false;
+      }
+    }
+  };
+
+  const stepLinkOscillators = (dtMs: number): void => {
+    // A real frame delta is clamped to the oscillator's supported range. A gap
+    // longer than 100ms (idle suspend, background tab) re-primes the derivative
+    // instead of injecting a fictitious impulse.
+    const clampedMs = Math.max(1, Math.min(32, dtMs));
+    const dtSeconds = clampedMs / 1000;
+    const reprime = dtMs > 100;
+    for (const link of linkStates) {
+      const distance = linkDistance(link);
+      if (link.previousDistance === 0 || reprime) {
+        // Prime on the first sample so a cold start never looks like a jump
+        // from zero to the current edge length.
+        link.previousDistance = distance;
+        link.previousVelocity = 0;
+        if (reprime) stepBridgeOscillator(link.oscillator, clampedMs, 0);
+        continue;
+      }
+      const velocity = (distance - link.previousDistance) / dtSeconds;
+      const acceleration = (velocity - link.previousVelocity) / dtSeconds;
+      stepBridgeOscillator(link.oscillator, clampedMs, bridgeExcitation(acceleration));
+      link.previousDistance = distance;
+      link.previousVelocity = velocity;
+    }
+  };
+
+  const afterTick = (dtMs: number): void => {
+    updateLinkTopology();
+    stepLinkOscillators(dtMs);
+  };
+
+  let lastTickAt: number | null = null;
+  sim.on('tick.links', () => {
+    const now = performance.now();
+    const dtMs = lastTickAt === null ? 0 : now - lastTickAt;
+    lastTickAt = now;
+    if (dtMs > 0) afterTick(dtMs);
+    else updateLinkTopology();
+  });
 
   const hoverAttraction = (alpha: number): void => {
     if (state !== 'hover' || !hoveredNode) return;
@@ -209,6 +389,7 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
 
   function tick(): void {
     sim.tick();
+    afterTick(TICK_MS);
     poll();
   }
 
@@ -246,6 +427,7 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
     dragNode = node;
     node.fx = node.x;
     node.fy = node.y;
+    dragAnchor = { x: node.x, y: node.y };
     dragSamples.length = 0;
     dragSamples.push({ x: node.x, y: node.y, t: performance.now() });
     state = 'drag';
@@ -254,17 +436,26 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
 
   function dragMove(x: number, y: number): void {
     if (state !== 'drag' || !dragNode) return;
-    dragNode.fx = x;
-    dragNode.fy = y;
-    dragSamples.push({ x, y, t: performance.now() });
+    const pinned = rubberBandDisplacement(dragAnchor, { x, y }, tetherRadius);
+    dragNode.fx = pinned.x;
+    dragNode.fy = pinned.y;
+    dragSamples.push({ x: pinned.x, y: pinned.y, t: performance.now() });
     if (dragSamples.length > 3) dragSamples.shift();
+    updateLinkTopology();
   }
 
   function dragEnd(): void {
     if (state !== 'drag' || !dragNode) return;
     const node = dragNode;
+    // Commit the last pinned coordinate before unpinning. A pointerup can
+    // arrive between physics ticks, so node.x/y may still hold the drag-start
+    // position; using it would falsely reconnect a bridge on release.
+    const releaseX = node.fx;
+    const releaseY = node.fy;
     node.fx = null;
     node.fy = null;
+    if (releaseX != null) node.x = releaseX;
+    if (releaseY != null) node.y = releaseY;
 
     const len = dragSamples.length;
     if (len >= 2) {
@@ -291,10 +482,19 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
     sim.velocityDecay(VELOCITY_DECAY_COAST);
     sim.alphaTarget(0);
     sim.alpha(0.3).restart();
+    // Reconnect immediately when the release point is already inside the
+    // recovery radius; otherwise the d3 tick.links listener reforms the bridge
+    // as the node settles.
+    updateLinkTopology();
   }
 
   function resize(nw: number, nh: number): void {
     recomputeTargets(nw, nh);
+    recomputeRestDistances(nw, nh);
+    for (const link of linkStates) {
+      link.restDistance = restDistances.get(linkKey(link.source, link.target)) ?? LINK_DISTANCE;
+    }
+    tetherRadius = Math.max(120, Math.min(nw, nh) * 0.75);
     (sim.force('charge') as ForceManyBody<GraphNode> | undefined)?.strength(
       chargeStrength(nw, nh),
     );
@@ -302,15 +502,32 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
     sim.alpha(0.2).restart();
   }
 
+  const isIdle = (): boolean => {
+    if (state !== 'idle') return false;
+    if (sim.alpha() > 0.01) return false;
+    for (const node of nodes) {
+      if (Math.hypot(node.vx ?? 0, node.vy ?? 0) >= 0.01) return false;
+    }
+    for (const link of linkStates) {
+      if (bridgeOscillatorAmplitude(link.oscillator) >= 0.1) return false;
+      if (!isBridgeOscillatorAtRest(link.oscillator)) return false;
+    }
+    return true;
+  };
+
   return {
     sim,
     nodes,
     links,
+    linkStates,
     get state() {
       return state;
     },
     get hovered() {
       return hoveredNode;
+    },
+    get isIdle() {
+      return isIdle();
     },
     tick,
     poll,
@@ -320,9 +537,16 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
     dragMove,
     dragEnd,
     findNode: (id) => nodes.find((n) => n.id === id),
+    findLink: (source, target) => {
+      const key = linkKey(source, target);
+      return linkStates.find((l) => linkKey(l.source, l.target) === key);
+    },
+    restDistance: (source, target) =>
+      restDistances.get(linkKey(source, target)) ?? LINK_DISTANCE,
     destroy: () => {
       sim.stop();
       sim.on('tick', null);
+      sim.on('tick.links', null);
       sim.on('end', null);
     },
   };

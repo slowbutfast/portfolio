@@ -1,11 +1,13 @@
 /**
- * Authoritative planar embedding for the six-project graph.
+ * Authoritative planar embedding for the eight-project graph.
  *
  * The four nodes `open-dungeon`, `transcribe-plus`, `sandwave-sim`, and
  * `attention-max` form a complete K4 subgraph. A straight-line planar K4
  * requires exactly one vertex inside the triangle formed by the other three;
  * `sandwave-sim` is nested strictly inside
- * triangle(open-dungeon, transcribe-plus, attention-max).
+ * triangle(open-dungeon, transcribe-plus, attention-max). The two new
+ * perimeter nodes attach only to vertices on the outer face so all 13
+ * tag-derived edges remain crossing-free.
  */
 export interface PlanarSeed {
   x: number;
@@ -19,6 +21,8 @@ export const PLANAR_NODE_SEEDS: Record<string, PlanarSeed> = {
   'transcribe-plus': { x: 0.72, y: 0.42 },
   'sandwave-sim': { x: 0.56, y: 0.55 },
   'attention-max': { x: 0.52, y: 0.8 },
+  'kintsugi-fracture': { x: 0.84, y: 0.72 },
+  'ivy-film-festival-2026': { x: 0.15, y: 0.75 },
 };
 
 /**

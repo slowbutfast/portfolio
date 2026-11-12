@@ -6,7 +6,9 @@ export type ParadigmTag =
   | 'Agent Tooling'
   | 'LaTeX'
   | 'Geospatial'
-  | 'WebExtension';
+  | 'WebExtension'
+  | 'Graphics'
+  | 'Design';
 
 export type TerminalStatus = 'ok' | 'warn' | 'error';
 
@@ -41,7 +43,8 @@ export interface ProjectData {
   /** Curated uppercase engineering classification, e.g. "AGENTIC ... // ...". */
   classification: string;
   tags: ParadigmTag[];
-  repo: string;
+  /** Public source repository. Omitted for client/design work without one. */
+  repo?: string;
   liveUrl?: string;
   previews: Preview[];
   terminalDemo?: TerminalDemo;

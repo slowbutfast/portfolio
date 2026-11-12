@@ -89,7 +89,9 @@ describe('CSP comparison helper', () => {
 });
 
 describe('package.json build script', () => {
-  it('typechecks before building so a type error fails the deploy', () => {
-    expect(pkg.scripts.build).toMatch(/^tsc --noEmit\s*&&\s*vite build$/);
+  it('typechecks the shipped code before building so a type error fails the deploy', () => {
+    expect(pkg.scripts.build).toMatch(
+      /^tsc --noEmit -p tsconfig\.build\.json\s*&&\s*vite build$/,
+    );
   });
 });

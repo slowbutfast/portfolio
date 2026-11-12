@@ -52,3 +52,32 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  vercel-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Replicate Vercel's uploaded file set: remove the paths listed in
+      # .vercelignore (except runtime directories) before typechecking/building.
+      - name: Prune Vercel-ignored paths
+        run: |
+          while IFS= read -r line || [ -n "$line" ]; do
+            case "$line" in
+              ''|\#*|.git/|node_modules/|dist/) continue ;;
+            esac
+            rm -rf -- "${line%/}"
+          done < .vercelignore
+
+      - name: Build against the Vercel file set
+        run: npm run build

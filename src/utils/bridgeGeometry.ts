@@ -13,6 +13,18 @@ export interface Point {
   y: number;
 }
 
+export interface BridgeOptions {
+  /**
+   * Natural center distance for this edge, derived from its scaled planar
+   * seeds. Cinching only begins once the current distance exceeds it.
+   */
+  restDistance?: number;
+  /** Number of tags shared by the endpoint projects. */
+  sharedTagCount?: number;
+  /** Lateral oscillator displacement injected along the bridge normal. */
+  sag?: number;
+}
+
 export interface BridgeGeometry {
   /** Perimeter anchors on circle A (top/bottom relative to the edge axis). */
   aTop: Point;
@@ -30,8 +42,14 @@ export interface BridgeGeometry {
   distance: number;
   /** Half-width of the attachment spread at the narrower node. */
   halfWidth: number;
+  /** Full semantic bridge width before any drag cinching. */
+  baseWidth: number;
+  /** Full midpoint width after rest-normalized cinching. */
+  waistWidth: number;
   /** Signed clearance of the upper curve at its midpoint (positive = open waist). */
   waist: number;
+  restDistance: number;
+  sag: number;
 }
 
 /** Fraction of the smaller radius used for the perimeter attachment spread. */
@@ -42,8 +60,8 @@ const MAX_SPREAD_ANGLE = Math.PI / 6.5;
 const HANDLE_GAP_RATIO = 0.45;
 /** Upper bound on handle length relative to the smaller radius. */
 const HANDLE_RADIUS_RATIO = 1.2;
-/** Never let the control handles collapse the waist through the centerline. */
-const MIN_WAIST = 1.5;
+/** Meniscus never becomes thinner than this many pixels. */
+const MIN_WAIST_WIDTH = 2;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -63,6 +81,38 @@ function mirrorAcrossAxis(point: Point, origin: Point, ux: number, uy: number): 
 }
 
 /**
+ * Semantic base width from shared tag count:
+ * `min(R_A, R_B) * 0.65` clamped to `6 + 4 (n - 1)` px. A single shared tag
+ * yields the narrowest ribbon; additional shared tags thicken it.
+ */
+export function bridgeBaseWidth(
+  radiusA: number,
+  radiusB: number,
+  sharedTagCount = 1,
+): number {
+  const tags = Math.max(1, Math.floor(sharedTagCount));
+  const raw = Math.min(radiusA, radiusB) * HALF_WIDTH_RATIO;
+  return Math.max(4, Math.min(raw, 6 + 4 * (tags - 1)));
+}
+
+/**
+ * Rest-normalized cinching curve. The bridge keeps full semantic width until
+ * the nodes are pulled beyond their natural seed distance, then necks down to
+ * a minimum 2px meniscus at (or past) the snap threshold.
+ */
+export function bridgeWaistWidth(
+  baseWidth: number,
+  distance: number,
+  restDistance: number,
+): number {
+  const rest = Math.max(1, restDistance);
+  if (distance <= rest) return baseWidth;
+  const snap = 2 * rest;
+  const progress = clamp((distance - rest) / Math.max(1, snap - rest), 0, 1);
+  return Math.max(MIN_WAIST_WIDTH, baseWidth * Math.pow(1 - progress, 1.25));
+}
+
+/**
  * Compute the top and normal-mirrored bottom cubic boundaries between two
  * nodes. Returns `null` when the circles touch or overlap (d <= R_A + R_B) or
  * when the centers coincide, so callers can omit the bridge without drawing
@@ -73,6 +123,7 @@ export function computeBridgeGeometry(
   b: Point,
   radiusA: number,
   radiusB: number,
+  options: BridgeOptions = {},
 ): BridgeGeometry | null {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
@@ -81,8 +132,22 @@ export function computeBridgeGeometry(
 
   const ux = dx / distance;
   const uy = dy / distance;
+  const nx = -uy;
+  const ny = ux;
 
-  const targetHalf = Math.min(radiusA, radiusB) * HALF_WIDTH_RATIO;
+  const restDistance = Math.max(1, options.restDistance ?? distance);
+  const sag = Number.isFinite(options.sag) ? (options.sag as number) : 0;
+  const baseWidth = bridgeBaseWidth(radiusA, radiusB, options.sharedTagCount);
+  const waistWidth = bridgeWaistWidth(baseWidth, distance, restDistance);
+  // Narrow ribbons should breathe proportionally, not swing by a fixed number
+  // of pixels. Clamp the scale so 4-6px bridges calm down and 14px+ bridges
+  // keep their full momentum.
+  const widthScale = Math.min(1.2, Math.max(0.5, baseWidth / 10));
+  const scaledSag = sag * widthScale;
+
+  // Attachment spread: half of the semantic base width, capped by the maximum
+  // hub angle so neighbouring bridges never merge.
+  const targetHalf = baseWidth / 2;
   const thetaA = Math.min(
     Math.asin(clamp(targetHalf / radiusA, 0, 1)),
     MAX_SPREAD_ANGLE,
@@ -104,34 +169,51 @@ export function computeBridgeGeometry(
   // Perimeter anchors. The normal component is mirrored exactly for the
   // bottom anchors, setting up the reflected lower curve.
   const aTop: Point = {
-    x: a.x + radiusA * (cosA * ux + sinA * -uy),
-    y: a.y + radiusA * (cosA * uy + sinA * ux),
+    x: a.x + radiusA * (cosA * ux + sinA * nx),
+    y: a.y + radiusA * (cosA * uy + sinA * ny),
   };
   const aBottom = mirrorAcrossAxis(aTop, a, ux, uy);
   const bTop: Point = {
-    x: b.x - radiusB * (cosB * ux - sinB * -uy),
-    y: b.y - radiusB * (cosB * uy - sinB * ux),
+    x: b.x - radiusB * (cosB * ux - sinB * nx),
+    y: b.y - radiusB * (cosB * uy - sinB * ny),
   };
   const bBottom = mirrorAcrossAxis(bTop, a, ux, uy);
 
   const gap = distance - radiusA - radiusB;
   const baseHandle = Math.min(
-    gap * HANDLE_GAP_RATIO,
+    Math.max(0, gap) * HANDLE_GAP_RATIO,
     Math.min(radiusA, radiusB) * HANDLE_RADIUS_RATIO,
   );
-  // The midpoint normal offset of a cubic is
-  //   (hA + hB) / 2 - (3L / 8)(cosA + cosB).
-  // Clamp L so the waist stays open rather than crossing the axis.
   const averageHalf = (halfA + halfB) / 2;
   const waistDenominator = (3 / 8) * (cosA + cosB);
-  const maxHandleForWaist =
-    waistDenominator > 0 ? Math.max(0, (averageHalf - MIN_WAIST) / waistDenominator) : baseHandle;
-  const handle = Math.min(baseHandle, maxHandleForWaist);
+  const desiredWaistHalf = waistWidth / 2;
+  // The midpoint normal offset of a symmetric cubic is
+  //   (hA + hB) / 2 - (3L / 8)(cosA + cosB) + (3/4) sag.
+  // Choose L to land exactly on the rest-normalized waist width, capped by the
+  // natural handle length.
+  const handleForWaist =
+    waistDenominator > 0
+      ? Math.max(0, (averageHalf - desiredWaistHalf) / waistDenominator)
+      : baseHandle;
+  // Inject lateral sag through the tangent-line handle length. Moving a handle
+  // off its tangent ray would break C1 continuity at the circle perimeter, so
+  // the sag is expressed as the only remaining degree of freedom: signed
+  // handle extension. Negative handles bow the ribbon outward.
+  const sagHandle = waistDenominator > 0 ? -scaledSag / waistDenominator : 0;
+  const maxPinchHandle =
+    waistDenominator > 0
+      ? (averageHalf - MIN_WAIST_WIDTH / 2) / waistDenominator
+      : baseHandle;
+  const handle = clamp(
+    handleForWaist + sagHandle,
+    -baseHandle,
+    Math.max(-baseHandle, Math.min(baseHandle, maxPinchHandle)),
+  );
   const waist = averageHalf - (3 / 8) * handle * (cosA + cosB);
 
   // Circle tangents: rotate the radial vector by +/- 90 degrees.
-  const tangentATop: Point = { x: sinA * ux - cosA * -uy, y: sinA * uy - cosA * ux };
-  const tangentBForward: Point = { x: sinB * ux + cosB * -uy, y: sinB * uy + cosB * ux };
+  const tangentATop: Point = { x: sinA * ux - cosA * nx, y: sinA * uy - cosA * ny };
+  const tangentBForward: Point = { x: sinB * ux + cosB * nx, y: sinB * uy + cosB * ny };
 
   const cp1Top: Point = {
     x: aTop.x + handle * tangentATop.x,
@@ -155,6 +237,10 @@ export function computeBridgeGeometry(
     cp2Bottom,
     distance,
     halfWidth,
+    baseWidth,
+    waistWidth: Math.abs(waist) * 2,
     waist,
+    restDistance,
+    sag,
   };
 }
