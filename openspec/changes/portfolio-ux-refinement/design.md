@@ -64,38 +64,34 @@ The design balances Swiss editorial minimalism with organic constructivism. Visu
 | `H1` | Sans | `28px` | `700` | `1.2` | Candidate brand name & modal headings |
 | `H2` | Sans | `20px` | `600` | `1.3` | Project drawer titles & grid card headings |
 | `Body` | Sans | `15px` | `400` | `1.5` | Project summaries, bio paragraphs |
-| `Tagline` | Mono | `10px` | `500` | `1.4` | Header subtitle: "Software Engineer · Autonomous Agents & Graphics" |
+| `Tagline` | Mono | `12px` | `500` | `1.4` | Canonical header tagline: "Software Engineer · Autonomous Agents & Graphics" (desktop & mobile) |
 | `Pill / Action` | Mono / Sans | `11px` | `600` | `1.0` | `Code ↗`, `Visit ↗`, `Resume ↗` action pills |
 
 ---
 
 ## 4. Component Anatomy & States
 
+### Component: Top Bar with Canonical Tagline & Scrim
+- **Visual Hierarchy & Placement**: Spans the top edge with safe-area insets.
+- **Styling**: `bg-gradient-to-b from-[var(--color-bg)] via-[var(--color-bg)]/80 to-transparent pb-6 backdrop-blur-[2px]`.
+- **Tagline**: Rendered at `text-xs font-mono tracking-wider text-[var(--color-muted)]` on both desktop and mobile viewports.
+
+### Component: `AboutModal` Top Contact Bar & Sandboxed Preview
+- **Visual Hierarchy & Placement**: Pinned at the top of the About modal dialog immediately beneath the heading.
+- **Component States**:
+  - **Contact Actions**: Row of fluid pills for Email (`mailto:`), LinkedIn, GitHub, and direct `Resume (Drive) ↗` link.
+  - **Click-to-Load Toggle**: `[ Preview Resume ▾ ]` revealing a 450px responsive iframe with `title="Resume - Gregory Lazatin"`, `referrerpolicy="no-referrer"`, and `sandbox="allow-scripts allow-same-origin allow-popups"`.
+
 ### Component: `NodeHoverCard` Direct Action Links
 - **Visual Hierarchy & Placement**: Pinned directly beneath the card title in the floating preview popup, above the summary.
 - **Component States**:
-  - **Default / Idle**: Pill with 1px border (`var(--color-outline)`), font-mono 10px, uppercase tracking. `Visit ↗` has accent tint background (`var(--color-accent)/10`).
+  - **Default / Idle**: Pill with 1px border (`var(--color-outline)`), font-mono 10px. `Visit ↗` has accent tint background (`var(--color-accent)/10`).
   - **Hover**: Background shifts to solid accent (`var(--color-accent)`) with white text.
-  - **Active / Pressed**: Scale down to `0.98`.
-  - **Focus**: 2px outline in `var(--color-accent)` with 2px offset.
-  - **Disabled**: Hidden if URL does not exist.
+  - **Accessibility**: Includes descriptive accessible names (e.g. `aria-label="OpenDungeon source code, opens in new tab"`).
 
 ### Component: `ProjectDrawer` Sticky Action Bar
 - **Visual Hierarchy & Placement**: Pinned in the sticky header directly below the scramble title container.
-- **Component States**:
-  - **Default / Idle**: Flexible row of fluid pills with icons (`GitBranch`, `ExternalLink`).
-  - **Hover**: Accent highlight border and color transition.
-  - **Focus**: Focus ring mirroring.
-
-### Component: `AboutModal` Contact Bar & Resume Preview
-- **Visual Hierarchy & Placement**: Bottom action bar in the About modal, followed by an expandable `Resume Preview` container.
-- **Component States**:
-  - **Resume Preview Toggle**: Pill button `[ View Resume Preview ▾ ]` revealing a 450px responsive iframe with smooth border and loading placeholder.
-  - **Contact Links**: Fluid pills for Email, LinkedIn, GitHub, and direct Google Drive file link.
-
-### Component: Top Bar Progressive Scrim
-- **Visual Hierarchy & Placement**: Spans the full top edge behind `ControlsOverlay`.
-- **Styling**: `bg-gradient-to-b from-[var(--color-bg)] via-[var(--color-bg)]/80 to-transparent pb-6 backdrop-blur-[2px]`. Guarantees legible typography without an artificial box.
+- **Mobile Styling**: Rendered as a docked bottom sheet with `fixed inset-x-0 bottom-0 rounded-t-2xl max-h-[85dvh] overflow-y-auto`.
 
 ---
 
@@ -103,7 +99,7 @@ The design balances Swiss editorial minimalism with organic constructivism. Visu
 
 | Viewport | Breakpoint | Layout Pattern | Navigation / Sizing Rules |
 | :--- | :--- | :--- | :--- |
-| **Mobile** | `< 768px` | Native Bottom Sheet drawer, stacked top bar | Touch targets $\ge 44\text{px}$, bottom sheet `fixed inset-x-0 bottom-0 rounded-t-2xl max-h-[85vh]` |
+| **Mobile** | `< 768px` | Native Bottom Sheet drawer, stacked top bar | Touch targets $\ge 44\text{px}$, bottom sheet `max-h-[85dvh]` |
 | **Desktop** | `≥ 768px` | Anchored HUD drawer, floating hover card | Compact spacing, hover tooltips enabled, candidate engineering subtitle visible |
 
 ---
@@ -111,7 +107,7 @@ The design balances Swiss editorial minimalism with organic constructivism. Visu
 ## 6. Interaction, Motion & Sound
 
 - **Transitions**: `transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease`.
-- **Card Hover Retention**: 150ms grace delay when moving pointer from graph node to hover card.
+- **Card Hover Retention**: 150ms transfer timeout; entering card cancels dismissal; drag immediately closes card.
 - **Stepped Decode Title**: 350ms duration at 12fps (bypassed when `prefers-reduced-motion: reduce` is active).
 
 ---
@@ -120,6 +116,7 @@ The design balances Swiss editorial minimalism with organic constructivism. Visu
 
 - **DO** use semantic CSS variables mapped to design tokens (`var(--color-accent)`, `var(--color-surface)`).
 - **DO** ensure all clickable pills and action buttons provide at least $44 \times 44\text{px}$ touch targets on mobile.
+- **DO** use `dvh` units for bottom sheet height clamping on mobile devices.
 - **DON'T** use low-contrast text that fails WCAG AA ($< 4.5:1$).
-- **DON'T** restore heavy solid background boxes or borders to the floating top bar.
+- **DON'T** hide the engineering tagline on mobile viewports.
 - **DON'T** render raw kebab slugs on canvas simulation nodes.

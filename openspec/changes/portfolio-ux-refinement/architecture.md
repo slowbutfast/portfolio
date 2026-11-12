@@ -4,13 +4,18 @@
 
 ## Context
 
-The portfolio is a client-side React 18 single-page application built on Vite, deployed to Vercel's global Edge CDN, and running an in-browser physics engine (d3-force) alongside SVG/HTML overlays. Current evaluations highlighted that candidate conversion was impeded by missing recruiter data channels, buried external links, and rigid iframe security headers that prevented embedding Google Drive document previews.
+The portfolio is a client-side React 19.3 single-page application built on Vite, deployed to Vercel's global Edge CDN, and running an in-browser physics engine (d3-force) alongside SVG/HTML overlays. Current evaluations highlighted that candidate conversion was impeded by missing recruiter data channels, buried external links, and rigid iframe security headers that prevented embedding Google Drive document previews.
 
 ## System Architecture Diagram
 
 ```mermaid
 flowchart TD
-    subgraph Client ["Client Browser Runtime"]
+    subgraph DataLayer ["Data Layer (Single Sources of Truth)"]
+        ProfileData["src/data/profile.ts\n(CandidateProfile: email, linkedIn, resumeUrls, tagline)"]
+        ProjectCatalog["src/data/projects.ts\n(ProjectData[]: mandatory shortTitle, repo, liveUrl, previews)"]
+    end
+
+    subgraph Client ["Client Browser Runtime (React 19.3)"]
         subgraph State ["Application State (App.tsx)"]
             ActiveProject["activeProjectId: string | null"]
             HoveredProject["hoveredProjectId: string | null"]
@@ -20,20 +25,21 @@ flowchart TD
 
         subgraph GraphSim ["Physics Layer (d3-force)"]
             CanvasNodes["nodes: (id, label=shortTitle, radius, visited)"]
-            ClampEngine["Viewport Boundary Clamping"]
+            ClampEngine["Full Pill Bounds Clamping & Collision Offsets"]
         end
 
         subgraph HUD ["Presentation Components"]
-            Controls["ControlsOverlay\n(Tagline, Scrim, Tag Filters)"]
-            About["AboutModal\n(Contact URLs + Drive Preview IFrame)"]
-            Drawer["ProjectDrawer\n(Sticky Header: Code + Visit ↗)"]
-            HoverCard["NodeHoverCard\n(pointer-events-auto: Code + Visit ↗)"]
-            Grid["ListView\n(Thumbnails, Compact Numerals)"]
+            Controls["ControlsOverlay\n(Canonical 12px Tagline, Scrim, Tag Filters)"]
+            About["AboutModal\n(Top Contact Actions + Sandboxed Drive IFrame)"]
+            Drawer["ProjectDrawer\n(Sticky Header: Code + Visit ↗, max-h-[85dvh])"]
+            HoverCard["NodeHoverCard\n(pointer-events-auto: Code + Visit ↗, Transfer Zone)"]
+            Grid["ListView\n(16:9 Thumbnails + Terminal Specimen Fallback)"]
         end
     end
 
     subgraph Edge ["Vercel Edge CDN Infrastructure"]
         VercelJson["vercel.json\n(CSP: frame-src 'self' https://drive.google.com)"]
+        CspGuard["src/utils/csp.ts\n(SPEC_CSP synchronized)"]
         StaticAssets["dist/assets/*\n(Cache-Control: immutable, max-age=31536000)"]
     end
 
@@ -42,12 +48,15 @@ flowchart TD
         GitHub["GitHub Repositories"]
     end
 
+    ProfileData --> Controls
+    ProfileData --> About
+    ProjectCatalog --> CanvasNodes
+    ProjectCatalog --> Grid
     ActiveProject --> Drawer
     HoveredProject --> HoverCard
-    ViewModeState --> CanvasNodes
-    ViewModeState --> Grid
     VercelJson -.-> Client
-    About -.->|Embeds IFrame| GoogleDrive
+    CspGuard -.-> VercelJson
+    About -.->|Click-to-Load IFrame| GoogleDrive
     Drawer -->|Navigates| GitHub
     HoverCard -->|Navigates| GitHub
 ```
@@ -55,10 +64,11 @@ flowchart TD
 ## Goals / Non-Goals
 
 **Goals:**
-- Provide zero-bundle-overhead embedded document inspection for the candidate's Google Drive resume by adapting Vercel Edge CSP to permit `frame-src https://drive.google.com`.
-- Maintain compile-time type safety across all project models via TypeScript `ProjectData` extensions (`shortTitle`).
-- Decouple canvas simulation display strings from internal project identifiers to prevent physics collision artifacts.
-- Enable direct pointer interaction on `NodeHoverCard` while preserving smooth canvas raycasting and drag mechanics.
+- Decouple candidate profile identity from project records by introducing `src/data/profile.ts`.
+- Provide zero-bundle-overhead embedded document inspection for the candidate's Google Drive resume by adapting Vercel Edge CSP to permit `frame-src https://drive.google.com;`, synchronizing `SPEC_CSP` in `src/utils/csp.ts`.
+- Enforce mandatory `shortTitle: string` compile-time type safety across all 6 project entries.
+- Implement robust pointer transfer grace periods between canvas nodes and `NodeHoverCard` (cancel-on-enter, re-arm on leave, dismiss-on-drag).
+- Guard mobile ergonomics using dynamic viewport units (`max-h-[85dvh]`).
 
 **Non-Goals:**
 - Client-side PDF rendering via heavy WebAssembly or PDF.js bundles.
@@ -67,39 +77,43 @@ flowchart TD
 
 ## Technical Decisions
 
-### 1. Embedded Document Rendering via Google Drive Preview
-- **Choice**: Embed `https://drive.google.com/file/d/1zcDDcEDFt9oXSsbcvQObDyr1py2OjimW/preview` inside a sandboxed `<iframe>` within `AboutModal.tsx`.
-- **Alternatives Considered**:
-  - `pdfjs-dist` / `react-pdf`: Adds ~450KB to JS bundle, requires Web Worker setup and polyfills for canvas text layers.
-  - Direct PDF link only: Forces recruiters to leave the application tab, lowering session retention.
-- **Security Requirement**: Amend `vercel.json` CSP from `default-src 'self'` to explicitly include `frame-src 'self' https://drive.google.com;`.
+### 1. Dedicated `CandidateProfile` Data Layer
+- **Choice**: Create `src/data/profile.ts` exporting a strongly typed `CandidateProfile` object.
+- **Contract**: Contains `name`, `canonicalTitle`, `tagline`, `email`, `linkedIn`, `github`, `resumeUrl`, and `resumeEmbedUrl`.
+- **Rationale**: Isolates candidate contact channels and canonical branding from repository project models (`ProjectData`), facilitating clean unit testing of URL protocols (`mailto:`, `https:`).
 
-### 2. Dual-Title Architecture (`id`, `title`, and `shortTitle`)
-- **Choice**: Extend `ProjectData` in `src/types/portfolio.ts` with optional `shortTitle?: string`.
-- **Mapping**:
-  - `open-dungeon` &rarr; `OpenDungeon`
-  - `agentic-resume-builder` &rarr; `Resume Builder`
-  - `pict-climate-risk-viz-chatbot` &rarr; `Climate Risk`
-  - `transcribe-plus` &rarr; `Transcribe+`
-  - `sandwave-sim` &rarr; `Sandwave`
-  - `attention-max` &rarr; `AttentionMax`
-- **Data Flow**: `GraphCanvas.tsx` maps catalog projects to simulation nodes assigning `label = p.shortTitle || p.title`. `graphSimulation.ts` assigns `label: n.label` instead of defaulting to `n.id`. Full titles remain in `NodeHoverCard`, `ProjectDrawer`, and `ListView`.
+### 2. Click-to-Load Sandboxed Google Drive Preview
+- **Choice**: Embed `https://drive.google.com/file/d/1zcDDcEDFt9oXSsbcvQObDyr1py2OjimW/preview` inside a sandboxed `<iframe>` only after user interaction ("Preview Resume" click).
+- **Security & Privacy Attributes**:
+  - `title="Resume - Gregory Lazatin"`
+  - `referrerpolicy="no-referrer"`
+  - `sandbox="allow-scripts allow-same-origin allow-popups"`
+  - `loading="lazy"`
+- **CSP Coordination**: Add `frame-src 'self' https://drive.google.com;` to `vercel.json` and update `SPEC_CSP` in `src/utils/csp.ts` so guard tests and the preview deployment gate pass cleanly.
 
-### 3. Hover Card Hit-Testing & Retention Zone
-- **Choice**: Switch `NodeHoverCard` from `pointer-events-none` to `pointer-events-auto`. Wrap child links in `onClick={(e) => e.stopPropagation()}` to allow opening `Code ↗` or `Visit ↗` directly in a new tab without triggering the parent card click (`onSelect(project.id)`).
-- **Grace Retention**: Provide a 150ms debounce timeout on node pointer departure or cursor proximity detection so the card remains active as the cursor glides from the node into the card bounds.
+### 3. Simulation Input Type Extension & Mandatory `shortTitle`
+- **Choice**: Extend `SimulationNode` in `src/physics/graphSimulation.ts` to `{ id: string; label?: string }`.
+- **Data Flow**: `projects.ts` defines required `shortTitle: string`. `GraphCanvas.tsx` maps projects to `simNodes` passing `label: p.shortTitle`. `createSimulation` maps `label: n.label || n.id`.
 
-### 4. Edge Asset Delivery for Media
-- **Choice**: Direct Vite asset imports (`dist/assets/`). Vercel's Edge CDN caches all `/assets/*` files with immutable 1-year headers (`Cache-Control: public, max-age=31536000, immutable`).
+### 4. Hover Card Transfer Zone State Machine
+- **State Flow**:
+  1. Hovering node `H`: mounts `NodeHoverCard` at computed clamp coordinates.
+  2. Pointer leaves node `H`: begins a 150ms timeout.
+  3. Pointer enters `NodeHoverCard`: `onMouseEnter` on card invokes `clearTimeout`, cancelling dismissal.
+  4. Pointer leaves `NodeHoverCard`: `onMouseLeave` restarts the 150ms timeout.
+  5. Pointer begins drag on canvas: canvas `dragstart` immediately unmounts card and cancels any pending timers.
+
+### 5. Multi-Node Label Collision Avoidance
+- **Choice**: When two nodes settle with center-to-center Euclidean distance $< 70\text{px}$, the rendering loop alternates vertical placement (`y - radius - 8` vs `y + radius + 18`) to ensure both labels remain fully legible.
 
 ## Risks / Trade-offs
 
-- **[Risk] Google Drive Preview CSP / Cookie Block**: Third-party cookies or enterprise network policies may occasionally restrict Google Drive preview iframes.
-  &rarr; *Mitigation*: Always provide a prominent fallback button (`Resume ↗`) linking directly to the full Google Drive file view URL with `target="_blank"`.
+- **[Risk] Google Drive Preview Permission Requirement**: If owner does not configure "Anyone with link can view", Drive renders a sign-in prompt.
+  &rarr; *Mitigation*: Direct `Resume (Drive) ↗` button remains the primary high-visibility action above the embed.
 - **[Risk] Hover Card Event Slip**: Moving mouse across canvas might trigger rapid hover card flicker.
-  &rarr; *Mitigation*: Debounce dismissals by 150ms and ignore hover card updates during active canvas drag or coasting states.
+  &rarr; *Mitigation*: 150ms transfer timeout + drag cancellation keeps interaction stable.
 - **[Risk] Mobile Viewport Clamping**: Long labels might push nodes against screen boundaries.
-  &rarr; *Mitigation*: Implement clamped pill rendering in `GraphCanvas.tsx` with a 12px bounding margin.
+  &rarr; *Mitigation*: Full rectangular bounds clamping `[pillX, pillY, pillWidth, pillHeight]` keeps labels inside canvas padding.
 
 ## Migration & Rollback Plan
 
