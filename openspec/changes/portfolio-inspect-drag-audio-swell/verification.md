@@ -1,0 +1,209 @@
+# Verification: portfolio-inspect-drag-audio-swell
+
+## Executive Summary & Environment
+
+- **Status**: All automated specs verified passing. `typecheck`, production build, unit suite, and the full desktop + mobile Playwright suite are green; `openspec validate --strict` reports zero issues.
+- **Date**: 2026-11-13
+- **Branch**: `feat/portfolio-inspect-drag-audio-swell` (branched from `ca2a15d`)
+- **Environment**:
+  - OS: Linux `7db21b94c3fa` 5.15.0-1081-oracle, `aarch64`
+  - Node: `v22.23.2`; npm: `10.9.8`
+  - Test runners: Vitest `3.2.7`; Playwright `1.63.0`
+  - OpenSpec CLI: `1.7.0`
+  - Browsers: Chromium `desktop` (`Desktop Chrome`) and `mobile` (`Pixel 7`, touch)
+
+## Requirement Adherence Audit Matrix
+
+Delta capability: `ambient-audio` → `### Requirement: Node hover harmonic resonance swell`.
+
+| Capability | Requirement & Scenario | Verification Method / Test | Status |
+| :--- | :--- | :--- | :--- |
+| `ambient-audio` | **Requirement: Node hover harmonic resonance swell** — non-clipping `HOVER_SWELL_GAIN = 1.0`, `50ms` ramps, `35%` plateau after `1.2s`, active on hover/drag/Graph+Grid inspect | `src/audio/audioConstants.ts:14-17`; `src/audio/ambientSynth.ts:452-479`; `src/utils/audioSwell.ts`; `src/audio/ambientSynth.test.ts` (18 tests); `src/utils/audioSwell.test.ts` (9 tests) | **PASS** |
+| `ambient-audio` | **Scenario: Pointer hovers over a canvas node** — opens to `1.0` with a `50ms` time constant, no clipping | `src/audio/ambientSynth.test.ts:347` `swells the hover bandpass gain to HOVER_SWELL_GAIN and returns to zero`; `src/audio/ambientSynth.test.ts:280` `uses setTargetAtTime for every parameter ramp` (asserts `RAMP_TIME_CONSTANT = 0.05`); `src/audio/ambientSynth.test.ts:184` `HOVER_SWELL_GAIN` is `1.0` | **PASS** |
+| `ambient-audio` | **Scenario: Pointer leaves a canvas node** — gain decays to zero when no drag/inspect remains | `src/audio/ambientSynth.test.ts:347` (asserts `hoverGain.gain.value === 0` after `onNodeHover(false)`); `src/utils/audioSwell.test.ts` (8-combination truth table, all-false → `false`); `e2e/portfolio.spec.ts:279` (canvas returns to `data-audio-swell="false"` after release/close) | **PASS** |
+| `ambient-audio` | **Scenario: User drags a node or inspects a project** — `pointerdown` on a node through release, or `ProjectDrawer` open from Graph or Grid view, settles to `0.35` if held | `e2e/portfolio.spec.ts:279` `canvas mirrors inspect and drag audio swell state` (deep-link inspect → `"true"`, close → `"false"`, drag → `"true"`, release → `"false"`); `src/components/GraphCanvas.tsx:355-367` (`syncSynthSwell` covers hover/select/drag); `src/App.tsx:303-308` (Grid-view inspect while `GraphCanvas` is unmounted); `src/audio/ambientSynth.test.ts:357` (plateau at `1199ms` vs `1200ms`), `:377` (idempotent repeats), `:396` (dispose clears timer) | **PASS** |
+
+## Resolved Assumptions & Empirical Proof
+
+| Assumption from research.md | How Verified in Code/Tests | Result / Value | Volatility |
+| :--- | :--- | :--- | :--- |
+| `onNodeHover` has four call sites in `GraphCanvas.tsx` (`L684`, `L1062`, `L1172`, `L1176`) | `grep -n "onNodeHover" src/components/GraphCanvas.tsx` after refactor shows a single routed call inside `syncSynthSwell`; every original path now calls `syncSynthSwell()` | All four entry points plus pointer lifecycle and effects covered | stable |
+| `selectedIdRef` already tracks `initialSelectedId` | `src/components/GraphCanvas.tsx:323-324` assigns `selectedIdRef.current = initialSelectedId ?? null` every render; new effect at `:1093-1096` reconciles on change | Verified by inspection and E2E deep-link inspect (`data-audio-swell="true"`) | stable |
+| `HOVER_SWELL_GAIN = 2.0` fits without clipping | Replaced by explicit `1.0`; unit assertion at `src/audio/ambientSynth.test.ts:182`; halving linear gain removes `+6.02 dB`, moving the researched `+1.5 dBFS` peak to approximately `-4.5 dBFS` | Non-clipping (`< 0 dBFS`) by construction | stable |
+| Sustained inspection can buzz at full peak | New plateau test advances fake timers to `1199ms` (stays `1.0`) then `1200ms` (settles to `0.35`); repeated `onNodeHover(true)` leaves the ramp count unchanged | Plateau + idempotency proven | stable |
+| Phone-speaker audibility and 30-second comfort on the user's iPhone | Not automatable in this environment; remains the manual check documented in `tests.md` | **Manual verification pending** (no empirical claim) | decays |
+
+## Nomenclature & Code Symbol Audit
+
+| Glossary Term | Final Code Identifier | Location / File | Verified Compliant? |
+| :--- | :--- | :--- | :--- |
+| Resonance swell | `AmbientSynth.onNodeHover(isHovered)` / `nodes.hoverGain` | `src/audio/ambientSynth.ts:452-479` | Yes |
+| Derived swell (`hovered \|\| selected \|\| dragging`) | `deriveSwellActive(hovered, selected, dragging)` | `src/utils/audioSwell.ts` | Yes |
+| Non-clipping swell gain | `HOVER_SWELL_GAIN` | `src/audio/audioConstants.ts:14` | Yes |
+| Sustained plateau | `HOVER_SWELL_PLATEAU` (`0.35`) | `src/audio/audioConstants.ts:16` | Yes |
+| Plateau delay | `HOVER_SWELL_PLATEAU_DELAY_MS` (`1200`) | `src/audio/audioConstants.ts:17` | Yes |
+| Single swell reconciler | `syncSynthSwell()` | `src/components/GraphCanvas.tsx:355-367` | Yes |
+| Drag lifecycle flag | `draggingNodeRef` | `src/components/GraphCanvas.tsx:340` | Yes |
+| Observability attribute | `data-audio-swell="true" \| "false"` | set in `syncSynthSwell()` on `<canvas data-testid="graph-canvas">` | Yes |
+| 50ms smoothing constant | `RAMP_TIME_CONSTANT = 0.05` used by `ramp()` | `src/audio/audioConstants.ts:18`; `src/audio/ambientSynth.ts:192-198` | Yes |
+
+## Landed Tech Footprint & Patterns
+
+| Adopted Pattern / Package | Implementation File(s) | Verification Command / Suite |
+| :--- | :--- | :--- |
+| Pure state helper mirroring `stickyFocal.ts` | `src/utils/audioSwell.ts`, `src/utils/audioSwell.test.ts` | `npm run test:unit` (`audioSwell.test.ts`, 9 tests) |
+| Idempotent envelope + plateau timer | `src/audio/ambientSynth.ts:452-479`; constants in `src/audio/audioConstants.ts:14-17` | `npm run test:unit` (`ambientSynth.test.ts`, 18 tests) |
+| DOM observability mirroring `data-sim-state` | `src/components/GraphCanvas.tsx:355-367` (`canvas.dataset.audioSwell`) | `npm run test:e2e` (`canvas mirrors inspect and drag audio swell state`) |
+| Single reconciler across hover/drag/inspect | `src/components/GraphCanvas.tsx` (`emitHover`, reduced-motion handler, `focusedId` effect, `initialSelectedId` effect, pointer down/up/cancel/leave, unmount cleanup) | `npm run typecheck`, `npm run test:e2e` |
+| Graph/Grid view parity | `src/App.tsx:303-308` | `npm run typecheck`; Grid-view behavior is code-verified (`GraphCanvas` is unmounted in list view) |
+
+## Invalidated Hypotheses & Mid-Build Adjustments
+
+| Original Belief | What Proved Wrong | Final Resolution | Rationale |
+| :--- | :--- | :--- | :--- |
+| A test can find the hover gain by looking for `gain.value === HOVER_SWELL_GAIN` | With `HOVER_SWELL_GAIN = 1.0`, the master gain also equals `1.0`, so the old lookup could select the master node and falsely fail the return-to-zero assertion | Added `findHoverGain()`, which captures the only gain still at `0` after `setSoundEnabled(true)` (`src/audio/ambientSynth.test.ts:322-329`) | Keeps the test deterministic without exposing private nodes |
+| Reduced-motion `pointerleave`/motion change could return early after clearing hover | Direct `onNodeHover(false)` calls bypassed drag/selected state, which could silence a still-open inspector | All paths now call `syncSynthSwell()`, and the derived helper keeps the swell alive while `selectedId` is set | Satisfies the spec clause for reduced motion with an open inspector |
+| Grid-view inspection could be covered only by `GraphCanvas` | `ListView` unmounts `GraphCanvas`, so no canvas attribute exists and no pointer lifecycle runs | `App.tsx` now calls `synth.onNodeHover(selectedId !== null)` when `view === 'list'` | Preserves audio parity across views |
+
+## Implementation-Discovered Deferrals
+
+- **Deferred Item**: Automated assertion of the Grid-view swell on the canvas.
+  - **Reason**: Grid view intentionally unmounts `<canvas>`, so `data-audio-swell` has nowhere to live. The App-level sync is covered by typecheck and code audit; adding a cross-view assertion would require a new persistent observability element outside this change's scope.
+- **Deferred Item**: Physical iPhone speaker / 30-second comfort check.
+  - **Reason**: Requires the user's hardware and hearing; documented as manual verification in `tests.md` rather than claimed as automated proof.
+
+## Empirical Execution Logs & Evidence
+
+All commands were run from the worktree root on 2026-11-13.
+
+### Typecheck
+
+```bash
+$ npm run typecheck
+> node-portfolio-graph@0.1.0 typecheck
+> tsc --noEmit
+```
+
+Exit code: `0`.
+
+### Production build
+
+```bash
+$ npm run build
+> node-portfolio-graph@0.1.0 build
+> tsc --noEmit -p tsconfig.build.json && vite build
+...
+✓ 1962 modules transformed.
+dist/assets/index-BER9ftws.css                           30.77 kB │ gzip:   6.63 kB
+dist/assets/index-DC_FpmIL.js                           342.51 kB │ gzip: 108.87 kB
+✓ built in 4.04s
+```
+
+Exit code: `0`.
+
+### Unit suite (Vitest)
+
+Run as the first phase of `npm test`, after `npm run build` created `dist/` (the two `buildOutput` guards run only when `dist/assets` exists):
+
+```bash
+$ npm test
+...
+✓ src/audio/ambientSynth.test.ts (18 tests)
+✓ src/utils/audioSwell.test.ts (9 tests)
+...
+Test Files  19 passed (19)
+     Tests  200 passed (200)
+```
+
+Exit code: `0`. On a tree without `dist/`, the same command reports `198 passed | 2 skipped (200)`; both skipped cases are the build-output guards.
+
+### Full E2E suite (Playwright, desktop + mobile)
+
+```bash
+$ npm run test:e2e
+...
+✓ [desktop] › e2e/portfolio.spec.ts:279:3 › portfolio graph SPA › canvas mirrors inspect and drag audio swell state
+✓ [mobile]  › e2e/portfolio.spec.ts:279:3 › portfolio graph SPA › canvas mirrors inspect and drag audio swell state
+...
+  36 skipped
+  106 passed (3.5m)
+```
+
+Exit code: `0`. The 36 skips are pre-existing project-targeted skips (desktop-only or mobile-only cases); no failures.
+
+**Flake note**: One earlier full-suite pass hit a pre-existing timing flake in `hover card stays inside the desktop viewport at 1440x900`, where `hoverCenteredNode()` did not observe a hover card within its fixed waits. That test passed in isolation (`npx playwright test -g "hover card stays inside the desktop viewport at 1440x900"` → `1 passed, 1 skipped`) and in the final full re-run quoted above. No production code in this change touches hover-card layout or placement.
+
+### OpenSpec strict validation
+
+```bash
+$ npx openspec validate portfolio-inspect-drag-audio-swell --strict --json
+{
+  "items": [
+    {
+      "id": "portfolio-inspect-drag-audio-swell",
+      "type": "change",
+      "valid": true,
+      "issues": [],
+      "durationMs": 6
+    }
+  ],
+  "summary": {
+    "totals": { "items": 1, "passed": 1, "failed": 0 }
+  },
+  "version": "1.0"
+}
+```
+
+Exit code: `0`.
+
+### TDD evidence (initial red state)
+
+Before implementation, the scaffolded tests failed for the intended reasons:
+
+```bash
+$ npx vitest run src/utils/audioSwell.test.ts src/audio/ambientSynth.test.ts
+FAIL  src/utils/audioSwell.test.ts — Failed to load url ./audioSwell (does the file exist?)
+FAIL  src/audio/ambientSynth.test.ts > audio constants > exposes the specified synthesizer topology
+      AssertionError: expected 2 to be 1
+FAIL  src/audio/ambientSynth.test.ts > parameter modulation > settles a sustained swell to a 35% plateau after 1.2s
+FAIL  src/audio/ambientSynth.test.ts > parameter modulation > treats repeated onNodeHover(true) calls while active as no-ops
+      AssertionError: expected 3 to be 1
+Test Files  2 failed (2)
+     Tests  3 failed | 15 passed (18)
+```
+
+### Metrics & Data Invariants
+
+| Metric / Count | Before | After | Delta / Observation |
+| :--- | :--- | :--- | :--- |
+| `HOVER_SWELL_GAIN` linear gain | `2.0` | `1.0` | `-6.02 dB`; researched peak `+1.5 dBFS` → ≈`-4.5 dBFS` (non-clipping) |
+| Sustained hover gain after `1.2s` | `2.0` (frozen) | `0.35` | `-15.1 dB` plateau, prevents a stuck loud buzz |
+| Hover-gain test lookup | value matched `HOVER_SWELL_GAIN` | zero-valued gain after start | Avoids collision with master gain at `1.0` |
+| New unit tests | `0` | `12` | +9 `deriveSwellActive` truth-table cases, +3 envelope/idempotency/dispose cases |
+| New E2E scenarios | `0` | `2` | Desktop + mobile `data-audio-swell` inspect/drag coverage |
+| Persistent data / storage schema | — | — | No storage or catalog changes; no data-loss surface |
+
+## Quick Re-Verification (60-Second Audit)
+
+```bash
+npm run typecheck && npm run test:unit && npx openspec validate portfolio-inspect-drag-audio-swell --strict
+```
+
+Expected output:
+
+```text
+> tsc --noEmit
+...
+Test Files  19 passed (19)
+     Tests  200 passed (200)   # 198 passed | 2 skipped when dist/ is absent
+...
+Change 'portfolio-inspect-drag-audio-swell' is valid
+```
+
+To re-check the browser behavior only:
+
+```bash
+npx playwright test -g "canvas mirrors inspect and drag audio swell state"
+```
+
+Expected: `2 passed` (desktop + mobile).

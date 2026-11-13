@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   BANDPASS_Q,
   BANDPASS_REST_FREQ,
@@ -9,6 +9,8 @@ import {
   BASE_LOWPASS_FREQ,
   DEFAULT_SOUND_VOLUME,
   HOVER_SWELL_GAIN,
+  HOVER_SWELL_PLATEAU,
+  HOVER_SWELL_PLATEAU_DELAY_MS,
   MASTER_GAIN,
   NOISE_FLOOR_GAIN,
   PAN_MAX,
@@ -179,7 +181,9 @@ describe('audio constants', () => {
     expect(BANDPASS_SWEEP_MIN).toBe(450);
     expect(BANDPASS_SWEEP_MAX).toBe(1400);
     expect(BANDPASS_Q).toBe(2.5);
-    expect(HOVER_SWELL_GAIN).toBe(2.0);
+    expect(HOVER_SWELL_GAIN).toBe(1.0);
+    expect(HOVER_SWELL_PLATEAU).toBe(0.35);
+    expect(HOVER_SWELL_PLATEAU_DELAY_MS).toBe(1200);
     expect(PAN_MIN).toBe(-0.75);
     expect(PAN_MAX).toBe(0.75);
     expect(RAMP_TIME_CONSTANT).toBe(0.05);
@@ -313,6 +317,18 @@ describe('user consent and preference persistence', () => {
   });
 });
 
+// The hover gain is the only gain still at zero after `setSoundEnabled(true)`:
+// master has ramped to the stored volume, drone and noise hold their constants.
+function findHoverGain(ctx: FakeContext) {
+  const hoverGain = ctx.gains.find((gain) => gain.gain.value === 0);
+  if (!hoverGain) throw new Error('hover gain node not found');
+  return hoverGain;
+}
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe('parameter modulation', () => {
   it('maps pointer position to pan and bandpass sweep', () => {
     const { ctx, synth } = setup();
@@ -328,14 +344,66 @@ describe('parameter modulation', () => {
     expect(bandpass.frequency.value).toBe(BANDPASS_SWEEP_MAX);
   });
 
-  it('swells the hover bandpass gain by +6dB and returns to zero', () => {
+  it('swells the hover bandpass gain to HOVER_SWELL_GAIN and returns to zero', () => {
     const { ctx, synth } = setup();
     synth.setSoundEnabled(true);
+    const hoverGain = findHoverGain(ctx);
     synth.onNodeHover(true);
-    const hoverGain = ctx.gains.find((gain) => gain.gain.value === HOVER_SWELL_GAIN);
-    expect(hoverGain).toBeDefined();
+    expect(hoverGain.gain.value).toBe(HOVER_SWELL_GAIN);
     synth.onNodeHover(false);
-    expect(hoverGain?.gain.value).toBe(0);
+    expect(hoverGain.gain.value).toBe(0);
+  });
+
+  it('settles a sustained swell to a 35% plateau after 1.2s', () => {
+    vi.useFakeTimers();
+    const { ctx, synth } = setup();
+    synth.setSoundEnabled(true);
+    const hoverGain = findHoverGain(ctx);
+
+    synth.onNodeHover(true);
+    expect(hoverGain.gain.value).toBe(HOVER_SWELL_GAIN);
+
+    vi.advanceTimersByTime(1199);
+    expect(hoverGain.gain.value).toBe(HOVER_SWELL_GAIN);
+
+    vi.advanceTimersByTime(1);
+    expect(hoverGain.gain.value).toBeCloseTo(HOVER_SWELL_GAIN * 0.35, 6);
+
+    synth.onNodeHover(false);
+    expect(hoverGain.gain.value).toBe(0);
+    synth.dispose();
+  });
+
+  it('treats repeated onNodeHover(true) calls while active as no-ops', () => {
+    vi.useFakeTimers();
+    const { ctx, synth } = setup();
+    synth.setSoundEnabled(true);
+    const hoverGain = findHoverGain(ctx);
+
+    synth.onNodeHover(true);
+    const rampCount = hoverGain.gain.ramps.length;
+    synth.onNodeHover(true);
+    synth.onNodeHover(true);
+    expect(hoverGain.gain.ramps.length).toBe(rampCount);
+
+    // The original plateau timer must still fire exactly once.
+    vi.advanceTimersByTime(1200);
+    expect(hoverGain.gain.ramps.length).toBe(rampCount + 1);
+    expect(hoverGain.gain.value).toBeCloseTo(HOVER_SWELL_GAIN * 0.35, 6);
+    synth.dispose();
+  });
+
+  it('clears the plateau timer on dispose without further ramps', () => {
+    vi.useFakeTimers();
+    const { ctx, synth } = setup();
+    synth.setSoundEnabled(true);
+    const hoverGain = findHoverGain(ctx);
+
+    synth.onNodeHover(true);
+    const rampCount = hoverGain.gain.ramps.length;
+    synth.dispose();
+    vi.advanceTimersByTime(1200);
+    expect(hoverGain.gain.ramps.length).toBe(rampCount);
   });
 
   it('modulates the base oscillator by at most 5% during a drag', () => {

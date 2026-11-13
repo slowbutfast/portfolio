@@ -276,6 +276,34 @@ test.describe('portfolio graph SPA', () => {
     expect(errors).toEqual([]);
   });
 
+  test('canvas mirrors inspect and drag audio swell state', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/#/p/open-dungeon');
+    await expect(page.getByTestId('project-drawer')).toBeVisible();
+    const canvas = page.getByTestId('graph-canvas');
+
+    // Inspect (including a deep link) keeps the bandpass swell active.
+    await expect(canvas).toHaveAttribute('data-audio-swell', 'true');
+
+    await page.getByTestId('drawer-close').click();
+    await expect(page.getByTestId('project-drawer')).toHaveCount(0);
+    await expect(canvas).toHaveAttribute('data-audio-swell', 'false');
+
+    // Pressing and dragging a node activates the swell until release.
+    await focusNode(page);
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error('graph canvas has no bounding box');
+    const centerX = box.x + box.width / 2;
+    const centerY = box.y + box.height / 2;
+    await page.mouse.move(centerX, centerY);
+    await page.mouse.down();
+    await page.mouse.move(centerX + 60, centerY + 40, { steps: 6 });
+    await expect(canvas).toHaveAttribute('data-audio-swell', 'true');
+    await page.mouse.up();
+    await expect(canvas).toHaveAttribute('data-audio-swell', 'false');
+    expect(errors).toEqual([]);
+  });
+
   test('volume popover appears only while Sound is enabled and hides after 500ms', async ({
     page,
   }, testInfo) => {

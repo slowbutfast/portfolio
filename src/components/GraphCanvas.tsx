@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   type PointerEvent as ReactPointerEvent,
@@ -16,6 +17,7 @@ import {
 } from '../physics/graphSimulation';
 import type { PopoverObstacles } from '../utils/popoverPlacement';
 import { shouldClearStickyFocalOnTap } from '../utils/stickyFocal';
+import { deriveSwellActive } from '../utils/audioSwell';
 import type { AmbientSynth } from '../audio/ambientSynth';
 
 interface GraphCanvasProps {
@@ -335,6 +337,7 @@ export function GraphCanvas({
   const dimmedEdgesRef = useRef('');
   const visibleRef = useRef(true);
   const hoveredProjectIdRef = useRef<string | null>(null);
+  const draggingNodeRef = useRef(false);
   const canHoverRef = useRef(false);
   const renderRef = useRef<() => void>(() => {});
   const wakeRef = useRef<() => void>(() => {});
@@ -343,6 +346,22 @@ export function GraphCanvas({
   const lastDragPointRef = useRef<{ x: number; y: number; t: number } | null>(null);
   const hoverDwellTimerRef = useRef<number | null>(null);
   const hoverCandidateRef = useRef<GraphNode | null>(null);
+
+  /**
+   * Single source of truth for hover, drag, and inspector activation. The synth
+   * is idempotent while active, so repeated calls never restart the plateau,
+   * and the canvas mirrors the derived state for E2E observability.
+   */
+  const syncSynthSwell = useCallback(() => {
+    const active = deriveSwellActive(
+      hoveredProjectIdRef.current !== null,
+      selectedIdRef.current !== null,
+      draggingNodeRef.current,
+    );
+    synthRef.current?.onNodeHover(active);
+    const canvas = canvasRef.current;
+    if (canvas) canvas.dataset.audioSwell = String(active);
+  }, []);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -681,15 +700,18 @@ export function GraphCanvas({
         hoverCandidateRef.current = null;
         if (hoveredProjectIdRef.current !== null) {
           hoveredProjectIdRef.current = null;
-          synthRef.current?.onNodeHover(false);
           onHoverNodeRef.current?.(null, null);
         }
         if (sim.state === 'drag') {
           sim.dragEnd();
           lastDragPointRef.current = null;
+          draggingNodeRef.current = false;
           synthRef.current?.onDragVelocity(0, 0);
         }
         sim.hover(null);
+        // Reduced motion cancels hover/drag but a still-open inspector keeps
+        // the swell alive; the derived helper decides.
+        syncSynthSwell();
         // Freeze the current graph in place, not the original planar seeds.
         staticPosRef.current = new Map(
           sim.nodes.map((node) => [node.id, [node.x, node.y] as [number, number]]),
@@ -872,6 +894,8 @@ export function GraphCanvas({
         window.clearTimeout(hoverDwellTimerRef.current);
         hoverDwellTimerRef.current = null;
       }
+      draggingNodeRef.current = false;
+      synthRef.current?.onNodeHover(false);
       sim.sim.on('tick', null);
       sim.destroy();
       simRef.current = null;
@@ -1059,11 +1083,17 @@ export function GraphCanvas({
     hoverCandidateRef.current = null;
     if (hoveredProjectIdRef.current !== null) {
       hoveredProjectIdRef.current = null;
-      synthRef.current?.onNodeHover(false);
       onHoverNodeRef.current?.(null, null);
     }
     simRef.current?.hover(null);
-  }, [focusedId]);
+    syncSynthSwell();
+  }, [focusedId, syncSynthSwell]);
+
+  // Opening, deep-linking, or closing the inspector must reconcile the swell
+  // even when the pointer never moved.
+  useEffect(() => {
+    syncSynthSwell();
+  }, [initialSelectedId, syncSynthSwell]);
 
   useEffect(() => {
     if (layoutResetVersion <= 0) return;
@@ -1168,12 +1198,11 @@ export function GraphCanvas({
     const nextId = node?.id ?? null;
     if (nextId === hoveredProjectIdRef.current) return;
     hoveredProjectIdRef.current = nextId;
+    syncSynthSwell();
     if (!node) {
-      synthRef.current?.onNodeHover(false);
       onHoverNodeRef.current?.(null, null);
       return;
     }
-    synthRef.current?.onNodeHover(true);
     const project = getProjectById(node.id) ?? null;
     const anchor = nodeScreenPoint(node);
     if (project && anchor) {
@@ -1314,6 +1343,10 @@ export function GraphCanvas({
     if (sim.state === 'hover') sim.hover(null);
     const p = worldPoint(e.clientX, e.clientY);
     const node = hitNode(p.x, p.y);
+    // `pointerdown` over a node starts the drag swell immediately, before the
+    // simulation transitions, so the tap blips cleanly into the inspector.
+    draggingNodeRef.current = node !== null;
+    syncSynthSwell();
     setCanvasCursor(node ? 'crosshair' : 'default');
     downPosRef.current = { x: p.x, y: p.y };
     downNodeIdRef.current = node?.id ?? null;
@@ -1329,6 +1362,7 @@ export function GraphCanvas({
     const sim = simRef.current;
     if (!sim) return;
     wakeRef.current();
+    draggingNodeRef.current = false;
     synthRef.current?.onDragVelocity(0, 0);
     lastDragPointRef.current = null;
     const p = worldPoint(e.clientX, e.clientY);
@@ -1353,12 +1387,14 @@ export function GraphCanvas({
     downPosRef.current = null;
     downNodeIdRef.current = null;
     setCanvasCursor(releasedNode ? 'crosshair' : 'default');
+    syncSynthSwell();
   };
 
   const onPointerCancel = (e: ReactPointerEvent<HTMLCanvasElement>) => {
     wakeRef.current();
     clearHoverDwell();
     emitHover(null);
+    draggingNodeRef.current = false;
     const sim = simRef.current;
     if (sim?.state === 'drag') {
       sim.dragEnd({ cancel: true });
@@ -1372,6 +1408,7 @@ export function GraphCanvas({
       canvas.releasePointerCapture(e.pointerId);
     }
     setCanvasCursor('default');
+    syncSynthSwell();
   };
 
   const onPointerLeave = () => {
@@ -1379,18 +1416,21 @@ export function GraphCanvas({
     setCanvasCursor('default');
     clearHoverDwell();
     emitHover(null);
+    draggingNodeRef.current = false;
     const sim = simRef.current;
     if (!sim) return;
     downPosRef.current = null;
     downNodeIdRef.current = null;
-    if (reduceMotionRef.current) return;
-    if (sim.state === 'drag') {
-      sim.dragEnd();
-    } else {
-      sim.hover(null);
+    if (!reduceMotionRef.current) {
+      if (sim.state === 'drag') {
+        sim.dragEnd();
+      } else {
+        sim.hover(null);
+      }
+      lastDragPointRef.current = null;
+      synthRef.current?.onDragVelocity(0, 0);
     }
-    lastDragPointRef.current = null;
-    synthRef.current?.onDragVelocity(0, 0);
+    syncSynthSwell();
   };
 
   return (
