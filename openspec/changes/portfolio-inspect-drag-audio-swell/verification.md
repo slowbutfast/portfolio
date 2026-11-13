@@ -2,7 +2,7 @@
 
 ## Executive Summary & Environment
 
-- **Status**: All automated specs verified passing. `typecheck`, production build, unit suite, and the full desktop + mobile Playwright suite are green; `openspec validate --strict` reports zero issues. The user also confirmed on-device sound quality manually (`"the sound looks good on my end"`, 2026-11-13) and requested that the 3-dot settings glyph itself carry the sound-active accent instead of a separate dot.
+- **Status**: All automated specs verified passing. `typecheck`, production build, unit suite, and the full desktop + mobile Playwright suite are green; `openspec validate --strict` reports zero issues. The user also confirmed on-device sound quality manually (`"the sound looks good on my end"`, 2026-11-13) and requested that the 3-dot settings glyph itself carry the sound-active accent instead of a separate dot. `PATCH-02` also adds the missing live demo URLs so the Transcribe Plus and Sandwave Sim inspectors render `Visit ↗` actions.
 - **Date**: 2026-11-13
 - **Branch**: `feat/portfolio-inspect-drag-audio-swell` (branched from `ca2a15d`)
 - **Environment**:
@@ -26,6 +26,8 @@ Delta capability: `ambient-audio` → `### Requirement: Node hover harmonic reso
 | `portfolio-controls` | **Scenario: Desktop visitor views top-right header options** — 3-dot glyph renders in `--color-accent` while sound is enabled | `e2e/portfolio.spec.ts` `Sound toggle persists the user preference across reloads` (asserts `data-sound-active="true"` and glyph accent, then reverts after disabling) | **PASS** |
 | `portfolio-controls` | **Scenario: Mobile visitor views top-right header options** — 3-dot glyph renders in `--color-accent`, no `controls-sound-indicator` dot | `e2e/portfolio.spec.ts` `mobile 3-dot menu hosts Sound, volume, and a reachable Reset` (asserts `data-sound-active`, glyph accent, and dot count `0`) | **PASS** |
 | `portfolio-controls` | **Scenario: User opens the 3-dot menu and resets graph layout** — unchanged `Filters`/Reset behavior | `e2e/portfolio.spec.ts` `3-dot menu exposes one Reset that clears filters, layout, and visited colors` | **PASS** |
+| `project-catalog` | **Requirement: Verified project metadata catalog and preview mapping** — `transcribe-plus` and `sandwave-sim` now declare `liveUrl` | `src/data/projects.test.ts` `declares live demo URLs for transcribe-plus and sandwave-sim` | **PASS** |
+| `project-drawer` | **Requirement: Elevated primary repository and live project actions** / **Scenario: User inspects a project with a live URL and repository** — both projects now render `Code ↗` and `Visit ↗` | `e2e/portfolio.spec.ts` `Transcribe Plus and Sandwave Sim drawers expose their live demo links` (desktop + mobile, href assertions) | **PASS** |
 
 ## Resolved Assumptions & Empirical Proof
 
@@ -59,6 +61,7 @@ Delta capability: `ambient-audio` → `### Requirement: Node hover harmonic reso
 | Idempotent envelope + plateau timer | `src/audio/ambientSynth.ts:452-479`; constants in `src/audio/audioConstants.ts:14-17` | `npm run test:unit` (`ambientSynth.test.ts`, 18 tests) |
 | DOM observability mirroring `data-sim-state` | `src/components/GraphCanvas.tsx:355-367` (`canvas.dataset.audioSwell`) | `npm run test:e2e` (`canvas mirrors inspect and drag audio swell state`) |
 | Glyph-as-indicator (no badge/dot) | `src/components/ControlsOverlay.tsx` (`data-sound-active`, accent class on `controls-dropdown-icon`); `src/styles.css` (unused `.sound-indicator` removed) | `npm run test:e2e` (`Sound toggle persists…`, `mobile 3-dot menu hosts Sound…`) |
+| Catalog live-demo metadata | `src/data/projects.ts` (`liveUrl` on `transcribe-plus` and `sandwave-sim`); `src/components/ProjectDrawer.tsx` existing `drawer-visit` render | `npx vitest run src/data/projects.test.ts`; `npx playwright test -g "Transcribe Plus and Sandwave Sim drawers expose"` |
 | Single reconciler across hover/drag/inspect | `src/components/GraphCanvas.tsx` (`emitHover`, reduced-motion handler, `focusedId` effect, `initialSelectedId` effect, pointer down/up/cancel/leave, unmount cleanup) | `npm run typecheck`, `npm run test:e2e` |
 | Graph/Grid view parity | `src/App.tsx:303-308` | `npm run typecheck`; Grid-view behavior is code-verified (`GraphCanvas` is unmounted in list view) |
 
@@ -117,10 +120,10 @@ $ npm test
 ✓ src/utils/audioSwell.test.ts (9 tests)
 ...
 Test Files  19 passed (19)
-     Tests  200 passed (200)
+     Tests  201 passed (201)
 ```
 
-Exit code: `0`. On a tree without `dist/`, the same command reports `198 passed | 2 skipped (200)`; both skipped cases are the build-output guards.
+Exit code: `0`. On a tree without `dist/`, the same command reports `199 passed | 2 skipped (201)`; both skipped cases are the build-output guards.
 
 ### Full E2E suite (Playwright, desktop + mobile)
 
@@ -129,9 +132,11 @@ $ npm run test:e2e
 ...
 ✓ [desktop] › e2e/portfolio.spec.ts:287:3 › portfolio graph SPA › canvas mirrors inspect and drag audio swell state
 ✓ [mobile]  › e2e/portfolio.spec.ts:287:3 › portfolio graph SPA › canvas mirrors inspect and drag audio swell state
+✓ [desktop] › e2e/portfolio.spec.ts:386:3 › portfolio graph SPA › Transcribe Plus and Sandwave Sim drawers expose their live demo links
+✓ [mobile]  › e2e/portfolio.spec.ts:386:3 › portfolio graph SPA › Transcribe Plus and Sandwave Sim drawers expose their live demo links
 ...
   36 skipped
-  106 passed (3.5m)
+  108 passed (3.5m)
 ```
 
 Exit code: `0`. The 36 skips are pre-existing project-targeted skips (desktop-only or mobile-only cases); no failures.
@@ -192,14 +197,48 @@ Test Files  2 failed (2)
 $ npx playwright test -g "Sound toggle persists|mobile 3-dot menu hosts Sound"
 Running 4 tests using 1 worker
   ✓  1 [desktop] › e2e/portfolio.spec.ts:254:3 › portfolio graph SPA › Sound toggle persists the user preference across reloads
-  -  2 [desktop] › e2e/portfolio.spec.ts:617:3 › portfolio graph SPA › mobile 3-dot menu hosts Sound, volume, and a reachable Reset
+  -  2 [desktop] › e2e/portfolio.spec.ts:635:3 › portfolio graph SPA › mobile 3-dot menu hosts Sound, volume, and a reachable Reset
   -  3 [mobile] › e2e/portfolio.spec.ts:254:3 › portfolio graph SPA › Sound toggle persists the user preference across reloads
-  ✓  4 [mobile] › e2e/portfolio.spec.ts:617:3 › portfolio graph SPA › mobile 3-dot menu hosts Sound, volume, and a reachable Reset
+  ✓  4 [mobile] › e2e/portfolio.spec.ts:635:3 › portfolio graph SPA › mobile 3-dot menu hosts Sound, volume, and a reachable Reset
   2 skipped
   2 passed (8.3s)
 ```
 
 Exit code: `0`. Desktop verifies the accent glyph on the desktop trigger; mobile verifies it inside the 3-dot menu flow, including `controls-sound-indicator` count `0`.
+
+### PATCH-02 targeted verification (live demo links)
+
+Initial red state before adding `liveUrl`:
+
+```bash
+$ npx vitest run src/data/projects.test.ts
+FAIL  src/data/projects.test.ts > project catalog contract > declares live demo URLs for transcribe-plus and sandwave-sim
+AssertionError: expected undefined to be 'https://transcribe-plus-frontend.vercel.app/'
+Test Files  1 failed (1)
+     Tests  1 failed | 11 passed (12)
+
+$ npx playwright test -g "Transcribe Plus and Sandwave Sim drawers expose"
+2 failed
+  [desktop] › … Transcribe Plus and Sandwave Sim drawers expose their live demo links
+  [mobile]  › … Transcribe Plus and Sandwave Sim drawers expose their live demo links
+```
+
+After adding both `liveUrl` entries:
+
+```bash
+$ npx vitest run src/data/projects.test.ts
+✓ src/data/projects.test.ts (12 tests)
+Test Files  1 passed (1)
+     Tests  12 passed (12)
+
+$ npx playwright test -g "Transcribe Plus and Sandwave Sim drawers expose"
+Running 2 tests using 1 worker
+  ✓  1 [desktop] › e2e/portfolio.spec.ts:386:3 › portfolio graph SPA › Transcribe Plus and Sandwave Sim drawers expose their live demo links (838ms)
+  ✓  2 [mobile] › e2e/portfolio.spec.ts:386:3 › portfolio graph SPA › Transcribe Plus and Sandwave Sim drawers expose their live demo links (698ms)
+  2 passed (4.5s)
+```
+
+Exit code: `0`.
 
 ### Metrics & Data Invariants
 
@@ -213,7 +252,10 @@ Exit code: `0`. Desktop verifies the accent glyph on the desktop trigger; mobile
 | On-device sound check | Manual pending | User-confirmed good | Manual **PASS** on 2026-11-13 |
 | Sound-active affordance | Mobile-only corner dot (`controls-sound-indicator`) | Accent 3-dot settings glyph on desktop + mobile | One fewer DOM node; `.sound-indicator` CSS removed |
 | Sound-state E2E assertions | Dot visibility/width | `data-sound-active` + accent class + dot count `0` | Covers both enabled and disabled states |
-| Persistent data / storage schema | — | — | No storage or catalog changes; no data-loss surface |
+| Catalog `liveUrl` entries | `3` (open-dungeon, kintsugi, ivy) | `5` | +`transcribe-plus`, +`sandwave-sim` |
+| Transcribe/Sandwave inspector `Visit ↗` actions | `0` | `1` each | New `drawer-visit` hrefs match the live demos |
+| New live-link E2E scenarios | `0` | `2` | Desktop + mobile href assertions |
+| Persistent data / storage schema | — | — | No storage or catalog schema changes; no data-loss surface |
 
 ## Quick Re-Verification (60-Second Audit)
 
@@ -227,7 +269,7 @@ Expected output:
 > tsc --noEmit
 ...
 Test Files  19 passed (19)
-     Tests  200 passed (200)   # 198 passed | 2 skipped when dist/ is absent
+     Tests  201 passed (201)   # 199 passed | 2 skipped when dist/ is absent
 ...
 Change 'portfolio-inspect-drag-audio-swell' is valid
 ```
@@ -239,3 +281,12 @@ npx playwright test -g "canvas mirrors inspect and drag audio swell state|Sound 
 ```
 
 Expected: `4 passed, 2 skipped` (desktop + mobile audio-swell, desktop sound persistence, mobile 3-dot menu).
+
+To re-check the live demo links only:
+
+```bash
+npx vitest run src/data/projects.test.ts
+npx playwright test -g "Transcribe Plus and Sandwave Sim drawers expose"
+```
+
+Expected: `12 passed` unit tests; `2 passed` E2E tests (desktop + mobile).

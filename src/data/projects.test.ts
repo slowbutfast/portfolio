@@ -84,6 +84,13 @@ describe('project catalog contract', () => {
     expect(ivy?.liveUrl).toBe('https://www.ivyfilmfestival.org/');
   });
 
+  it('declares live demo URLs for transcribe-plus and sandwave-sim', () => {
+    const transcribe = projects.find((p) => p.id === 'transcribe-plus');
+    const sandwave = projects.find((p) => p.id === 'sandwave-sim');
+    expect(transcribe?.liveUrl).toBe('https://transcribe-plus-frontend.vercel.app/');
+    expect(sandwave?.liveUrl).toBe('https://sandwave-sim.vercel.app/');
+  });
+
   it('treats repo as optional while every other project declares a GitHub URL', () => {
     for (const p of projects) {
       if (p.id === 'ivy-film-festival-2026') {

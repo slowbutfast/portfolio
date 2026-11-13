@@ -14,3 +14,12 @@
 
 - [x] 3.1 Run `npm run typecheck`, `npm run build`, `npm test`, and `npx openspec validate portfolio-inspect-drag-audio-swell --strict --json` to verify clean passes
 - [x] 3.2 Populate `verification.md` with Requirement Adherence Matrix and verbatim execution logs
+
+## Patch 02: Add Sandwave Sim and Transcribe Plus liveUrl for inspector Visit links
+
+> The external handoff labelled this work `PATCH-01`; it is recorded here as `PATCH-02` because `PATCH-01` is the accent settings-glyph patch already landed in `6581b8c`.
+
+- [x] P02.1 Add failing unit assertion in `src/data/projects.test.ts` and failing desktop/mobile E2E assertion in `e2e/portfolio.spec.ts` for both `liveUrl` values and `drawer-visit` hrefs
+- [x] P02.2 Add `liveUrl: 'https://transcribe-plus-frontend.vercel.app/',` and `liveUrl: 'https://sandwave-sim.vercel.app/',` in `src/data/projects.ts`
+- [x] P02.3 Verify tests pass (`npm run typecheck && npm run build && npm test`)
+- [x] P02.4 Update `verification.md` and mark `PATCH-02` resolved in `patch.md`

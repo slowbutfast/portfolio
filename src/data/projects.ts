@@ -86,6 +86,7 @@ export const projects = [
     classification: 'LOCAL AUDIO TRANSCRIPTION // MONOREPO',
     tags: ['Express', 'Vanilla JS', 'Audio'],
     repo: 'https://github.com/slowbutfast/transcribe-plus',
+    liveUrl: 'https://transcribe-plus-frontend.vercel.app/',
     previews: [
       { kind: 'video', src: transcribeClip, caption: 'Transcribe Plus product walkthrough' },
       { kind: 'terminal', label: 'Terminal' },
@@ -102,6 +103,7 @@ export const projects = [
     classification: 'ACOUSTIC PHYSICS SIMULATION // CHLADNI PLATES',
     tags: ['Vanilla JS', 'Audio'],
     repo: 'https://github.com/slowbutfast/sandwave-sim',
+    liveUrl: 'https://sandwave-sim.vercel.app/',
     previews: [
       { kind: 'screenshot', src: sandwaveScreenshot, caption: 'Sandwave Chladni plate view' },
       { kind: 'terminal', label: 'Terminal' },

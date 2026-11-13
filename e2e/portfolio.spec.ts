@@ -383,6 +383,24 @@ test.describe('portfolio graph SPA', () => {
     );
   });
 
+  test('Transcribe Plus and Sandwave Sim drawers expose their live demo links', async ({ page }) => {
+    await page.goto('/#/p/transcribe-plus');
+    await expect(page.getByTestId('project-drawer')).toBeVisible();
+    await expect(page.getByTestId('drawer-visit')).toBeVisible();
+    await expect(page.getByTestId('drawer-visit')).toHaveAttribute(
+      'href',
+      'https://transcribe-plus-frontend.vercel.app/',
+    );
+
+    await page.goto('/#/p/sandwave-sim');
+    await expect(page.getByTestId('project-drawer')).toBeVisible();
+    await expect(page.getByTestId('drawer-visit')).toBeVisible();
+    await expect(page.getByTestId('drawer-visit')).toHaveAttribute(
+      'href',
+      'https://sandwave-sim.vercel.app/',
+    );
+  });
+
   test('list view renders 8 cards and a card click opens the project drawer', async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto('/');
