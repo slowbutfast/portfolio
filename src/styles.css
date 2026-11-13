@@ -120,6 +120,53 @@ body {
   accent-color: var(--color-accent);
   background: transparent;
   cursor: pointer;
+  touch-action: none;
+}
+
+/* In-menu mobile volume row: horizontal 44px-high touch target. */
+.volume-slider-horizontal {
+  writing-mode: horizontal-tb;
+  direction: ltr;
+  width: auto;
+  height: 2.75rem;
+  touch-action: none;
+}
+
+/*
+ * Header control visibility. These rules live after the utility layer so they
+ * beat the `inline-flex` baked into `.bareText` (equal specificity, source
+ * order decides).
+ */
+.nav-github-link {
+  display: none;
+}
+
+.desktop-sound {
+  display: none;
+}
+
+.mobile-sound-row {
+  display: block;
+}
+
+@media (min-width: 640px) {
+  .nav-github-link {
+    display: inline-flex;
+  }
+}
+
+@media (min-width: 640px) and (hover: hover) {
+  .desktop-sound {
+    display: inline-flex;
+  }
+
+  .mobile-sound-row {
+    display: none;
+  }
+
+  .sound-indicator {
+    display: none;
+  }
 }
 
 .sr-only {

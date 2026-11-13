@@ -69,7 +69,12 @@ export interface GraphSimulation {
   hover(node: GraphNode | null): void;
   dragStart(node: GraphNode): void;
   dragMove(x: number, y: number): void;
-  dragEnd(): void;
+  /**
+   * Release an active drag. `cancel: true` abandons the gesture: no fling
+   * velocity is applied and no new home anchor is committed, so the node
+   * springs back to its previous resting position.
+   */
+  dragEnd(options?: { cancel?: boolean }): void;
   /** Clear user pins and detached flags, then restore the planar seeds. */
   resetLayout(): void;
   findNode(id: string): GraphNode | undefined;
@@ -557,9 +562,33 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
     if (dragSamples.length > 3) dragSamples.shift();
   }
 
-  function dragEnd(): void {
+  function dragEnd(options?: { cancel?: boolean }): void {
     if (state !== 'drag' || !dragNode) return;
     const node = dragNode;
+
+    if (options?.cancel) {
+      // OS gesture interruption: drop the hard pin without committing the
+      // dragged coordinate as the new home. The existing home spring pulls the
+      // node back to where it rested before the gesture.
+      node.fx = null;
+      node.fy = null;
+      node.vx = 0;
+      node.vy = 0;
+
+      coastingNode = null;
+      dragNode = null;
+      dragTarget = null;
+      dragSamples.length = 0;
+      state = 'idle';
+      refreshLinkStrength();
+      refreshDragIsolation();
+      sim.velocityDecay(VELOCITY_DECAY_IDLE);
+      sim.alphaTarget(0);
+      sim.alpha(0.2).restart();
+      updateLinkTopology();
+      return;
+    }
+
     // Commit the last dragged coordinate before releasing the hard pin.
     const releaseX = node.fx;
     const releaseY = node.fy;

@@ -123,7 +123,7 @@ export function ControlsOverlay({
         className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-[var(--color-bg)] via-[var(--color-bg)]/80 to-transparent md:h-28"
       />
       <header
-        className="pointer-events-auto absolute inset-x-0 top-0 flex flex-wrap items-center gap-x-4 gap-y-1"
+        className="pointer-events-auto absolute inset-x-0 top-0 flex flex-wrap items-center gap-x-3 gap-y-1 sm:gap-x-4"
         style={{
           paddingTop: safe('top', '1rem'),
           paddingLeft: safe('left', '1rem'),
@@ -142,7 +142,7 @@ export function ControlsOverlay({
           {candidateProfile.name}
         </button>
 
-        <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1 font-secondary text-xs font-light md:gap-x-6">
+        <div className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1 font-secondary text-xs font-light sm:gap-x-4 md:gap-x-6">
           <button type="button" data-testid="nav-about" onClick={onOpenAbout} className={bareText}>
             About
           </button>
@@ -151,7 +151,7 @@ export function ControlsOverlay({
             target="_blank"
             rel="noreferrer"
             data-testid="nav-github"
-            className={`${bareText} gap-1`}
+            className={`${bareText} nav-github-link gap-1`}
           >
             GitHub <span aria-hidden="true">↗</span>
           </a>
@@ -165,7 +165,7 @@ export function ControlsOverlay({
             {view === 'graph' ? 'Grid' : 'Graph'}
           </button>
           <div
-            className="relative inline-flex"
+            className="desktop-sound relative"
             onPointerEnter={showVolume}
             onPointerLeave={scheduleVolumeHide}
             onFocus={showVolume}
@@ -245,16 +245,23 @@ export function ControlsOverlay({
               aria-expanded={open}
               aria-controls="portfolio-controls"
               onClick={() => setOpen((value) => !value)}
-              className={`${bareText} min-w-11 justify-center md:min-w-0`}
+              className={`${bareText} relative min-w-11 justify-center md:min-w-0`}
             >
               <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+              {soundEnabled && (
+                <span
+                  data-testid="controls-sound-indicator"
+                  aria-hidden="true"
+                  className="sound-indicator absolute right-0 top-0 h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]"
+                />
+              )}
             </button>
 
             {open && (
               <div
                 id="portfolio-controls"
                 data-testid="controls-dropdown"
-                className="absolute right-0 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-[var(--color-outline)] bg-[var(--color-surface)]/95 p-4 text-[var(--color-text)] shadow-2xl backdrop-blur-md"
+                className="absolute right-0 mt-2 max-h-[calc(100dvh-5rem)] w-[min(22rem,calc(100vw-2rem))] overflow-y-auto rounded-2xl border border-[var(--color-outline)] bg-[var(--color-surface)]/95 p-4 text-[var(--color-text)] shadow-2xl backdrop-blur-md"
               >
                 <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
                   Filters
@@ -294,6 +301,41 @@ export function ControlsOverlay({
                       </button>
                     );
                   })}
+                </div>
+
+                <div
+                  data-testid="mobile-audio-controls"
+                  className="mobile-sound-row mt-4 border-t border-[var(--color-divider)] pt-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      data-testid="mobile-audio-toggle"
+                      aria-pressed={soundEnabled}
+                      onClick={onToggleSound}
+                      className={`fluid-pill min-h-11 shrink-0 ${
+                        soundEnabled ? 'fluid-pill-active' : ''
+                      }`}
+                    >
+                      Sound
+                    </button>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={soundVolume}
+                      aria-label="Sound volume"
+                      aria-orientation="horizontal"
+                      data-testid="mobile-volume-slider"
+                      onChange={(event) => onVolumeChange(Number(event.target.value))}
+                      onPointerDown={() => {
+                        volumeDraggingRef.current = true;
+                        clearVolumeHide();
+                      }}
+                      className="volume-slider volume-slider-horizontal min-w-0 flex-1"
+                    />
+                  </div>
                 </div>
 
                 <div className="mt-4 flex items-center justify-end gap-2 border-t border-[var(--color-divider)] pt-3">
