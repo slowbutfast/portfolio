@@ -109,7 +109,17 @@ body {
 }
 
 .canvas-interactive {
-  cursor: crosshair;
+  cursor: default;
+}
+
+.volume-slider {
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 1.25rem;
+  height: 6rem;
+  accent-color: var(--color-accent);
+  background: transparent;
+  cursor: pointer;
 }
 
 .sr-only {

@@ -1,32 +1,75 @@
 import { ExternalLink, GitBranch } from 'lucide-react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import type { Preview, ProjectData } from '../types/portfolio';
+import {
+  chooseBestPopoverPosition,
+  type PopoverObstacles,
+} from '../utils/popoverPlacement';
 
 interface NodeHoverCardProps {
   project: ProjectData;
   position: { x: number; y: number };
+  /** Canvas center used to project the card outward from the graph cluster. */
+  canvasCenter?: { x: number; y: number };
+  obstacles?: PopoverObstacles;
   onPointerEnter?: () => void;
   onPointerLeave?: () => void;
 }
 
 type MediaPreview = Extract<Preview, { kind: 'video' | 'screenshot' }>;
 
+/** Fallback measurements until the first ResizeObserver frame. */
+const FALLBACK_WIDTH = 320;
+const FALLBACK_HEIGHT = 330;
+const VIEWPORT_MARGIN = 20;
+const NODE_GAP = 36;
+
 export function NodeHoverCard({
   project,
   position,
+  canvasCenter,
+  obstacles,
   onPointerEnter,
   onPointerLeave,
 }: NodeHoverCardProps) {
-  const cardWidth = 320;
-  const cardHeight = 330;
-  const margin = 20;
-  const left = Math.min(
-    Math.max(margin, position.x + 28),
-    Math.max(margin, window.innerWidth - cardWidth - margin),
-  );
-  const top = Math.min(
-    Math.max(margin, position.y - 40),
-    Math.max(margin, window.innerHeight - cardHeight - margin),
-  );
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ width: FALLBACK_WIDTH, height: FALLBACK_HEIGHT });
+
+  useLayoutEffect(() => {
+    const element = cardRef.current;
+    if (!element) return;
+    const measure = () => {
+      const rect = element.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      setSize((previous) =>
+        Math.abs(previous.width - rect.width) < 0.5 &&
+        Math.abs(previous.height - rect.height) < 0.5
+          ? previous
+          : { width: rect.width, height: rect.height },
+      );
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [project.id]);
+
+  const cardWidth = size.width || FALLBACK_WIDTH;
+  const cardHeight = size.height || FALLBACK_HEIGHT;
+  const viewportWidth = typeof window === 'undefined' ? 1024 : window.innerWidth;
+  const viewportHeight = typeof window === 'undefined' ? 768 : window.innerHeight;
+  const center = canvasCenter ?? { x: viewportWidth / 2, y: viewportHeight / 2 };
+  const { left, top } = chooseBestPopoverPosition({
+    anchor: position,
+    size: { width: cardWidth, height: cardHeight },
+    viewport: { width: viewportWidth, height: viewportHeight },
+    canvasCenter: center,
+    margin: VIEWPORT_MARGIN,
+    topMargin: 72,
+    gap: NODE_GAP,
+    targetNodeId: project.id,
+    obstacles,
+  });
 
   const video = project.previews.find(
     (preview): preview is Extract<MediaPreview, { kind: 'video' }> => preview.kind === 'video',
@@ -38,6 +81,7 @@ export function NodeHoverCard({
 
   return (
     <div
+      ref={cardRef}
       data-testid="node-hover-card"
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
@@ -61,13 +105,12 @@ export function NodeHoverCard({
           alt={project.title}
           className="h-32 w-full rounded-xl object-cover"
         />
-      ) : (
+      ) : project.terminalDemo ? (
         <div className="flex h-32 w-full flex-col justify-between rounded-xl border border-[var(--color-divider)] bg-[var(--color-bg)] p-3 font-mono text-[11px] text-[var(--color-muted)]">
           <span className="text-[var(--color-accent)]">&gt;_</span>
-          <span className="truncate">{project.terminalDemo?.prompt || project.title}</span>
-          <span className="text-[10px] uppercase tracking-[0.18em]">CLI specimen</span>
+          <span className="truncate">{project.terminalDemo.prompt || project.title}</span>
         </div>
-      )}
+      ) : null}
 
       <div className="mt-3 flex items-start justify-between gap-2">
         <h3

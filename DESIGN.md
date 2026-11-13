@@ -130,7 +130,7 @@ components:
 
 ## Overview
 
-The portfolio is a **fluid minimalist personal showcase** for Gregory Lazatin: a warm architectural-paper canvas where pure circular primitives, bilateral ferrofluid connections, instant media previews, and Helvetica typography carry the visual identity. Light is the default theme; dark mode is an explicit one-click choice. A floating top bar frames the work; `Filters ▾` holds search and filtering; hovering a node reveals an interactive media card; and project inspection opens as a contextual HUD on desktop or a bottom sheet on mobile.
+The portfolio is a **fluid minimalist personal showcase** for Gregory Lazatin: a warm architectural-paper canvas where pure circular primitives, bilateral ferrofluid connections, instant media previews, and Helvetica typography carry the visual identity. Light is the default theme; dark mode is an explicit one-click choice. A floating top bar frames the work; a 3-dot overflow menu holds search, filtering, and a singular reset; hovering a node reveals an interactive media card; and project inspection opens as a contextual HUD on desktop or a bottom sheet on mobile.
 
 Root `DESIGN.md` is the authoritative visual identity definition for the project.
 
@@ -152,7 +152,7 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 
 ### 3. Radical Reduction (Ma)
 - No background grid, visible brand banner, coordinate ticker, corner crop marks, plate captions, build stamps, or classification captions inside the inspector.
-- The canvas cursor is a crosshair (`+`), inviting direct manipulation without adding chrome.
+- The canvas cursor is the default arrow at rest and becomes a crosshair (`+`) only while hovering or dragging a project node, inviting direct manipulation without mis signaling that empty canvas is interactive.
 - Project titles sit inside background-matched knockout pills so connections never obstruct reading.
 
 ### 4. Fluid Geometry, Planar Resting States & Dual Themes
@@ -163,7 +163,7 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 
 ### 5. Human Identity & Discoverability
 - The top-left wordmark is the author's name (`Gregory Lazatin`), rendered as naked typography with no pill, panel, or background container.
-- Top-right navigation is equally bare and ordered: `About`, `GitHub ↗`, `Graph` / `Grid`, `Dark` / `Light`, and `Filters ▾`.
+- Top-right navigation is equally bare and ordered: `About`, `GitHub ↗`, `Graph` / `Grid`, `Sound`, `Dark` / `Light`, and a 3-dot overflow menu (`...`).
 - Hovering any node on a fine-pointer device reveals an interactive media card with its video or screenshot, title, tags, summary, and direct `Code ↗` / `Visit ↗` actions. A 150ms pointer-transfer grace period keeps the card alive when the cursor moves from node to card.
 - The About modal carries the canonical Brown University bio and top-mounted Email, LinkedIn, GitHub, and Resume links; the resume preview is a click-to-load sandboxed Google Drive iframe.
 
@@ -206,9 +206,9 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 ## Component Anatomy
 
 ### Floating Top Bar
-- Naked typography floating directly over the canvas: `Gregory Lazatin` at top-left; `About`, `GitHub ↗`, `Graph` / `Grid`, `Dark` / `Light`, and `Filters ▾` at top-right, in that exact order.
+- Naked typography floating directly over the canvas: `Gregory Lazatin` at top-left; `About`, `GitHub ↗`, `Graph` / `Grid`, `Sound`, `Dark` / `Light`, and a 3-dot overflow menu (`...`) at top-right, in that exact order.
 - No background fill, no border, and no pill wrapper around the top bar or its text links. A progressive gradient scrim from `var(--color-bg)` to transparent preserves legibility when Grid cards scroll beneath the bar.
-- Clicking the wordmark resets filters and returns to graph view. `Dark` / `Light` toggles the theme directly in the bar; `Filters` opens a `rounded-2xl` popover containing search, stackable tag pills, and reset only.
+- Clicking the wordmark returns to graph view and resets the HUD. `Dark` / `Light` toggles the theme directly in the bar; the 3-dot menu opens a `rounded-2xl` popover containing the `Filters` heading, search, stackable tag pills, and a singular `Reset` action that clears filters, layout, and visited-node colors.
 
 ### Instant Node Hover Media Card
 - On fine-pointer hover over any graph node, a `rounded-2xl` media card appears adjacent to the node (`+28px, -40px`) and clamps to a 20px viewport margin.
@@ -222,7 +222,8 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 
 ### Canvas Primitives & Bilateral Bridges
 - Pure flat circles at `r = 22px`; visited nodes in cobalt; hovered/focused nodes in the active accent.
-- Cubic boundaries attach flush to both circumferences along exact tangent rays and mirror exactly across the center-to-center axis, producing a symmetrical hourglass waist.
+- Cubic boundaries attach flush to both circumferences along exact tangent rays and mirror exactly across the center-to-center axis, producing a symmetrical hourglass waist. Every control-point normal offset stays non-negative.
+- Filtering illuminates an edge only when both endpoint nodes match; any dimmed endpoint dims the whole connection. Focal permanent edges display up to three shared tags inside one contiguous rounded rectangle (no inter-row gap, 1.15 line spacing) at their midpoint, and the labels persist while that node's inspector is open.
 - A close-node guard returns `null` when circles touch or overlap, so no inverted or crossed geometry renders during a drag.
 - Title knockout pills are filled with the theme background only — no stroke, no outline, no border — and use the Helvetica sans stack.
 
@@ -235,7 +236,7 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 
 ### Publication List & Media
 - Asymmetric two-column Swiss editorial rhythm with 16:9 thumbnails, understated monospaced index stamps, and fluid pill tags.
-- Cards with visual previews render a lazy-loaded video or screenshot. Terminal-only projects render an authentic dark CLI specimen with a `[CLI Specimen]` badge instead of a broken image.
+- Grid card hierarchy is fixed: `01  Title` inline in one row, then the summary subtitle, then the 16:9 preview, then tag pills. Cards with visual previews render a lazy-loaded video or screenshot. Projects with terminal data render a dark CLI specimen without a `[CLI Specimen]` badge; linkout-only projects omit the media block entirely instead of showing a placeholder terminal.
 - Media previews render video and screenshots without figcaption captions; accessible names live on the media elements.
 
 ---
@@ -245,6 +246,7 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 - **Silky Physics:** `d3-force` with 22px nodes, 36px collision clearance, weak seed homing (`strength: 0.02`), and `0.18` coasting decay.
 - **Planar Resting State:** Initial, reduced-motion, and settled layouts derive from `PLANAR_NODE_SEEDS`; active dragging may temporarily displace nodes and homing returns them to the planar basin.
 - **Ferrofluid Tension:** Bridge width and waist respond continuously to distance; no interpolation loops or keyframes are needed.
+- **Hover Dwell:** `250ms` pointer dwell gates both simulation hover and the media card, cancelled synchronously on press, drag, leave, focus change, coasting, or reduced motion.
 - **Stepped Title Decode:** 12fps, <=350ms, once per drawer open, bypassed under `prefers-reduced-motion`.
 - **Theme Transition:** 180ms background/color ease; reduced-motion users receive instant changes. `theme-init.js` prevents first-paint theme flashes.
 
@@ -255,7 +257,7 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 | Viewport | Pattern | Rules |
 | :--- | :--- | :--- |
 | Mobile `< 768px` | Wrapped naked top bar, bottom-sheet inspector, stacked filter popover | Touch targets >= 44px, safe-area insets, `max-h-[85dvh]`; hover card disabled on coarse pointers |
-| Desktop `>= 768px` | Naked top bar, HUD tooltip beside node, interactive hover card | Compact light metadata, crosshair canvas, clamped inspector |
+| Desktop `>= 768px` | Naked top bar, HUD tooltip beside node, interactive hover card | Compact light metadata, node-hover crosshair, clamped inspector |
 
 ---
 

@@ -15,6 +15,7 @@ import { ProjectDrawer } from './components/ProjectDrawer';
 import { AboutModal } from './components/AboutModal';
 import { NodeHoverCard } from './components/NodeHoverCard';
 import { getAmbientSynth } from './audio/ambientSynth';
+import type { PopoverObstacles } from './utils/popoverPlacement';
 
 type ViewMode = 'graph' | 'list';
 type CanvasAnchor = { x: number; y: number };
@@ -52,8 +53,17 @@ export default function App() {
   const [drawerAnchor, setDrawerAnchor] = useState<CanvasAnchor | null>(null);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [hoverState, setHoverState] = useState<HoverState>(null);
+  const [hoverObstacles, setHoverObstacles] = useState<PopoverObstacles>();
+  const [drawerObstacles, setDrawerObstacles] = useState<PopoverObstacles>();
+  const [stickyFocalId, setStickyFocalId] = useState<string | null>(null);
+  const [layoutResetVersion, setLayoutResetVersion] = useState(0);
+  const [canvasCenter, setCanvasCenter] = useState(() => ({
+    x: window.innerWidth / 2,
+    y: window.innerHeight / 2,
+  }));
   const synth = useMemo(() => getAmbientSynth(), []);
   const [soundEnabled, setSoundEnabled] = useState(() => synth.isEnabled());
+  const [soundVolume, setSoundVolume] = useState(() => synth.getVolume());
   const soundEnabledRef = useRef(soundEnabled);
   soundEnabledRef.current = soundEnabled;
   const triggerRef = useRef<HTMLElement | null>(null);
@@ -136,6 +146,12 @@ export default function App() {
 
   useEffect(() => clearHoverDismissal, [clearHoverDismissal]);
 
+  // Focus movement is a hover-cancellation signal: dismiss immediately rather
+  // than waiting for the 150ms pointer-transfer grace period.
+  useEffect(() => {
+    dismissHover();
+  }, [focusedId, dismissHover]);
+
   const openAbout = useCallback(() => {
     setIsAboutOpen(true);
     clearHoverDismissal();
@@ -153,12 +169,19 @@ export default function App() {
   }, []);
 
   const handleHoverNode = useCallback(
-    (project: ProjectData | null, position: CanvasAnchor | null) => {
+    (
+      project: ProjectData | null,
+      position: CanvasAnchor | null,
+      obstacles?: PopoverObstacles,
+    ) => {
       if (project && position) {
         clearHoverDismissal();
         setHoverState({ project, position });
+        setHoverObstacles(obstacles);
         return;
       }
+      // Keep the last obstacle snapshot during the grace period; clearing it
+      // would let the card re-place itself away from the pointer mid-transfer.
       // A 150ms grace period lets the pointer travel from a node into the
       // interactive hover card before the card is dismissed.
       scheduleHoverDismiss();
@@ -166,12 +189,21 @@ export default function App() {
     [clearHoverDismissal, scheduleHoverDismiss],
   );
 
-  const handleResolveAnchor = useCallback((id: string, anchor: CanvasAnchor) => {
-    if (selectedIdRef.current === id) setDrawerAnchor(anchor);
-  }, []);
+  const handleResolveAnchor = useCallback(
+    (
+      id: string,
+      anchor: CanvasAnchor,
+      obstacles?: PopoverObstacles,
+    ) => {
+      if (selectedIdRef.current !== id) return;
+      setDrawerAnchor(anchor);
+      if (obstacles) setDrawerObstacles(obstacles);
+    },
+    [],
+  );
 
   const openProject = useCallback(
-    (id: string, anchor?: CanvasAnchor) => {
+    (id: string, anchor?: CanvasAnchor, obstacles?: PopoverObstacles) => {
       if (!getProjectById(id)) return;
       setIsAboutOpen(false);
       dismissHover();
@@ -189,7 +221,9 @@ export default function App() {
       });
       selectedIdRef.current = id;
       setSelectedId(id);
+      setStickyFocalId(id);
       setDrawerAnchor(anchor ?? null);
+      setDrawerObstacles(obstacles);
       if (window.location.hash !== `#/p/${id}`) {
         window.location.hash = `#/p/${id}`;
       }
@@ -201,6 +235,7 @@ export default function App() {
     selectedIdRef.current = null;
     setSelectedId(null);
     setDrawerAnchor(null);
+    setDrawerObstacles(undefined);
     // Clear the hash without adding a history entry, so the browser Back
     // button doesn't reopen the drawer the user just dismissed.
     if (window.location.hash) {
@@ -226,6 +261,7 @@ export default function App() {
         if (selectedIdRef.current !== id) setDrawerAnchor(null);
         selectedIdRef.current = id;
         setSelectedId(id);
+        setStickyFocalId(id);
       } else {
         selectedIdRef.current = null;
         setSelectedId(null);
@@ -246,10 +282,23 @@ export default function App() {
     });
   }, []);
 
-  const resetFilters = useCallback(() => {
+  const resetAll = useCallback(() => {
     setActiveTags(new Set());
     setSearch('');
+    setLayoutResetVersion((version) => version + 1);
+    setVisitedIds(new Set());
+    setStickyFocalId(null);
+    setHoverObstacles(undefined);
+    setDrawerObstacles(undefined);
   }, []);
+
+  const clearStickyFocal = useCallback(() => {
+    setStickyFocalId(null);
+  }, []);
+
+  useEffect(() => {
+    if (view !== 'graph') setStickyFocalId(null);
+  }, [view]);
 
   const toggleTheme = useCallback(() => {
     setTheme((current) => (current === 'dark' ? 'light' : 'dark'));
@@ -268,6 +317,14 @@ export default function App() {
     setSoundEnabled(next);
   }, [synth]);
 
+  const handleVolumeChange = useCallback(
+    (volume: number) => {
+      synth.setVolume(volume);
+      setSoundVolume(volume);
+    },
+    [synth],
+  );
+
   return (
     <div className="relative h-full w-full overflow-hidden bg-[var(--color-bg)] text-[var(--color-text)]">
       <h1 className="sr-only">Portfolio</h1>
@@ -280,11 +337,13 @@ export default function App() {
         onToggleTag={toggleTag}
         search={search}
         onSearchChange={setSearch}
-        onReset={resetFilters}
+        onReset={resetAll}
         theme={theme}
         onToggleTheme={toggleTheme}
         soundEnabled={soundEnabled}
+        soundVolume={soundVolume}
         onToggleSound={toggleSound}
+        onVolumeChange={handleVolumeChange}
         onOpenAbout={openAbout}
       />
 
@@ -302,6 +361,10 @@ export default function App() {
             onCanvasDragStart={dismissHover}
             onResolveAnchor={handleResolveAnchor}
             onSelect={openProject}
+            layoutResetVersion={layoutResetVersion}
+            onCanvasCenterChange={setCanvasCenter}
+            stickyFocalId={stickyFocalId}
+            onClearStickyFocal={clearStickyFocal}
           />
         ) : (
           <ListView
@@ -344,6 +407,8 @@ export default function App() {
         <NodeHoverCard
           project={hoverState.project}
           position={hoverState.position}
+          canvasCenter={canvasCenter}
+          obstacles={hoverObstacles}
           onPointerEnter={clearHoverDismissal}
           onPointerLeave={scheduleHoverDismiss}
         />
@@ -356,6 +421,8 @@ export default function App() {
           key={selected.id}
           project={selected}
           anchor={drawerAnchor}
+          canvasCenter={canvasCenter}
+          obstacles={drawerObstacles}
           onClose={closeDrawer}
         />
       )}

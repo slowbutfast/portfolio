@@ -90,11 +90,26 @@ The system SHALL default new visitors to the Light color scheme on first visit w
 - **THEN** the `/theme-init.js` script immediately sets `data-theme="dark"` on `document.documentElement` before body paint with zero visual flashing.
 
 ### Requirement: Top-right header navigation sequence and theme toggle
-The system SHALL organize top-right header controls in the canonical sequence: `About`, `GitHub ↗`, `Graph`/`Grid`, `Sound`, `Dark`/`Light`, and `Filters ▾`, presenting the theme toggle as a direct one-click text button (`bareText`) styled identically to the view toggle, and the sound toggle as an accessible `aria-pressed` button reflecting real-time synthesizer state.
+The system SHALL organize top-right header controls in the canonical sequence: `About`, `GitHub ↗`, `Graph`/`Grid`, `Sound`, `Dark`/`Light`, and a 3-dot overflow menu button (`aria-label="Filters & Layout"`), presenting the theme toggle as a direct one-click text button (`bareText`), the sound toggle as an accessible `aria-pressed` button reflecting real-time synthesizer state, and moving the `Filters` section heading inside the 3-dot dropdown panel alongside a singular `Reset` action below the filter controls that clears filters, graph layout, and visited-node colors.
 
 #### Scenario: Desktop visitor views top-right header options
 - **WHEN** the header mounts on a desktop or mobile viewport
-- **THEN** controls appear in the exact sequence: `About`, `GitHub ↗`, `Graph`/`Grid`, `Sound`, `Dark`/`Light`, `Filters ▾`, with `Sound` reflecting the active sound state via `aria-pressed` and toggling audio playback on click.
+- **THEN** controls appear in the exact sequence: `About`, `GitHub ↗`, `Graph`/`Grid`, `Sound`, `Dark`/`Light`, and the 3-dot menu trigger (`data-testid="controls-dropdown-trigger"`), with `Sound` reflecting the active sound state via `aria-pressed` and toggling audio playback on click.
+
+#### Scenario: User opens the 3-dot menu and resets graph layout
+- **WHEN** the user opens the 3-dot menu (`data-testid="controls-dropdown"`)
+- **THEN** the panel displays a `"Filters"` heading above the search input and tag pills, and one `"Reset"` button (`data-testid="reset-layout"`) below the filter section that clears active filters/search, restores the planar layout, and clears visited-node colors.
+
+### Requirement: Sound volume popover and persisted gain
+The system SHALL render a vertical volume slider popover anchored beneath the `Sound` toggle when sound is enabled and the toggle is hovered, focused, or switched on. The popover SHALL hide `500ms` after the pointer leaves the toggle/popover or immediately when sound is disabled. The slider SHALL expose `data-testid="volume-slider"`, persist a clamped `[0, 1]` value under `portfolio_sound_volume`, and scale master gain by `volume * MASTER_GAIN`. A volume of `0` SHALL leave Sound enabled (`aria-pressed="true"`) at zero gain.
+
+#### Scenario: User adjusts sound volume
+- **WHEN** sound is enabled and the user hovers/focuses `Sound` or turns it on
+- **THEN** the vertical volume popover appears, the slider reflects the persisted volume, and changing it updates audio gain immediately without disabling Sound at `0`.
+
+#### Scenario: User leaves the volume control
+- **WHEN** the pointer leaves both the `Sound` toggle and its popover
+- **THEN** the popover auto-hides after `500ms`; turning Sound off hides it immediately.
 
 ### Requirement: Accessible About modal dialog with canonical bio
 The system SHALL provide an accessible About dialog (`role="dialog"`, `aria-modal="true"`, `aria-label="About Gregory Lazatin"`, with focus trap, backdrop dismissal, Escape key handler, and `#/about` deep-link routing) presenting candidate name, the canonical Brown University bio statement, and top-mounted contact buttons (Email, LinkedIn, GitHub, Resume), with all role subtitles and focus area tags omitted.

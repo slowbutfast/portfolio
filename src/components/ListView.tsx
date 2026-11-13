@@ -65,11 +65,8 @@ function CardPreview({ project }: { project: ProjectData }) {
       data-testid={`terminal-specimen-${project.id}`}
       className="flex aspect-video w-full flex-col justify-between rounded-xl border border-[#27272a] bg-[#08080a] p-4 text-[#7dd3fc]"
     >
-      <div className="flex items-center justify-between font-secondary text-[10px] font-light uppercase tracking-[0.18em] text-[#a1a1aa]">
+      <div className="flex items-center font-secondary text-[10px] font-light uppercase tracking-[0.18em] text-[#a1a1aa]">
         <span>&gt;_ prompt</span>
-        <span className="rounded-full border border-[#27272a] px-2 py-0.5 text-[#7dd3fc]">
-          [CLI Specimen]
-        </span>
       </div>
       <span className="truncate font-mono text-xs">
         {project.terminalDemo?.prompt ?? `${project.id} --help`}
@@ -101,24 +98,26 @@ export function ListView({ projects, dimmedIds, onSelect }: ListViewProps) {
                 } ${dimmed ? 'opacity-30' : 'opacity-100'}`}
               >
                 <div className="flex items-center justify-between gap-4">
-                  <span className="select-none font-mono text-lg text-[var(--color-muted)]">
-                    {index}
-                  </span>
-                  <span className="flex items-center gap-1.5 text-[var(--color-muted)]">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="select-none font-mono text-lg text-[var(--color-muted)]">
+                      {index}
+                    </span>
+                    <h2 className="truncate text-xl font-semibold leading-tight text-[var(--color-text)]">
+                      {project.title}
+                    </h2>
+                  </div>
+                  <span className="flex shrink-0 items-center gap-1.5 text-[var(--color-muted)]">
                     {previewIcons(project)}
                   </span>
                 </div>
 
+                <p className="mt-2 text-sm leading-relaxed text-[var(--color-muted)]">
+                  {project.summary}
+                </p>
+
                 <div className="mt-4">
                   <CardPreview project={project} />
                 </div>
-
-                <h2 className="mt-4 text-xl font-semibold leading-tight text-[var(--color-text)]">
-                  {project.title}
-                </h2>
-                <p className="mt-2 flex-1 text-sm leading-relaxed text-[var(--color-muted)]">
-                  {project.summary}
-                </p>
 
                 <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-[var(--color-divider)] pt-3">
                   {project.tags.map((tag) => (

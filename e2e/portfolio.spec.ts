@@ -14,6 +14,8 @@ const PROJECT_IDS = [
 
 const GITHUB_URL = 'https://github.com/slowbutfast';
 
+const edgeKey = (a: string, b: string) => [a, b].sort().join('\u0000');
+
 // Vercel injects its Preview Comments toolbar (vercel.live/_next-live/feedback)
 // into preview deployments. Our strict CSP (`script-src 'self'`) correctly
 // blocks it, which logs a console error that is not an application defect.
@@ -203,6 +205,58 @@ test.describe('portfolio graph SPA', () => {
     expect(errors).toEqual([]);
   });
 
+  test('volume popover appears only while Sound is enabled and hides after 500ms', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'hover volume popover runs on desktop');
+    await page.goto('/');
+    const toggle = page.getByTestId('audio-toggle');
+    const popover = page.getByTestId('volume-popover');
+    const slider = page.getByTestId('volume-slider');
+
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await toggle.hover();
+    await expect(popover).toHaveCount(0);
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(popover).toBeVisible();
+    await expect(slider).toHaveValue('1');
+
+    const setVolume = async (value: number) => {
+      await slider.evaluate((element, next) => {
+        const input = element as HTMLInputElement;
+        const setter = Object.getOwnPropertyDescriptor(
+          HTMLInputElement.prototype,
+          'value',
+        )?.set;
+        setter?.call(input, String(next));
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      }, value);
+    };
+
+    await setVolume(0.35);
+    await expect(slider).toHaveValue('0.35');
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem('portfolio_sound_volume')))
+      .toBe('0.35');
+
+    await setVolume(0);
+    await expect(slider).toHaveValue('0');
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+
+    await page.mouse.move(12, 800);
+    await page.waitForTimeout(650);
+    await expect(popover).toHaveCount(0);
+
+    await toggle.hover();
+    await expect(popover).toBeVisible();
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await expect(popover).toHaveCount(0);
+  });
+
   test('Ivy Film Fest drawer renders Visit without a Code action', async ({ page }) => {
     await page.goto('/#/p/ivy-film-festival-2026');
     await expect(page.getByTestId('project-drawer')).toBeVisible();
@@ -260,10 +314,31 @@ test.describe('portfolio graph SPA', () => {
 
     const terminalCard = page.getByTestId('card-agentic-resume-builder');
     await expect(page.getByTestId('terminal-specimen-agentic-resume-builder')).toBeVisible();
-    await expect(page.getByTestId('terminal-specimen-agentic-resume-builder')).toContainText(
+    await expect(page.getByTestId('terminal-specimen-agentic-resume-builder')).not.toContainText(
       '[CLI Specimen]',
     );
     await expect(terminalCard.locator('img')).toHaveCount(0);
+
+    const index = mediaCard.getByText('01', { exact: true });
+    const heading = mediaCard.locator('h2');
+    const summary = mediaCard.locator('p');
+    const preview = mediaCard.locator('img');
+    const firstTag = mediaCard.locator('.fluid-pill').first();
+    const indexBox = await index.boundingBox();
+    const headingBox = await heading.boundingBox();
+    const summaryBox = await summary.boundingBox();
+    const previewBox = await preview.boundingBox();
+    const tagBox = await firstTag.boundingBox();
+    if (!indexBox || !headingBox || !summaryBox || !previewBox || !tagBox) {
+      throw new Error('grid card hierarchy is missing a measurable element');
+    }
+    expect(headingBox.x).toBeGreaterThan(indexBox.x);
+    expect(Math.abs(
+      headingBox.y + headingBox.height / 2 - (indexBox.y + indexBox.height / 2),
+    )).toBeLessThan(12);
+    expect(summaryBox.y).toBeGreaterThan(headingBox.y + headingBox.height - 2);
+    expect(previewBox.y).toBeGreaterThan(summaryBox.y + summaryBox.height - 2);
+    expect(tagBox.y).toBeGreaterThan(previewBox.y + previewBox.height - 2);
   });
 
   test('terminal command chip executes and displays captured output', async ({ page }) => {
@@ -526,6 +601,19 @@ test.describe('portfolio graph SPA', () => {
     await expect(page.getByTestId('node-hover-card')).toHaveCount(0);
   });
 
+  test('terminal-only hover fallback omits the CLI specimen badge', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'hover previews are desktop-only');
+    await page.goto('/');
+    await hoverCenteredNode(page, 'kintsugi-fracture');
+    const card = page.getByTestId('node-hover-card');
+    await expect(card).toContainText('Kintsugi Fracture');
+    await expect(card).not.toContainText('CLI specimen');
+    await expect(card).not.toContainText('[CLI Specimen]');
+    await expect(card).not.toContainText('>_');
+  });
+
   test('hover card survives a 150ms pointer transfer and dismisses on drag', async ({
     page,
   }, testInfo) => {
@@ -553,6 +641,309 @@ test.describe('portfolio graph SPA', () => {
     await page.mouse.up();
   });
 
+  test('3-dot menu exposes one Reset that clears filters, layout, and visited colors', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem('portfolio_visited', JSON.stringify(['open-dungeon']));
+      } catch {
+        // ignore storage denial
+      }
+    });
+    await page.goto('/');
+    const trigger = await openFilters(page);
+    const dropdown = page.getByTestId('controls-dropdown');
+    await expect(trigger).toHaveAccessibleName('Filters & Layout');
+    await expect(dropdown.getByRole('heading', { name: 'Filters' })).toBeVisible();
+
+    await page.getByTestId('tag-pill-LLM').click();
+    await page.getByTestId('search-input').fill('dungeon');
+    await expect(page.getByTestId('nav-transcribe-plus')).toHaveAttribute('data-dimmed', 'true');
+
+    await expect(dropdown.getByTestId('reset-filters')).toHaveCount(0);
+    const reset = dropdown.getByTestId('reset-layout');
+    await expect(reset).toHaveAccessibleName('Reset');
+    await expect(reset).toHaveText('Reset');
+
+    await reset.click();
+    await expect(page.getByTestId('tag-pill-LLM')).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.getByTestId('search-input')).toHaveValue('');
+    await expect(page.getByTestId('nav-transcribe-plus')).not.toHaveAttribute(
+      'data-dimmed',
+      'true',
+    );
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const raw = localStorage.getItem('portfolio_visited');
+          return raw ? (JSON.parse(raw) as string[]).length : 0;
+        }),
+      )
+      .toBe(0);
+    await expect(page.getByTestId('graph-canvas')).toBeVisible();
+  });
+
+  test('canvas cursor is crosshair only while over or dragging a node', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'pointer cursor test runs on desktop');
+    await page.goto('/');
+    await page.waitForTimeout(1500);
+    await page.getByTestId('nav-open-dungeon').focus();
+    await page.waitForTimeout(1600);
+    const canvas = page.getByTestId('graph-canvas');
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error('graph canvas has no bounding box');
+    const cursorAt = async (x: number, y: number) => {
+      await page.mouse.move(x, y);
+      await page.waitForTimeout(60);
+      return canvas.evaluate((element) => getComputedStyle(element).cursor);
+    };
+
+    await expect
+      .poll(() => cursorAt(box.x + 10, box.y + box.height - 10))
+      .toBe('default');
+    await expect
+      .poll(() => cursorAt(box.x + box.width / 2, box.y + box.height / 2))
+      .toBe('crosshair');
+
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    expect(await canvas.evaluate((element) => getComputedStyle(element).cursor)).toBe(
+      'crosshair',
+    );
+    await page.mouse.up();
+  });
+
+  test('LLM filter dims every edge with a non-matching endpoint', async ({ page }) => {
+    await page.goto('/');
+    await openFilters(page);
+    await page.getByTestId('tag-pill-LLM').click();
+    const raw = await page.getByTestId('graph-canvas').getAttribute('data-dimmed-edges');
+    const dimmedEdges = new Set((raw ?? '').split(',').filter(Boolean));
+
+    // Both LLM projects stay bright; the edge between them remains active.
+    expect(dimmedEdges.has(edgeKey('open-dungeon', 'pict-climate-risk-viz-chatbot'))).toBe(false);
+    // A mixed active/dimmed pair must dim, unlike the old `&&` behavior.
+    expect(dimmedEdges.has(edgeKey('open-dungeon', 'transcribe-plus'))).toBe(true);
+    expect(dimmedEdges.has(edgeKey('attention-max', 'kintsugi-fracture'))).toBe(true);
+    expect(dimmedEdges.size).toBe(12);
+  });
+
+  test('hover dwell suppresses fast sweeps and opens after 250ms', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'hover previews are desktop-only');
+    await page.goto('/');
+    await page.waitForTimeout(1500);
+    await page.getByTestId('nav-open-dungeon').focus();
+    await page.waitForTimeout(1600);
+
+    const canvas = page.getByTestId('graph-canvas');
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error('graph canvas has no bounding box');
+    const centerX = box.x + box.width / 2;
+    const centerY = box.y + box.height / 2;
+
+    // Cross the centered node and leave well inside the 250ms dwell window.
+    await page.mouse.move(centerX, centerY);
+    await page.mouse.move(box.x + 12, box.y + box.height - 12);
+    await page.waitForTimeout(120);
+    await expect(page.getByTestId('node-hover-card')).toHaveCount(0);
+
+    // Returning and dwelling opens the card only after the timer fires.
+    await page.mouse.move(centerX, centerY);
+    await page.waitForTimeout(180);
+    await expect(page.getByTestId('node-hover-card')).toHaveCount(0);
+    await expect(page.getByTestId('node-hover-card')).toBeVisible();
+  });
+
+  test('focal edge tag pills persist while the inspector is open', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'hover previews are desktop-only');
+    await page.goto('/');
+    await page.waitForTimeout(1500);
+    await page.getByTestId('nav-open-dungeon').focus();
+    await page.waitForTimeout(1600);
+    const canvas = page.getByTestId('graph-canvas');
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error('graph canvas has no bounding box');
+    const centerX = box.x + box.width / 2;
+    const centerY = box.y + box.height / 2;
+
+    await page.mouse.move(centerX, centerY);
+    await expect(page.getByTestId('node-hover-card')).toBeVisible();
+    await expect
+      .poll(async () => Number((await canvas.getAttribute('data-focal-tag-pills')) ?? 0))
+      .toBeGreaterThan(0);
+
+    await page.mouse.click(centerX, centerY);
+    await expect(page.getByTestId('project-drawer')).toBeVisible();
+    await expect
+      .poll(async () => Number((await canvas.getAttribute('data-focal-tag-pills')) ?? 0))
+      .toBeGreaterThan(0);
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('project-drawer')).toHaveCount(0);
+    // The inspected focal connection stays sticky after closing the drawer.
+    await expect
+      .poll(async () => Number((await canvas.getAttribute('data-focal-tag-pills')) ?? 0))
+      .toBeGreaterThan(0);
+
+    // Leaving the node does not clear the sticky highlight.
+    await page.mouse.move(box.x + 12, box.y + box.height - 12);
+    await page.waitForTimeout(150);
+    await expect
+      .poll(async () => Number((await canvas.getAttribute('data-focal-tag-pills')) ?? 0))
+      .toBeGreaterThan(0);
+
+    // Re-center the node, dwell on it for 250ms, then leave and blur the
+    // semantic nav. The sticky highlight must already be cleared; otherwise
+    // the focal tag pills would remain after both hover and focus are gone.
+    await page.getByTestId('nav-open-dungeon').focus();
+    await page.waitForTimeout(1600);
+    await page.mouse.move(centerX, centerY);
+    await expect(page.getByTestId('node-hover-card')).toBeVisible();
+    await page.mouse.move(box.x + 12, box.y + box.height - 12);
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await expect
+      .poll(async () => Number((await canvas.getAttribute('data-focal-tag-pills')) ?? 0))
+      .toBe(0);
+  });
+
+  test('Reset clears the sticky inspected focus', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'sticky focus test runs on desktop');
+    await page.goto('/#/p/open-dungeon');
+    await expect(page.getByTestId('project-drawer')).toBeVisible();
+    await page.getByTestId('drawer-close').click();
+    const canvas = page.getByTestId('graph-canvas');
+    await expect
+      .poll(async () => Number((await canvas.getAttribute('data-focal-tag-pills')) ?? 0))
+      .toBeGreaterThan(0);
+
+    await openFilters(page);
+    await page.getByTestId('reset-layout').click();
+    await expect
+      .poll(async () => Number((await canvas.getAttribute('data-focal-tag-pills')) ?? 0))
+      .toBe(0);
+  });
+
+  test('mid-drag reduced-motion transition releases the drag cleanly', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'pointer drag test runs on desktop');
+    await page.goto('/');
+    await page.waitForTimeout(1500);
+    await page.getByTestId('nav-open-dungeon').focus();
+    await page.waitForTimeout(1600);
+    const canvas = page.getByTestId('graph-canvas');
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error('graph canvas has no bounding box');
+    const centerX = box.x + box.width / 2;
+    const centerY = box.y + box.height / 2;
+
+    await page.mouse.move(centerX, centerY);
+    await page.waitForTimeout(300);
+    await page.mouse.down();
+    await page.mouse.move(centerX + 120, centerY + 80, { steps: 8 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.waitForTimeout(100);
+    await page.mouse.up();
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await expect(canvas).toBeVisible();
+    await expect
+      .poll(async () => canvas.getAttribute('data-sim-state'))
+      .toBe('idle');
+  });
+
+  test('live reduced-motion transitions freeze and resume hover capability', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'hover previews are desktop-only');
+    await page.goto('/');
+    const box = await hoverCenteredNode(page);
+    const card = page.getByTestId('node-hover-card');
+    await expect(card).toBeVisible();
+
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect(card).toHaveCount(0);
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.waitForTimeout(350);
+    await expect(card).toHaveCount(0);
+
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.mouse.move(box.x + 12, box.y + box.height - 12);
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await expect(card).toBeVisible();
+  });
+
+  for (const viewport of [
+    { label: 'desktop', width: 1440, height: 900 },
+    { label: 'narrow mobile', width: 393, height: 852 },
+  ]) {
+    test(`hover card stays inside the ${viewport.label} viewport at ${viewport.width}x${viewport.height}`, async ({
+      page,
+    }, testInfo) => {
+      test.skip(testInfo.project.name !== 'desktop', 'hover previews are desktop-only');
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await page.goto('/');
+      await hoverCenteredNode(page);
+      const card = page.getByTestId('node-hover-card');
+      const cardBox = await card.boundingBox();
+      if (!cardBox) throw new Error('hover card has no bounding box');
+      const margin = 20;
+
+      expect(cardBox.x).toBeGreaterThanOrEqual(margin - 1);
+      expect(cardBox.y).toBeGreaterThanOrEqual(margin - 1);
+      expect(cardBox.x + cardBox.width).toBeLessThanOrEqual(viewport.width - margin + 1);
+      expect(cardBox.y + cardBox.height).toBeLessThanOrEqual(viewport.height - margin + 1);
+
+      const cardCenter = {
+        x: cardBox.x + cardBox.width / 2,
+        y: cardBox.y + cardBox.height / 2,
+      };
+      const offset = Math.hypot(
+        cardCenter.x - viewport.width / 2,
+        cardCenter.y - viewport.height / 2,
+      );
+      expect(offset).toBeGreaterThan(60);
+    });
+  }
+
+  test('desktop inspector drags from its border and stays inside the viewport', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'drawer dragging runs on desktop');
+    await page.goto('/#/p/open-dungeon');
+    const drawer = page.getByTestId('project-drawer');
+    await expect(drawer).toBeVisible();
+    await page.waitForTimeout(600);
+    const before = await drawer.boundingBox();
+    if (!before) throw new Error('drawer drag geometry is unavailable');
+
+    // The left border is the drag surface; hovering it shows the move cursor.
+    const startX = before.x + 3;
+    const startY = before.y + before.height / 2;
+    await page.mouse.move(startX, startY);
+    await expect
+      .poll(() => drawer.evaluate((element) => getComputedStyle(element).cursor))
+      .toBe('move');
+    await page.mouse.down();
+    await page.mouse.move(startX + 140, startY + 60, { steps: 8 });
+    await page.mouse.up();
+    await page.waitForTimeout(300);
+
+    const after = await drawer.boundingBox();
+    if (!after) throw new Error('drawer lost its bounding box after dragging');
+    expect(
+      Math.hypot(after.x - before.x, after.y - before.y),
+    ).toBeGreaterThan(60);
+    const viewport = page.viewportSize();
+    if (!viewport) throw new Error('viewport is unavailable');
+    expect(after.x).toBeGreaterThanOrEqual(15);
+    expect(after.y).toBeGreaterThanOrEqual(70);
+    expect(after.x + after.width).toBeLessThanOrEqual(viewport.width - 15);
+    expect(after.y + after.height).toBeLessThanOrEqual(viewport.height - 15);
+  });
+
   test('canvas selection anchors the inspector beside the node', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'anchored offset is only distinguishable on desktop');
     await page.goto('/');
@@ -561,8 +952,18 @@ test.describe('portfolio graph SPA', () => {
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     const drawer = page.getByTestId('project-drawer');
     await expect(drawer).toBeVisible();
-    const left = await drawer.evaluate((el) => Number.parseFloat((el as HTMLElement).style.left));
-    expect(left).toBeGreaterThan(box.width / 2 - 100);
+    const panel = await drawer.boundingBox();
+    if (!panel) throw new Error('project drawer has no bounding box');
+    const viewport = page.viewportSize();
+    if (!viewport) throw new Error('viewport is unavailable');
+    expect(panel.x).toBeGreaterThanOrEqual(15);
+    expect(panel.y).toBeGreaterThanOrEqual(70);
+    expect(panel.x + panel.width).toBeLessThanOrEqual(viewport.width - 15);
+    expect(panel.y + panel.height).toBeLessThanOrEqual(viewport.height - 15);
+    const anchorX = box.x + box.width / 2;
+    const besideNode =
+      panel.x + panel.width <= anchorX + 40 || panel.x >= anchorX - 40;
+    expect(besideNode).toBe(true);
   });
 
   test('accessibility: graph view has zero WCAG A/AA violations (dark)', async ({ page }) => {
@@ -691,7 +1092,7 @@ test.describe('portfolio graph SPA', () => {
     await expect(page.getByTestId('audio-toggle')).toHaveAccessibleName('Sound');
     await expect(page.getByTestId('audio-toggle')).toHaveAttribute('aria-pressed', 'false');
     const trigger = await openFilters(page);
-    await expect(trigger).toHaveAccessibleName('Filters & Navigation');
+    await expect(trigger).toHaveAccessibleName('Filters & Layout');
     await expect(trigger).toHaveAttribute('aria-expanded', 'true');
 
     const llmPill = page.getByRole('button', { name: 'LLM', exact: true });

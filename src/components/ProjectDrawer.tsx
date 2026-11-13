@@ -1,8 +1,19 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { ExternalLink, GitBranch, X } from 'lucide-react';
 import type { Preview, ProjectData } from '../types/portfolio';
 import { projects } from '../data/projects';
 import { formatIndex } from '../utils/drafting';
+import {
+  chooseBestPopoverPosition,
+  type PopoverObstacles,
+} from '../utils/popoverPlacement';
 import { TerminalSimulator } from './TerminalSimulator';
 import { MediaView } from './MediaView';
 
@@ -16,6 +27,8 @@ interface DrawerTab {
 interface ProjectDrawerProps {
   project: ProjectData;
   anchor?: { x: number; y: number } | null;
+  canvasCenter?: { x: number; y: number };
+  obstacles?: PopoverObstacles;
   onClose: () => void;
 }
 
@@ -25,6 +38,8 @@ const SCRAMBLE_TOTAL_MS = 350;
 /** Exponential tracking rate for the drawer's anchor lerp. */
 const DRAWER_TRACK_LAMBDA = 18;
 const DRAWER_SNAP_PX = 0.5;
+/** Desktop panel border thickness that starts a move drag. */
+const DRAWER_EDGE_PX = 8;
 
 function scrambleTitle(target: string, progress: number): string {
   const revealed = Math.floor(target.length * progress);
@@ -40,15 +55,31 @@ function scrambleTitle(target: string, progress: number): string {
   return out;
 }
 
-export function ProjectDrawer({ project, anchor, onClose }: ProjectDrawerProps) {
+export function ProjectDrawer({
+  project,
+  anchor,
+  canvasCenter,
+  obstacles,
+  onClose,
+}: ProjectDrawerProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<TabKind | null>(null);
   const [displayTitle, setDisplayTitle] = useState(project.title);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
-  const [isSheet, setIsSheet] = useState(false);
+  const [isSheet, setIsSheet] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth < 768,
+  );
   const positionRef = useRef<{ left: number; top: number } | null>(null);
   const targetRef = useRef<{ left: number; top: number } | null>(null);
   const pointerRafRef = useRef(0);
+  const hasUserDraggedRef = useRef(false);
+  const dragStateRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    startLeft: number;
+    startTop: number;
+  } | null>(null);
 
   const catalogIndex = projects.findIndex((p) => p.id === project.id);
   const safeIndex = catalogIndex >= 0 ? catalogIndex : 0;
@@ -129,17 +160,40 @@ export function ProjectDrawer({ project, anchor, onClose }: ProjectDrawerProps) 
         return;
       }
       setIsSheet(false);
-      const margin = 16;
-      const width = panel.offsetWidth;
-      const height = panel.offsetHeight;
-      const preferredLeft = anchor ? anchor.x + 32 : window.innerWidth / 2 - width / 2;
-      const preferredTop = anchor ? anchor.y - 40 : window.innerHeight / 2 - height / 2;
-      const maxLeft = Math.max(margin, window.innerWidth - width - margin);
-      const maxTop = Math.max(margin, window.innerHeight - height - margin);
-      targetRef.current = {
-        left: Math.min(Math.max(margin, preferredLeft), maxLeft),
-        top: Math.min(Math.max(margin, preferredTop), maxTop),
+      const viewport = {
+        width: window.innerWidth,
+        height: window.innerHeight,
       };
+      if (hasUserDraggedRef.current) {
+        const current = positionRef.current;
+        if (current) {
+          const maxLeft = Math.max(16, viewport.width - panel.offsetWidth - 16);
+          const maxTop = Math.max(72, viewport.height - panel.offsetHeight - 16);
+          targetRef.current = {
+            left: Math.min(Math.max(16, current.left), maxLeft),
+            top: Math.min(Math.max(72, current.top), maxTop),
+          };
+        }
+        return;
+      }
+      const resolvedAnchor = anchor ?? canvasCenter ?? {
+        x: viewport.width / 2,
+        y: viewport.height / 2,
+      };
+      targetRef.current = chooseBestPopoverPosition({
+        anchor: resolvedAnchor,
+        size: { width: panel.offsetWidth, height: panel.offsetHeight },
+        viewport,
+        canvasCenter: canvasCenter ?? {
+          x: viewport.width / 2,
+          y: viewport.height / 2,
+        },
+        margin: 16,
+        topMargin: 72,
+        gap: 36,
+        targetNodeId: project.id,
+        obstacles,
+      });
     };
 
     const frame = (now: number) => {
@@ -195,7 +249,7 @@ export function ProjectDrawer({ project, anchor, onClose }: ProjectDrawerProps) 
       window.removeEventListener('resize', place);
       resizeObserver.disconnect();
     };
-  }, [anchor]);
+  }, [anchor, canvasCenter, obstacles, project.id]);
 
   useLayoutEffect(() => {
     const el = panelRef.current;
@@ -238,6 +292,100 @@ export function ProjectDrawer({ project, anchor, onClose }: ProjectDrawerProps) 
     };
   }, [onClose]);
 
+  const isOnDragBorder = (
+    panel: HTMLDivElement,
+    clientX: number,
+    clientY: number,
+  ): boolean => {
+    const rect = panel.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    return (
+      x <= DRAWER_EDGE_PX ||
+      x >= rect.width - DRAWER_EDGE_PX ||
+      y <= DRAWER_EDGE_PX ||
+      y >= rect.height - DRAWER_EDGE_PX
+    );
+  };
+
+  const updateBorderCursor = (
+    panel: HTMLDivElement,
+    clientX: number,
+    clientY: number,
+  ) => {
+    const nextCursor = isOnDragBorder(panel, clientX, clientY) ? 'move' : '';
+    if (panel.style.cursor !== nextCursor) panel.style.cursor = nextCursor;
+  };
+
+  const handlePanelPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (isSheet || event.button !== 0) return;
+    const panel = panelRef.current;
+    const current = positionRef.current;
+    if (
+      !panel ||
+      !current ||
+      !isOnDragBorder(panel, event.clientX, event.clientY)
+    ) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    hasUserDraggedRef.current = true;
+    dragStateRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startLeft: current.left,
+      startTop: current.top,
+    };
+    panel.style.cursor = 'move';
+    panel.setPointerCapture(event.pointerId);
+  };
+
+  const handlePanelPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const panel = panelRef.current;
+    if (!panel) return;
+    const state = dragStateRef.current;
+    if (!state || state.pointerId !== event.pointerId) {
+      updateBorderCursor(panel, event.clientX, event.clientY);
+      return;
+    }
+    event.preventDefault();
+    const margin = 16;
+    const maxLeft = Math.max(margin, window.innerWidth - panel.offsetWidth - margin);
+    const maxTop = Math.max(72, window.innerHeight - panel.offsetHeight - 16);
+    const left = Math.min(
+      Math.max(margin, state.startLeft + event.clientX - state.startX),
+      maxLeft,
+    );
+    const top = Math.min(
+      Math.max(72, state.startTop + event.clientY - state.startY),
+      maxTop,
+    );
+    const next = { left: Math.round(left), top: Math.round(top) };
+    positionRef.current = next;
+    targetRef.current = next;
+    setPosition(next);
+    panel.style.cursor = 'move';
+  };
+
+  const handlePanelPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const state = dragStateRef.current;
+    const panel = panelRef.current;
+    if (!state || !panel || state.pointerId !== event.pointerId) return;
+    dragStateRef.current = null;
+    if (panel.hasPointerCapture(event.pointerId)) {
+      panel.releasePointerCapture(event.pointerId);
+    }
+    updateBorderCursor(panel, event.clientX, event.clientY);
+  };
+
+  const handlePanelPointerLeave = () => {
+    if (dragStateRef.current) return;
+    const panel = panelRef.current;
+    if (panel && panel.style.cursor !== '') panel.style.cursor = '';
+  };
+
   const mediaPreviews = project.previews.filter(
     (p): p is Extract<Preview, { kind: 'video' | 'screenshot' }> =>
       p.kind === 'video' || p.kind === 'screenshot',
@@ -270,6 +418,11 @@ export function ProjectDrawer({ project, anchor, onClose }: ProjectDrawerProps) 
               : { left: 0, top: 0, visibility: 'hidden' }
         }
         className={panelClass}
+        onPointerDown={handlePanelPointerDown}
+        onPointerMove={handlePanelPointerMove}
+        onPointerUp={handlePanelPointerUp}
+        onPointerCancel={handlePanelPointerUp}
+        onPointerLeave={handlePanelPointerLeave}
       >
         <header className="sticky top-0 z-10 border-b border-[var(--color-divider)] bg-[var(--color-surface)]/95 px-5 py-4 backdrop-blur-md">
           <div className="flex items-start justify-between gap-3">

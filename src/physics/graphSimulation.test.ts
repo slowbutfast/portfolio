@@ -1,8 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  ambientDriftOffset,
   bridgeExcitation,
   createSimulation,
+  RECOIL_MS,
+  RECONNECT_COOLDOWN_MS,
+  RECONNECT_MULTIPLIER,
   rubberBandDisplacement,
+  SNAP_MULTIPLIER,
   type GraphSimulation,
 } from './graphSimulation';
 import {
@@ -36,6 +41,44 @@ function ringPositions(width: number, height: number): Record<string, [number, n
     out[id] = [cx + radius * Math.cos(angle), cy + radius * Math.sin(angle)];
   });
   return out;
+}
+
+type SeedPoint = [number, number];
+
+function cross(origin: SeedPoint, a: SeedPoint, b: SeedPoint): number {
+  return (a[0] - origin[0]) * (b[1] - origin[1]) - (a[1] - origin[1]) * (b[0] - origin[0]);
+}
+
+function properIntersection(a: SeedPoint, b: SeedPoint, c: SeedPoint, d: SeedPoint): boolean {
+  const d1 = cross(c, d, a);
+  const d2 = cross(c, d, b);
+  const d3 = cross(a, b, c);
+  const d4 = cross(a, b, d);
+  return d1 * d2 < 0 && d3 * d4 < 0;
+}
+
+/** Count proper crossings in a position map without importing test helpers. */
+function countSeedCrossings(positions: Record<string, SeedPoint>): number {
+  const segments = LINKS.map((edge) => ({
+    ...edge,
+    a: positions[edge.source],
+    b: positions[edge.target],
+  }));
+  let crossings = 0;
+  for (let i = 0; i < segments.length; i += 1) {
+    for (let j = i + 1; j < segments.length; j += 1) {
+      const left = segments[i];
+      const right = segments[j];
+      const sharesEndpoint =
+        left.source === right.source ||
+        left.source === right.target ||
+        left.target === right.source ||
+        left.target === right.target;
+      if (sharesEndpoint) continue;
+      if (properIntersection(left.a, left.b, right.a, right.b)) crossings += 1;
+    }
+  }
+  return crossings;
 }
 
 function settle(width: number, height: number) {
@@ -221,7 +264,7 @@ describe('rubber-band drag tether', () => {
 });
 
 describe('drag-time bridge snapping and recovery', () => {
-  it('detaches a bridge beyond 2x rest distance and reconnects after release', () => {
+  it('detaches a bridge beyond 1.6x rest distance and recovers after resetLayout', () => {
     const width = 1000;
     const height = 1000;
     const seeds = {
@@ -245,11 +288,15 @@ describe('drag-time bridge snapping and recovery', () => {
     // Pull the node far to the left. The tether caps the visual displacement,
     // but it is still well beyond twice the 100px rest distance.
     sim.dragMove(-5000, 500);
+    sim.tick();
     expect(link.isDetached).toBe(true);
 
     sim.dragEnd();
-    for (let i = 0; i < 600; i += 1) sim.tick();
+    for (let i = 0; i < 30; i += 1) sim.tick();
+    expect(sim.findLink('a', 'b')!.isDetached).toBe(true);
 
+    sim.resetLayout();
+    for (let i = 0; i < 600; i += 1) sim.tick();
     expect(sim.findLink('a', 'b')!.isDetached).toBe(false);
     expect(sim.linkStates).toHaveLength(1);
     sim.destroy();
@@ -276,12 +323,269 @@ describe('drag-time bridge snapping and recovery', () => {
     const node = sim.findNode('attention-max')!;
     sim.dragStart(node);
     sim.dragMove(node.x + 900, node.y + 400);
+    sim.tick();
     expect(sim.linkStates.some((link) => link.isDetached)).toBe(true);
     sim.dragEnd();
+    sim.resetLayout();
 
     for (let i = 0; i < 600; i += 1) sim.tick();
     expect(sim.linkStates).toHaveLength(13);
     expect(sim.linkStates.every((link) => !link.isDetached)).toBe(true);
+    sim.destroy();
+  });
+});
+
+describe('decoupled drag and persistent user pinning', () => {
+  it('keeps a non-dragged neighbor within <15px over a 160px drag', () => {
+    const sim = twoNodeSim();
+    const node = sim.findNode('a')!;
+    const neighbor = sim.findNode('b')!;
+    const startX = node.x;
+    const startY = node.y;
+    const before = { x: neighbor.x, y: neighbor.y };
+
+    sim.dragStart(node);
+    for (let step = 1; step <= 20; step += 1) {
+      sim.dragMove(startX + (160 * step) / 20, startY);
+      sim.tick();
+      // The decoupling must come from force isolation, never neighbor pins.
+      expect(neighbor.fx, `neighbor fx at step ${step}`).toBeNull();
+      expect(neighbor.fy, `neighbor fy at step ${step}`).toBeNull();
+    }
+
+    const displacement = Math.hypot(neighbor.x - before.x, neighbor.y - before.y);
+    expect(displacement).toBeLessThan(12);
+    sim.destroy();
+  });
+
+  it('advances the viscous drag follower on the frame clock, not pointer events', () => {
+    const sim = twoNodeSim();
+    const node = sim.findNode('a')!;
+    const startX = node.x;
+
+    sim.dragStart(node);
+    sim.dragMove(startX + 160, node.y);
+    // The pointer sample only stores a target; the next physics frame moves it.
+    expect(node.fx).toBeCloseTo(startX, 6);
+
+    const positions: number[] = [];
+    for (let tick = 0; tick < 20; tick += 1) {
+      sim.tick();
+      positions.push(node.fx ?? node.x);
+    }
+
+    expect(positions[0]).toBeGreaterThan(startX);
+    expect(positions[0]).toBeLessThan(startX + 160);
+    for (let index = 1; index < positions.length; index += 1) {
+      expect(positions[index]).toBeGreaterThanOrEqual(positions[index - 1] - 1e-6);
+    }
+    expect(positions.at(-1)!).toBeGreaterThan(startX + 100);
+    sim.destroy();
+  });
+
+  it('settles toward a soft home anchor without keeping fx/fy pins', () => {
+    const sim = twoNodeSim();
+    const node = sim.findNode('a')!;
+
+    sim.dragStart(node);
+    sim.dragMove(760, 720);
+    const homeX = node.fx ?? node.x;
+    const homeY = node.fy ?? node.y;
+    sim.dragEnd();
+
+    expect(node.fx).toBeNull();
+    expect(node.fy).toBeNull();
+
+    // Nudge the released node away; the alpha-independent home spring must pull
+    // it back smoothly without a hard pin.
+    node.x += 90;
+    node.y += 45;
+    for (let tick = 0; tick < 300; tick += 1) sim.tick();
+    expect(Math.hypot(node.x - homeX, node.y - homeY)).toBeLessThan(2);
+
+    sim.resetLayout();
+    expect(Math.abs(node.x - 0.4 * 1000)).toBeLessThan(30);
+    expect(Math.abs(node.y - 0.5 * 1000)).toBeLessThan(30);
+    sim.destroy();
+  });
+
+  it('scales and clamps soft home anchors proportionally on resize', () => {
+    const sim = twoNodeSim();
+    const node = sim.findNode('a')!;
+
+    sim.dragStart(node);
+    sim.dragMove(1000, 950);
+    const homeX = node.fx ?? node.x;
+    const homeY = node.fy ?? node.y;
+    sim.dragEnd();
+
+    sim.resize(2000, 400);
+    const clamp = (value: number, min: number, max: number) =>
+      Math.min(Math.max(value, min), Math.max(min, max));
+    const expectedX = clamp(homeX * 2, 48, 2000 - 48);
+    const expectedY = clamp(homeY * 0.4, 48, 400 - 48);
+    node.x = expectedX + 60;
+    node.y = expectedY + 30;
+    for (let tick = 0; tick < 260; tick += 1) sim.tick();
+    expect(Math.hypot(node.x - expectedX, node.y - expectedY)).toBeLessThan(2);
+    sim.destroy();
+  });
+
+  it('clears pins, detached flags, and restores planar seeds on resetLayout', () => {
+    const sim = twoNodeSim();
+    const node = sim.findNode('a')!;
+    const link = sim.findLink('a', 'b')!;
+
+    sim.dragStart(node);
+    sim.dragMove(-5000, 500);
+    sim.tick();
+    expect(link.isDetached).toBe(true);
+    sim.dragEnd();
+
+    sim.resetLayout();
+    expect(node.fx).toBeNull();
+    expect(node.fy).toBeNull();
+    expect(link.isDetached).toBe(false);
+    expect(node.x).toBeCloseTo(0.4 * 1000, 6);
+    expect(node.y).toBeCloseTo(0.5 * 1000, 6);
+
+    for (let i = 0; i < 60; i += 1) sim.tick();
+    expect(Math.abs(node.x - 0.4 * 1000)).toBeLessThan(30);
+    expect(Math.abs(node.y - 0.5 * 1000)).toBeLessThan(30);
+    sim.destroy();
+  });
+});
+
+describe('snap hysteresis, recoil, and reconnect cooldown', () => {
+  it('uses the 1.6x snap and 1.25x reconnect multipliers', () => {
+    expect(SNAP_MULTIPLIER).toBe(1.6);
+    expect(RECONNECT_MULTIPLIER).toBe(1.25);
+    expect(RECOIL_MS).toBe(220);
+    expect(RECONNECT_COOLDOWN_MS).toBe(350);
+  });
+
+  it('uses render-clock detachedAt/reconnect timestamps and emits a reconnect ripple', () => {
+    let now = 1000;
+    const clock = vi.spyOn(performance, 'now').mockImplementation(() => now);
+    const sim = twoNodeSim();
+    const node = sim.findNode('a')!;
+    const other = sim.findNode('b')!;
+    const link = sim.findLink('a', 'b')!;
+
+    sim.dragStart(node);
+    sim.dragMove(-5000, 500);
+    sim.tick();
+    expect(link.isDetached).toBe(true);
+    expect(link.detachedAt).not.toBeNull();
+    const detachedAt = link.detachedAt!;
+    expect(detachedAt).toBe(1000);
+
+    // The recoil timestamp is a render-clock fact, not an afterTick counter, so
+    // it must remain stable even while the simulation is idle/stopped.
+    now = 1110;
+    sim.sim.stop();
+    expect(link.detachedAt).toBe(detachedAt);
+    expect(now - detachedAt).toBeLessThan(RECOIL_MS);
+
+    sim.dragEnd();
+    expect(link.reconnectCooldownUntil).toBe(now + RECONNECT_COOLDOWN_MS);
+
+    // Put the released node inside the 1.25x radius without any fx/fy pin. The
+    // cooldown must still hold the bridge detached until its timestamp passes.
+    node.x = other.x - RECONNECT_MULTIPLIER * link.restDistance * 0.96;
+    node.y = other.y;
+    node.fx = null;
+    node.fy = null;
+    node.vx = 0;
+    node.vy = 0;
+    now = 1200;
+    sim.tick();
+    expect(link.isDetached).toBe(true);
+
+    now = 1110 + RECONNECT_COOLDOWN_MS + 50;
+    sim.tick();
+    expect(link.isDetached).toBe(false);
+    expect(link.detachedAt).toBeNull();
+    expect(bridgeOscillatorAmplitude(link.oscillator)).toBeGreaterThan(0.05);
+    clock.mockRestore();
+    sim.destroy();
+  });
+});
+
+describe('visual ambient drift', () => {
+  it('is deterministic and bounded by the 3.5px amplitude', () => {
+    for (const id of ['open-dungeon', 'attention-max', 'ivy-film-festival-2026']) {
+      const first = ambientDriftOffset(id, 1234);
+      const second = ambientDriftOffset(id, 1234);
+      expect(first).toEqual(second);
+      expect(Math.hypot(first.x, first.y)).toBeLessThanOrEqual(3.5 + 1e-9);
+    }
+  });
+
+  it.each([
+    ['desktop 1440x900', 1440, 900],
+    ['mobile 393x852', 393, 852],
+  ])('keeps zero crossings at maximum ambient offset on %s', (_label, width, height) => {
+    const positions = scaleSeeds(PLANAR_NODE_SEEDS, width, height);
+    for (const time of [0, 137, 999, 4321, 98765]) {
+      const displaced: Record<string, [number, number]> = {};
+      for (const id of PROJECT_IDS) {
+        const offset = ambientDriftOffset(id, time);
+        const base = positions[id];
+        displaced[id] = [base[0] + offset.x, base[1] + offset.y];
+      }
+      expect(countSeedCrossings(displaced), `t=${time}ms`).toBe(0);
+    }
+  });
+});
+
+describe('proximity pairs never create force links', () => {
+  it('keeps exactly the 13 permanent links in the simulation', () => {
+    const sim = fullSim();
+    expect(sim.links).toHaveLength(13);
+    expect(sim.linkStates).toHaveLength(13);
+    expect(sim.sim.force('proximity')).toBeUndefined();
+    sim.destroy();
+  });
+});
+
+describe('mobile snap reachability', () => {
+  it('can drag every permanent edge past 1.6x rest distance at 393x852', () => {
+    const width = 393;
+    const height = 852;
+    const edges = deriveEdges(projects);
+    const sim = createSimulation({
+      nodes: projects.map((project) => ({ id: project.id, label: project.shortTitle })),
+      links: edges.map((edge) => ({
+        source: edge.source,
+        target: edge.target,
+        tags: edge.tags,
+      })),
+      width,
+      height,
+      seeds: PLANAR_NODE_SEEDS,
+      initialPositions: scaleSeeds(PLANAR_NODE_SEEDS, width, height),
+    });
+
+    for (const link of sim.linkStates) {
+      sim.resetLayout();
+      const source = sim.findNode(link.source)!;
+      const target = sim.findNode(link.target)!;
+      const dx = source.x - target.x;
+      const dy = source.y - target.y;
+      const distance = Math.hypot(dx, dy) || 1;
+      sim.dragStart(source);
+      sim.dragMove(
+        source.x + (dx / distance) * 100000,
+        source.y + (dy / distance) * 100000,
+      );
+      sim.tick();
+      expect(
+        link.isDetached,
+        `${link.source} -> ${link.target} (rest ${link.restDistance.toFixed(1)}px)`,
+      ).toBe(true);
+      sim.dragEnd();
+    }
     sim.destroy();
   });
 });
@@ -360,43 +664,30 @@ describe('d3 tick event path', () => {
     sim.destroy();
   });
 
-  it('reconnects a released, detached bridge', () => {
+  it('reconnects a released, detached bridge once cooldown expires and it returns', () => {
     const sim = fullSim();
     const listener = tickListener(sim);
     const node = sim.findNode('attention-max')!;
+    const home = scaleSeeds(PLANAR_NODE_SEEDS, 1440, 900)['attention-max'];
     drive(sim, listener, 1);
 
     sim.dragStart(node);
     sim.dragMove(node.x - 2000, node.y);
+    sim.tick();
     expect(sim.linkStates.some((link) => link.isDetached)).toBe(true);
 
     sim.dragEnd();
     expect(sim.linkStates.some((link) => link.isDetached)).toBe(true);
 
-    const tracked = sim.linkStates
-      .filter((link) => link.isDetached)
-      .sort((a, b) => b.restDistance - a.restDistance)[0];
-    let reconnectDistance: number | null = null;
-    for (let i = 0; i < 600 && reconnectDistance === null; i += 1) {
-      now += 1000 / 60;
-      sim.sim.tick();
-      listener();
-      sim.poll();
-      if (!tracked.isDetached) {
-        const source = sim.findNode(tracked.source)!;
-        const target = sim.findNode(tracked.target)!;
-        reconnectDistance = Math.hypot(source.x - target.x, source.y - target.y);
-      }
-    }
-    expect(reconnectDistance).not.toBeNull();
-    expect(reconnectDistance!).toBeLessThanOrEqual(2 * tracked.restDistance);
-
+    // Return the pinned node to its planar home and wait past the cooldown.
+    node.fx = home[0];
+    node.fy = home[1];
     drive(sim, listener, 600);
     expect(sim.linkStates.every((link) => !link.isDetached)).toBe(true);
     sim.destroy();
   });
 
-  it('does not reconnect through the idle backstop beyond 2x rest distance', () => {
+  it('keeps a pinned far-away bridge detached until resetLayout', () => {
     const sim = twoNodeSim();
     const listener = tickListener(sim);
     const node = sim.findNode('a')!;
@@ -406,37 +697,25 @@ describe('d3 tick event path', () => {
 
     sim.dragStart(node);
     sim.dragMove(-5000, 500);
+    sim.tick();
     expect(link.isDetached).toBe(true);
     sim.dragEnd();
 
-    // Force the coast-to-idle transition while the node is still stretched far
-    // beyond the snap radius.
     node.vx = 0;
     node.vy = 0;
     sim.poll();
     expect(sim.state).toBe('idle');
     expect(Math.hypot(node.x - other.x, node.y - other.y)).toBeGreaterThan(
-      2 * link.restDistance,
+      RECONNECT_MULTIPLIER * link.restDistance,
     );
 
-    now += 1000 / 60;
-    sim.sim.tick();
-    listener();
-    sim.poll();
+    // No idle backstop may pop the bridge back while the node is far away.
+    drive(sim, listener, 600);
     expect(link.isDetached).toBe(true);
 
-    let reconnectDistance: number | null = null;
-    for (let i = 0; i < 600 && reconnectDistance === null; i += 1) {
-      now += 1000 / 60;
-      sim.sim.tick();
-      listener();
-      sim.poll();
-      if (!link.isDetached) {
-        reconnectDistance = Math.hypot(node.x - other.x, node.y - other.y);
-      }
-    }
-    expect(reconnectDistance).not.toBeNull();
-    expect(reconnectDistance!).toBeLessThanOrEqual(2 * link.restDistance);
+    sim.resetLayout();
+    drive(sim, listener, 5);
+    expect(link.isDetached).toBe(false);
     sim.destroy();
   });
 
