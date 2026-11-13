@@ -18,6 +18,19 @@ import { TerminalSimulator } from './TerminalSimulator';
 import { MediaView } from './MediaView';
 
 type TabKind = 'terminal' | 'media';
+type SheetDetent = 'peek' | 'half' | 'full';
+
+const SHEET_DETENT_VH: Record<SheetDetent, number> = {
+  peek: 28,
+  half: 56,
+  full: 86,
+};
+/** Dragging the sheet below this fraction of the viewport dismisses it. */
+const SHEET_DISMISS_VH = 16;
+/** Minimum visible graph strip before the sheet falls back to Peek. */
+const SHEET_MIN_STRIP_PX = 120;
+/** Flick velocity (px/ms) that advances a detent without waiting for distance. */
+const SHEET_FLICK_VELOCITY = 0.35;
 
 interface DrawerTab {
   kind: TabKind;
@@ -55,6 +68,26 @@ function scrambleTitle(target: string, progress: number): string {
   return out;
 }
 
+function computeIsSheet(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.innerWidth < 768 ||
+    (window.matchMedia('(pointer: coarse)').matches && window.innerHeight < 500)
+  );
+}
+
+/** Bottom edge of the ControlsOverlay header, in viewport coordinates. */
+function measureHeaderBottom(): number {
+  const brand = document.querySelector<HTMLElement>('[data-testid="brand-home"]');
+  return brand?.closest('header')?.getBoundingClientRect().bottom ?? 0;
+}
+
+function defaultSheetDetent(): SheetDetent {
+  if (typeof window === 'undefined') return 'half';
+  const halfTop = window.innerHeight * (1 - SHEET_DETENT_VH.half / 100);
+  return halfTop - measureHeaderBottom() < SHEET_MIN_STRIP_PX ? 'peek' : 'half';
+}
+
 export function ProjectDrawer({
   project,
   anchor,
@@ -66,11 +99,19 @@ export function ProjectDrawer({
   const [activeTab, setActiveTab] = useState<TabKind | null>(null);
   const [displayTitle, setDisplayTitle] = useState(project.title);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
-  const [isSheet, setIsSheet] = useState(
-    () => typeof window !== 'undefined' && window.innerWidth < 768,
-  );
+  const [isSheet, setIsSheet] = useState(computeIsSheet);
+  const [sheetDetent, setSheetDetent] = useState<SheetDetent>('half');
+  const [liveSheetHeightPx, setLiveSheetHeightPx] = useState<number | null>(null);
   const positionRef = useRef<{ left: number; top: number } | null>(null);
   const targetRef = useRef<{ left: number; top: number } | null>(null);
+  const sheetDragRef = useRef<{
+    pointerId: number;
+    startY: number;
+    startHeight: number;
+    lastY: number;
+    lastT: number;
+    velocity: number;
+  } | null>(null);
   const pointerRafRef = useRef(0);
   const hasUserDraggedRef = useRef(false);
   const dragStateRef = useRef<{
@@ -102,6 +143,14 @@ export function ProjectDrawer({
   useEffect(() => {
     if (!activeTab && tabs.length > 0) setActiveTab(tabs[0].kind);
   }, [tabs, activeTab]);
+
+  // The Half detent must leave a usable graph strip. On short viewports (for
+  // example 320x568 with a wrapped header) fall back to Peek before first paint.
+  useLayoutEffect(() => {
+    if (!isSheet) return;
+    setSheetDetent(defaultSheetDetent());
+    setLiveSheetHeightPx(null);
+  }, [isSheet, project.id]);
 
   // Stepped 12fps character decode, bounded to 350ms. Reduced motion renders
   // the final string immediately. All timers clear on unmount/project switch.
@@ -154,9 +203,15 @@ export function ProjectDrawer({
     };
 
     const computeTarget = () => {
-      if (window.innerWidth < 768) {
+      if (computeIsSheet()) {
         setIsSheet(true);
         targetRef.current = null;
+        if (panel.style.cursor !== '') panel.style.cursor = '';
+        const halfTop =
+          window.innerHeight * (1 - SHEET_DETENT_VH.half / 100);
+        if (halfTop - measureHeaderBottom() < SHEET_MIN_STRIP_PX) {
+          setSheetDetent((current) => (current === 'half' ? 'peek' : current));
+        }
         return;
       }
       setIsSheet(false);
@@ -313,6 +368,10 @@ export function ProjectDrawer({
     clientX: number,
     clientY: number,
   ) => {
+    if (isSheet) {
+      if (panel.style.cursor !== '') panel.style.cursor = '';
+      return;
+    }
     const nextCursor = isOnDragBorder(panel, clientX, clientY) ? 'move' : '';
     if (panel.style.cursor !== nextCursor) panel.style.cursor = nextCursor;
   };
@@ -386,14 +445,131 @@ export function ProjectDrawer({
     if (panel && panel.style.cursor !== '') panel.style.cursor = '';
   };
 
+  const handleSheetPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!isSheet) return;
+    const panel = panelRef.current;
+    if (!panel) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const now = performance.now();
+    sheetDragRef.current = {
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      startHeight: panel.getBoundingClientRect().height,
+      lastY: event.clientY,
+      lastT: now,
+      velocity: 0,
+    };
+    setLiveSheetHeightPx(panel.getBoundingClientRect().height);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleSheetPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const state = sheetDragRef.current;
+    if (!state || state.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    const now = performance.now();
+    const dy = event.clientY - state.lastY;
+    const dt = Math.max(1, now - state.lastT);
+    // Positive velocity means the pointer is moving up (expanding the sheet).
+    state.velocity = -dy / dt;
+    state.lastY = event.clientY;
+    state.lastT = now;
+    const nextHeight = Math.max(
+      0,
+      Math.min(
+        window.innerHeight,
+        state.startHeight - (event.clientY - state.startY),
+      ),
+    );
+    setLiveSheetHeightPx(nextHeight);
+  };
+
+  const handleSheetPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const state = sheetDragRef.current;
+    if (!state || state.pointerId !== event.pointerId) return;
+    sheetDragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    const height = Math.max(
+      0,
+      Math.min(
+        window.innerHeight,
+        state.startHeight - (event.clientY - state.startY),
+      ),
+    );
+    if (height < window.innerHeight * (SHEET_DISMISS_VH / 100)) {
+      setLiveSheetHeightPx(null);
+      onClose();
+      return;
+    }
+    const detents = Object.entries(SHEET_DETENT_VH) as [SheetDetent, number][];
+    let next = detents.reduce((best, entry) =>
+      Math.abs(entry[1] - (height / window.innerHeight) * 100) <
+      Math.abs(best[1] - (height / window.innerHeight) * 100)
+        ? entry
+        : best,
+    )[0];
+    if (Math.abs(state.velocity) >= SHEET_FLICK_VELOCITY) {
+      const order: SheetDetent[] = ['peek', 'half', 'full'];
+      const index = order.indexOf(next);
+      const step = state.velocity > 0 ? 1 : -1;
+      next = order[Math.min(order.length - 1, Math.max(0, index + step))];
+    }
+    setSheetDetent(next);
+    setLiveSheetHeightPx(null);
+  };
+
   const mediaPreviews = project.previews.filter(
     (p): p is Extract<Preview, { kind: 'video' | 'screenshot' }> =>
       p.kind === 'video' || p.kind === 'screenshot',
   );
   const linkPreviews = project.previews.filter((p) => p.kind === 'linkout');
 
+  const actionLinks = (
+    <div className="mt-3 flex flex-wrap items-center gap-2">
+      {project.repo && (
+        <a
+          href={project.repo}
+          target="_blank"
+          rel="noreferrer"
+          data-testid="drawer-code"
+          aria-label={`${project.title} source code, opens in new tab`}
+          className="fluid-pill min-h-11 gap-1.5 md:min-h-0"
+        >
+          <GitBranch className="h-3.5 w-3.5" aria-hidden="true" />
+          Code <span aria-hidden="true">↗</span>
+        </a>
+      )}
+      {project.liveUrl && (
+        <a
+          href={project.liveUrl}
+          target="_blank"
+          rel="noreferrer"
+          data-testid="drawer-visit"
+          aria-label={`${project.title} live demo, opens in new tab`}
+          className="fluid-pill min-h-11 gap-1.5 md:min-h-0"
+        >
+          <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+          Visit <span aria-hidden="true">↗</span>
+        </a>
+      )}
+    </div>
+  );
+
+  const summaryParagraph = (
+    <p className="mt-2 text-sm leading-relaxed text-[var(--color-muted)]">
+      {project.summary}
+    </p>
+  );
+
   const panelClass = isSheet
-    ? 'fixed inset-x-0 bottom-0 z-50 flex max-h-[85dvh] w-full flex-col overflow-y-auto rounded-t-2xl border border-[var(--color-outline)] bg-[var(--color-surface)]/95 text-[var(--color-text)] shadow-2xl backdrop-blur-md'
+    ? `fixed inset-x-0 bottom-0 z-50 flex w-full flex-col overflow-hidden rounded-t-2xl border border-[var(--color-outline)] bg-[var(--color-surface)]/95 text-[var(--color-text)] shadow-2xl backdrop-blur-md ${
+        liveSheetHeightPx === null
+          ? 'transition-[height] duration-200 ease-out'
+          : ''
+      }`
     : 'fixed z-50 flex max-h-[85dvh] w-[min(420px,calc(100vw-2rem))] flex-col overflow-y-auto rounded-2xl border border-[var(--color-outline)] bg-[var(--color-surface)]/95 text-[var(--color-text)] shadow-2xl backdrop-blur-md';
 
   return (
@@ -410,9 +586,15 @@ export function ProjectDrawer({
         aria-modal="true"
         aria-label={`${project.title} project details`}
         data-testid="project-drawer"
+        data-sheet-detent={isSheet ? sheetDetent : undefined}
         style={
           isSheet
-            ? undefined
+            ? {
+                height:
+                  liveSheetHeightPx !== null
+                    ? `${liveSheetHeightPx}px`
+                    : `${SHEET_DETENT_VH[sheetDetent]}dvh`,
+              }
             : position
               ? { left: position.left, top: position.top }
               : { left: 0, top: 0, visibility: 'hidden' }
@@ -424,14 +606,37 @@ export function ProjectDrawer({
         onPointerCancel={handlePanelPointerUp}
         onPointerLeave={handlePanelPointerLeave}
       >
-        <header className="sticky top-0 z-10 border-b border-[var(--color-divider)] bg-[var(--color-surface)]/95 px-5 py-4 backdrop-blur-md">
+        <header
+          className={
+            isSheet
+              ? 'sticky top-0 z-10 shrink-0 border-b border-[var(--color-divider)] bg-[var(--color-surface)]/95 px-4 pb-2 pt-0 backdrop-blur-md'
+              : 'sticky top-0 z-10 border-b border-[var(--color-divider)] bg-[var(--color-surface)]/95 px-5 py-4 backdrop-blur-md'
+          }
+        >
+          {isSheet && (
+            <div
+              data-testid="sheet-drag-handle"
+              aria-hidden="true"
+              className="flex min-h-8 cursor-grab touch-none items-center justify-center active:cursor-grabbing"
+              onPointerDown={handleSheetPointerDown}
+              onPointerMove={handleSheetPointerMove}
+              onPointerUp={handleSheetPointerUp}
+              onPointerCancel={handleSheetPointerUp}
+            >
+              <div className="h-1 w-10 rounded-full bg-[var(--color-outline)]" />
+            </div>
+          )}
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <span className="inline-flex items-center rounded-full border border-[var(--color-outline)] px-2.5 py-0.5 font-secondary text-[10px] font-light uppercase tracking-[0.18em] text-[var(--color-muted)]">
                 {indexLabel}
               </span>
 
-              <div className="mt-2 grid [grid-template-areas:'title']">
+              <div
+                className={`grid [grid-template-areas:'title'] ${
+                  isSheet ? 'mt-1' : 'mt-2'
+                }`}
+              >
                 <h2 data-testid="drawer-heading" className="sr-only">
                   {project.title}
                 </h2>
@@ -450,38 +655,8 @@ export function ProjectDrawer({
                 </span>
               </div>
 
-              <p className="mt-2 text-sm leading-relaxed text-[var(--color-muted)]">
-                {project.summary}
-              </p>
-
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                {project.repo && (
-                  <a
-                    href={project.repo}
-                    target="_blank"
-                    rel="noreferrer"
-                    data-testid="drawer-code"
-                    aria-label={`${project.title} source code, opens in new tab`}
-                    className="fluid-pill min-h-11 gap-1.5 md:min-h-0"
-                  >
-                    <GitBranch className="h-3.5 w-3.5" aria-hidden="true" />
-                    Code <span aria-hidden="true">↗</span>
-                  </a>
-                )}
-                {project.liveUrl && (
-                  <a
-                    href={project.liveUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    data-testid="drawer-visit"
-                    aria-label={`${project.title} live demo, opens in new tab`}
-                    className="fluid-pill min-h-11 gap-1.5 md:min-h-0"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-                    Visit <span aria-hidden="true">↗</span>
-                  </a>
-                )}
-              </div>
+              {!isSheet && summaryParagraph}
+              {!isSheet && actionLinks}
             </div>
             <button
               type="button"
@@ -495,7 +670,19 @@ export function ProjectDrawer({
           </div>
         </header>
 
-        <div className="px-5 py-4">
+        <div
+          className={
+            isSheet
+              ? 'flex-1 overflow-y-auto px-5 py-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]'
+              : 'px-5 py-4'
+          }
+        >
+          {isSheet && (
+            <div className="mb-4">
+              {summaryParagraph}
+              {actionLinks}
+            </div>
+          )}
           <div className="flex flex-wrap gap-2">
             {project.tags.map((tag) => (
               <span

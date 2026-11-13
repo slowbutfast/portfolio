@@ -738,6 +738,72 @@ describe('d3 tick event path', () => {
     sim.destroy();
   });
 
+  it('cancels a drag with zero fling velocity and an unmoved home anchor', () => {
+    const sim = twoNodeSim();
+    const listener = tickListener(sim);
+    const node = sim.findNode('a')!;
+    drive(sim, listener, 1);
+
+    // Establish a committed home anchor with a normal release first.
+    sim.dragStart(node);
+    sim.dragMove(node.x + 80, node.y);
+    drive(sim, listener, 8);
+    sim.dragEnd();
+    drive(sim, listener, 300);
+    const committedHome = { x: node.x, y: node.y };
+
+    sim.dragStart(node);
+    sim.dragMove(committedHome.x + 280, committedHome.y + 120);
+    drive(sim, listener, 12);
+    const dragged = { x: node.fx!, y: node.fy! };
+    expect(
+      Math.hypot(dragged.x - committedHome.x, dragged.y - committedHome.y),
+    ).toBeGreaterThan(60);
+
+    // pointercancel semantics: release the pin without a fling and without
+    // committing the dragged coordinate as the new home.
+    sim.dragEnd({ cancel: true });
+    expect(sim.state).toBe('idle');
+    expect(node.fx).toBeNull();
+    expect(node.fy).toBeNull();
+    expect(node.vx).toBe(0);
+    expect(node.vy).toBe(0);
+
+    // The previously committed home spring wins over the abandoned position.
+    drive(sim, listener, 600);
+    const fromHome = Math.hypot(
+      node.x - committedHome.x,
+      node.y - committedHome.y,
+    );
+    const fromDragged = Math.hypot(node.x - dragged.x, node.y - dragged.y);
+    expect(fromHome).toBeLessThan(15);
+    expect(fromHome).toBeLessThan(fromDragged);
+    sim.destroy();
+  });
+
+  it('returns a never-placed node to its pre-drag position on cancel', () => {
+    const sim = twoNodeSim();
+    const listener = tickListener(sim);
+    const node = sim.findNode('a')!;
+    drive(sim, listener, 1);
+    const resting = { x: node.x, y: node.y };
+
+    sim.dragStart(node);
+    sim.dragMove(resting.x + 280, resting.y + 120);
+    drive(sim, listener, 12);
+    expect(
+      Math.hypot((node.fx ?? 0) - resting.x, (node.fy ?? 0) - resting.y),
+    ).toBeGreaterThan(60);
+
+    sim.dragEnd({ cancel: true });
+    drive(sim, listener, 600);
+
+    // No prior normal release exists, so the cancel path must seed the home
+    // spring from the pre-drag anchor to bring the node back.
+    expect(Math.hypot(node.x - resting.x, node.y - resting.y)).toBeLessThan(15);
+    sim.destroy();
+  });
+
   it('rings down oscillators and reaches idle', () => {
     const sim = fullSim();
     const listener = tickListener(sim);

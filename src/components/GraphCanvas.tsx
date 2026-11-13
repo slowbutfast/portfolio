@@ -15,6 +15,7 @@ import {
   type GraphSimulation,
 } from '../physics/graphSimulation';
 import type { PopoverObstacles } from '../utils/popoverPlacement';
+import { shouldClearStickyFocalOnTap } from '../utils/stickyFocal';
 import type { AmbientSynth } from '../audio/ambientSynth';
 
 interface GraphCanvasProps {
@@ -47,7 +48,8 @@ interface GraphCanvasProps {
   onCanvasCenterChange?: (center: { x: number; y: number }) => void;
   /** Highlighted node retained after the inspector closes. */
   stickyFocalId?: string | null;
-  onClearStickyFocal?: () => void;
+  /** Clears the sticky focal highlight (empty-canvas tap, Reset, Grid view). */
+  onClearFocal?: () => void;
 }
 
 interface Size {
@@ -110,6 +112,17 @@ function readToken(name: string, fallback: string): string {
   if (typeof window === 'undefined') return fallback;
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   return value || fallback;
+}
+
+/**
+ * Mobile GPUs pay for every backing-store pixel. Touch-first devices are capped
+ * at 2 even when the display reports 2.6x/3x, which is visually
+ * indistinguishable for these hairlines and circles.
+ */
+function getEffectiveDpr(): number {
+  const dpr = window.devicePixelRatio || 1;
+  const coarse = window.matchMedia('(pointer: coarse)').matches;
+  return coarse ? Math.min(dpr, 2) : dpr;
 }
 
 function cacheTokens(): FluidTokens {
@@ -276,7 +289,7 @@ export function GraphCanvas({
   layoutResetVersion = 0,
   onCanvasCenterChange,
   stickyFocalId = null,
-  onClearStickyFocal,
+  onClearFocal,
 }: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -288,6 +301,7 @@ export function GraphCanvas({
   const tokensRef = useRef<FluidTokens>(DEFAULT_TOKENS);
   const staticPosRef = useRef<Map<string, [number, number]>>(new Map());
   const downPosRef = useRef<{ x: number; y: number } | null>(null);
+  const downNodeIdRef = useRef<string | null>(null);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
   const dimmedRef = useRef(dimmedIds);
@@ -308,8 +322,8 @@ export function GraphCanvas({
   selectedIdRef.current = initialSelectedId ?? null;
   const stickyFocalRef = useRef<string | null>(stickyFocalId);
   stickyFocalRef.current = stickyFocalId;
-  const onClearStickyFocalRef = useRef(onClearStickyFocal);
-  onClearStickyFocalRef.current = onClearStickyFocal;
+  const onClearFocalRef = useRef(onClearFocal);
+  onClearFocalRef.current = onClearFocal;
   const buildObstacleSnapshotRef = useRef<
     () => PopoverObstacles | undefined
   >(() => undefined);
@@ -339,6 +353,7 @@ export function GraphCanvas({
 
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     reduceMotionRef.current = reduceMotion;
+    const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
     canHoverRef.current =
       !reduceMotion && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
@@ -348,7 +363,7 @@ export function GraphCanvas({
     let width = Math.max(1, Math.round(container.getBoundingClientRect().width));
     let height = Math.max(1, Math.round(container.getBoundingClientRect().height));
 
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = getEffectiveDpr();
     canvas.width = Math.round(width * dpr);
     canvas.height = Math.round(height * dpr);
     sizeRef.current = { width, height, dpr };
@@ -375,6 +390,7 @@ export function GraphCanvas({
 
     const ctx = canvas.getContext('2d');
     let raf = 0;
+    let idleTimer = 0;
     let disposed = false;
 
     const visibilityObserver = new IntersectionObserver(
@@ -462,6 +478,24 @@ export function GraphCanvas({
       }
       if (canvas.dataset.simState !== sim.state) {
         canvas.dataset.simState = sim.state;
+      }
+      const camera = transformRef.current;
+      canvas.dataset.cameraX = camera.x.toFixed(1);
+      canvas.dataset.cameraY = camera.y.toFixed(1);
+      canvas.dataset.renderDpr = String(d);
+      canvas.dataset.renderCount = String(
+        (Number(canvas.dataset.renderCount) || 0) + 1,
+      );
+      if (selectedIdRef.current) {
+        const selectedPos = active.get(selectedIdRef.current);
+        if (selectedPos) {
+          canvas.dataset.selectedScreenY = (
+            selectedPos[1] * camera.scale +
+            camera.y
+          ).toFixed(1);
+        }
+      } else if (canvas.dataset.selectedScreenY !== undefined) {
+        delete canvas.dataset.selectedScreenY;
       }
 
       const nodeColor = (id: string): string => {
@@ -664,6 +698,10 @@ export function GraphCanvas({
         sim.sim.stop();
         cancelAnimationFrame(raf);
         raf = 0;
+        if (idleTimer !== 0) {
+          window.clearTimeout(idleTimer);
+          idleTimer = 0;
+        }
         render();
         return;
       }
@@ -701,6 +739,10 @@ export function GraphCanvas({
 
     const wake = () => {
       if (disposed) return;
+      if (idleTimer !== 0) {
+        window.clearTimeout(idleTimer);
+        idleTimer = 0;
+      }
       if (idleSuspended) {
         idleSuspended = false;
         // A small alpha re-heats homing and oscillator integration just enough
@@ -733,6 +775,18 @@ export function GraphCanvas({
         ) {
           render();
           lastRenderAtRef.current = now;
+        }
+        if (idleAmbientOnly && coarsePointer) {
+          // Touch devices: stop both the d3 timer and the rAF loop between
+          // ambient frames. The timed 15fps tick keeps the ferrofluid breathing
+          // while cutting idle wakeups by ~75-87%.
+          idleSuspended = true;
+          sim.sim.stop();
+          idleTimer = window.setTimeout(() => {
+            idleTimer = 0;
+            loop();
+          }, 1000 / 15);
+          return;
         }
       }
       if (
@@ -778,7 +832,7 @@ export function GraphCanvas({
         x: rect.left + rect.width / 2,
         y: rect.top + rect.height / 2,
       });
-      const d = window.devicePixelRatio || 1;
+      const d = getEffectiveDpr();
       canvas.width = Math.round(width * d);
       canvas.height = Math.round(height * d);
       canvas.style.width = `${width}px`;
@@ -813,6 +867,7 @@ export function GraphCanvas({
       themeObserver.disconnect();
       motionQuery.removeEventListener('change', handleMotionChange);
       cancelAnimationFrame(raf);
+      if (idleTimer !== 0) window.clearTimeout(idleTimer);
       if (hoverDwellTimerRef.current !== null) {
         window.clearTimeout(hoverDwellTimerRef.current);
         hoverDwellTimerRef.current = null;
@@ -884,6 +939,115 @@ export function GraphCanvas({
     }
     wakeRef.current();
   }, [focusedId]);
+
+  // On sheet viewports the camera lifts the inspected node into the visible
+  // strip between the measured header bottom and the drawer's top edge. The
+  // strip is re-measured on viewport resize and while the sheet changes height
+  // (drag or detent snap), then released to (0, 0) as soon as the sheet closes
+  // — even when the sticky focal highlight persists.
+  useEffect(() => {
+    const sim = simRef.current;
+    const canvas = canvasRef.current;
+    if (!sim || !canvas) return;
+    const goal = targetRef.current;
+    let frame = 0;
+    let retry: number | null = null;
+    let disposed = false;
+
+    const sheetViewport = () =>
+      window.innerWidth < 768 ||
+      (window.matchMedia('(pointer: coarse)').matches &&
+        window.innerHeight < 500);
+
+    const reset = () => {
+      goal.x = 0;
+      goal.y = 0;
+      wakeRef.current();
+    };
+
+    if (!initialSelectedId) {
+      // Selecting a semantic nav entry owns the camera; otherwise closing the
+      // sheet returns the graph to its resting transform.
+      if (!focusedId) reset();
+      return;
+    }
+    if (!sheetViewport() || focusedId) return;
+
+    const measure = () => {
+      if (disposed) return;
+      if (!sheetViewport()) {
+        reset();
+        return;
+      }
+      const node = simRef.current?.findNode(initialSelectedId);
+      const sheet = document.querySelector<HTMLElement>(
+        '[data-testid="project-drawer"]',
+      );
+      const brand = document.querySelector<HTMLElement>(
+        '[data-testid="brand-home"]',
+      );
+      if (!node) return;
+      if (!sheet) {
+        // The drawer mounts in the same commit, but keep a short retry window
+        // for deep links that hydrate the selection after first paint.
+        if (retry === null) {
+          retry = window.setTimeout(() => {
+            retry = null;
+            measure();
+          }, 80);
+        }
+        return;
+      }
+      const headerBottom =
+        brand?.closest('header')?.getBoundingClientRect().bottom ?? 0;
+      const sheetTop = sheet.getBoundingClientRect().top;
+      const targetY = headerBottom + (sheetTop - headerBottom) / 2;
+      const rect = canvas.getBoundingClientRect();
+      const scale = transformRef.current.scale;
+      const nextX = rect.width / 2 - node.x * scale;
+      const nextY = targetY - rect.top - node.y * scale;
+      if (Math.hypot(nextX - goal.x, nextY - goal.y) > 0.5) {
+        goal.x = nextX;
+        goal.y = nextY;
+        wakeRef.current();
+      }
+    };
+
+    const scheduleMeasure = () => {
+      if (disposed || frame !== 0) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        measure();
+      });
+    };
+
+    measure();
+    const sheet = document.querySelector<HTMLElement>(
+      '[data-testid="project-drawer"]',
+    );
+    let sheetObserver: ResizeObserver | null = null;
+    if (sheet) {
+      sheetObserver = new ResizeObserver(scheduleMeasure);
+      sheetObserver.observe(sheet);
+    }
+    window.addEventListener('resize', scheduleMeasure);
+    const orientation = window.matchMedia('(orientation: landscape)');
+    orientation.addEventListener('change', scheduleMeasure);
+    // CSS detent transitions may not emit a usable ResizeObserver sample on
+    // every frame (and dynamic viewport units can settle late). A light poll
+    // keeps the target in sync while the sheet is open; it disappears on close.
+    const geometryPoll = window.setInterval(measure, 120);
+
+    return () => {
+      disposed = true;
+      cancelAnimationFrame(frame);
+      window.clearInterval(geometryPoll);
+      if (retry !== null) window.clearTimeout(retry);
+      sheetObserver?.disconnect();
+      window.removeEventListener('resize', scheduleMeasure);
+      orientation.removeEventListener('change', scheduleMeasure);
+    };
+  }, [initialSelectedId, focusedId]);
 
   // Focusing a semantic nav entry immediately cancels any pending hover dwell
   // and dismisses an open preview card.
@@ -1065,7 +1229,7 @@ export function GraphCanvas({
       if (!currentSim || !candidate || reduceMotionRef.current) return;
       const current = currentSim.findNode(candidate.id);
       if (!current || currentSim.state === 'coasting' || currentSim.state === 'drag') return;
-      onClearStickyFocalRef.current?.();
+      onClearFocalRef.current?.();
       currentSim.hover(current);
       emitHover(current);
     }, HOVER_DWELL_MS);
@@ -1079,6 +1243,24 @@ export function GraphCanvas({
       if (pos && Math.hypot(wx - pos.x, wy - pos.y) <= n.radius) return n;
     }
     return null;
+  };
+
+  /**
+   * A clean tap either opens the inspector or, when it lands on the node that
+   * already owns the sticky focal highlight, dismisses that highlight instead.
+   */
+  const activateNode = (node: GraphNode) => {
+    if (
+      shouldClearStickyFocalOnTap(
+        node.id,
+        selectedIdRef.current,
+        stickyFocalRef.current,
+      )
+    ) {
+      onClearFocalRef.current?.();
+      return;
+    }
+    onSelectRef.current(node.id, nodeScreenPoint(node), buildObstacleSnapshot());
   };
 
   const emitAudioPointer = (clientX: number, clientY: number) => {
@@ -1134,6 +1316,7 @@ export function GraphCanvas({
     const node = hitNode(p.x, p.y);
     setCanvasCursor(node ? 'crosshair' : 'default');
     downPosRef.current = { x: p.x, y: p.y };
+    downNodeIdRef.current = node?.id ?? null;
     lastDragPointRef.current = { x: p.x, y: p.y, t: e.timeStamp };
     if (node) {
       onCanvasDragStartRef.current?.();
@@ -1151,18 +1334,44 @@ export function GraphCanvas({
     const p = worldPoint(e.clientX, e.clientY);
     const start = downPosRef.current;
     const moved = start ? Math.hypot(p.x - start.x, p.y - start.y) : 10;
+    const downNodeId = downNodeIdRef.current;
+    const releasedNode = hitNode(p.x, p.y);
     if (sim.state === 'drag') {
-      const node = hitNode(p.x, p.y);
       sim.dragEnd();
-      if (!reduceMotionRef.current && moved < 6 && node) {
-        onSelectRef.current(node.id, nodeScreenPoint(node), buildObstacleSnapshot());
+      if (!reduceMotionRef.current && moved < 6 && releasedNode) {
+        activateNode(releasedNode);
       }
-    } else if (reduceMotionRef.current && moved < 6) {
-      const node = hitNode(p.x, p.y);
-      if (node) onSelectRef.current(node.id, nodeScreenPoint(node), buildObstacleSnapshot());
+    } else if (reduceMotionRef.current && moved < 6 && releasedNode) {
+      activateNode(releasedNode);
+    }
+    // A tap that starts and ends on empty canvas clears the sticky highlight.
+    // Requiring `downNodeId === null` prevents a finger slipping off a node's
+    // edge from being misread as an empty-canvas tap.
+    if (moved < 6 && downNodeId === null && !releasedNode) {
+      onClearFocalRef.current?.();
     }
     downPosRef.current = null;
-    setCanvasCursor(hitNode(p.x, p.y) ? 'crosshair' : 'default');
+    downNodeIdRef.current = null;
+    setCanvasCursor(releasedNode ? 'crosshair' : 'default');
+  };
+
+  const onPointerCancel = (e: ReactPointerEvent<HTMLCanvasElement>) => {
+    wakeRef.current();
+    clearHoverDwell();
+    emitHover(null);
+    const sim = simRef.current;
+    if (sim?.state === 'drag') {
+      sim.dragEnd({ cancel: true });
+    }
+    synthRef.current?.onDragVelocity(0, 0);
+    downPosRef.current = null;
+    downNodeIdRef.current = null;
+    lastDragPointRef.current = null;
+    const canvas = e.currentTarget;
+    if (canvas.hasPointerCapture(e.pointerId)) {
+      canvas.releasePointerCapture(e.pointerId);
+    }
+    setCanvasCursor('default');
   };
 
   const onPointerLeave = () => {
@@ -1172,6 +1381,8 @@ export function GraphCanvas({
     emitHover(null);
     const sim = simRef.current;
     if (!sim) return;
+    downPosRef.current = null;
+    downNodeIdRef.current = null;
     if (reduceMotionRef.current) return;
     if (sim.state === 'drag') {
       sim.dragEnd();
@@ -1192,6 +1403,7 @@ export function GraphCanvas({
         onPointerMove={onPointerMove}
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
         onPointerLeave={onPointerLeave}
       />
     </div>

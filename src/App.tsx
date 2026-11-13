@@ -364,7 +364,7 @@ export default function App() {
             layoutResetVersion={layoutResetVersion}
             onCanvasCenterChange={setCanvasCenter}
             stickyFocalId={stickyFocalId}
-            onClearStickyFocal={clearStickyFocal}
+            onClearFocal={clearStickyFocal}
           />
         ) : (
           <ListView
