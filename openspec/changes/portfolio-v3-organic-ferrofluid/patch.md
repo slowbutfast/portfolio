@@ -98,3 +98,24 @@
   - Introduced `LABEL_FONT_SIZE = 12`, `EDGE_TAG_LINE_SPACING = 1.15`, and `EDGE_TAG_VERTICAL_PADDING = 4`.
   - `drawEdgeTagPills` now computes `lineHeight = LABEL_FONT_SIZE * EDGE_TAG_LINE_SPACING` (`13.8px`), total height `n * 13.8 + 8`, and stacks text at that pitch inside one contiguous `roundRect`.
   - `DESIGN.md` documents "no inter-row gap, 1.15 line spacing"; verification addendum records the visual check and regression logs.
+
+### [PATCH-05] Collision-Aware Popups & Sticky Inspected Connections
+- **Date**: 2026-11-13 18:41:31 UTC
+- **Feedback Source**: Feature Request / UX Refinement on PR #12 (`feat/portfolio-v3-organic-ferrofluid`)
+- **Reported Issue**:
+  1. `NodeHoverCard` and desktop `ProjectDrawer` need to calculate placement where they cover/collide with the fewest node connections (especially focal edges) and nodes.
+  2. Highlighted connections & focal tag pills from an inspected project should stay visible after closing `ProjectDrawer` until the user hovers over any node (including the same node) or clicks `Reset`.
+  3. Desktop `ProjectDrawer` inspect popup should be draggable via a subtle `Move`/grab handle, clamped within viewport bounds.
+- **Root Cause**:
+  - `NodeHoverCard.tsx` uses a single outward ray (`position - canvasCenter`), and `ProjectDrawer.tsx` hardcodes `anchor.x + 32, anchor.y - 40`, ignoring live connection segments and neighboring nodes.
+  - `GraphCanvas.tsx` `focalId` drops `selectedId` as soon as `ProjectDrawer` closes.
+- **Target Files**: `src/utils/popoverPlacement.ts`, `src/utils/popoverPlacement.test.ts`, `src/components/GraphCanvas.tsx`, `src/components/NodeHoverCard.tsx`, `src/components/ProjectDrawer.tsx` (including header drag handle), `src/App.tsx`, `e2e/portfolio.spec.ts`
+- **Expected Resolution**: `chooseBestPopoverPosition` scores 8 candidate quadrants against live screen-space node circles and Liang-Barsky segment-AABB intersections (weighting `isFocal` edges `3x`), placing both `NodeHoverCard` and desktop `ProjectDrawer` with minimal connection overlap; `stickyFocalId` preserves inspected focal edges & contiguous tag pills after closing `ProjectDrawer` until `250ms` hover dwell activates on any node (or `Reset` / `Grid` view); desktop `ProjectDrawer` gains a hover-revealed `Move`/grab handle with pointer-captured, viewport-clamped dragging and a `hasUserDraggedRef` lock so anchor updates cannot snap it back.
+- **Status**: RESOLVED (2026-11-13 19:03:00 UTC)
+- **Resolution**:
+  - Added `src/utils/popoverPlacement.ts` with 8 candidate rectangles, viewport/72px header clamping, circle-rect node penalties (`5000` target / `1000` neighbor), Liang-Barsky segment-AABB intersection scoring (`3x` focal), and an outward-ray tie-breaker; unit tests cover hub, corner, focal-edge, neighbor-node, and clamping cases.
+  - `GraphCanvas` emits live screen-space `{ nodes, segments }` snapshots through `onHoverNode`, `onSelect`, and `onResolveAnchor`; both `NodeHoverCard` and desktop `ProjectDrawer` place through `chooseBestPopoverPosition`.
+  - Added `stickyFocalId`: `openProject` sets it, `closeDrawer` preserves it, `Reset` / `Grid` view clear it, and the unified `250ms` hover dwell clears it on any node (including the same inspected node). Sticky focal connections and contiguous tag pills remain visible after the drawer closes.
+  - Kept the last obstacle snapshot during the 150ms hover-card transfer grace period so the card cannot re-place itself away from the pointer mid-transfer.
+  - Desktop `ProjectDrawer` now exposes a hover-revealed `Move` / `cursor-grab` / `cursor-grabbing` header handle (`data-testid="drawer-drag-handle"`) with pointer capture, viewport-clamped dragging, and a `hasUserDraggedRef` lock that prevents anchor updates from snapping the panel back. Mobile remains an unchanged bottom sheet.
+  - Verification: typecheck clean, 181 unit tests, 96 e2e passed / 28 expected skips, build clean, OpenSpec changes/specs valid.

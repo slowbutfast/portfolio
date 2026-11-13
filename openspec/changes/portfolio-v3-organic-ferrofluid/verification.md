@@ -534,3 +534,67 @@ $ npm run test:e2e
 $ npx openspec validate --changes
 Totals: 2 passed, 0 failed (2 items)
 ```
+
+---
+
+# PATCH-05 Verification Addendum: Collision-Aware Popups, Sticky Inspected Connections & Draggable Drawer
+
+## Status: RESOLVED
+
+- **Date**: 2026-11-13
+- **Patch**: `PATCH-05` (`patch.md`)
+- **Changes**: `src/utils/popoverPlacement.ts` (new), `popoverPlacement.test.ts`, `GraphCanvas.tsx`, `NodeHoverCard.tsx`, `ProjectDrawer.tsx`, `App.tsx`, `e2e/portfolio.spec.ts`.
+
+## Requirement Adherence Audit Matrix (PATCH-05)
+
+| Request | Resolution | Verification |
+| :--- | :--- | :--- |
+| Hover/inspect popups avoid the most node connections | `chooseBestPopoverPosition` scores 8 candidates with circle-rect node overlap (`5000` target / `1000` neighbor), Liang-Barsky segment-AABB crossings (`3x` focal), viewport/72px header clamping, and outward tie-breaker. Both `NodeHoverCard` and desktop `ProjectDrawer` use it. | `popoverPlacement.test.ts` (5 tests: clamping, focal edge, neighbor node, dense hub, outward tie); visual check at `1440x900` | **PASS** |
+| Sticky inspected connections/tags after drawer close | `App.stickyFocalId` is set on open, preserved on close, cleared by `Reset`, `Grid` view, and the unified `250ms` hover dwell on any node. `GraphCanvas` focal fallback includes `stickyFocalRef`. | `e2e/portfolio.spec.ts::focal edge tag pills persist while the inspector is open` (sticky after close -> dwell same node -> clear) and `::Reset clears the sticky inspected focus` | **PASS** |
+| Desktop draggable inspect popup | `ProjectDrawer` header now has `data-testid="drawer-drag-handle"` with a hover `Move` icon, `cursor-grab`/`cursor-grabbing`, pointer capture, viewport clamping, and `hasUserDraggedRef` so anchors cannot snap it back. Mobile bottom sheet unchanged. | `e2e/portfolio.spec.ts::desktop inspector drags by its handle and stays inside the viewport`; visual check at `1440x900` | **PASS** |
+| Preserve existing hover card transfer behavior | Kept the obstacle snapshot during the 150ms grace window so the card cannot re-place away from the pointer mid-transfer. | `e2e/portfolio.spec.ts::hover card survives a 150ms pointer transfer and dismisses on drag` | **PASS** |
+
+## Empirical Execution Logs (PATCH-05)
+
+```text
+$ npm run typecheck
+> tsc --noEmit
+(exit 0, no diagnostics)
+```
+
+```text
+$ npm run test:unit
+ Test Files  17 passed (17)
+      Tests  181 passed (181)
+```
+
+```text
+$ npm run build
+dist/assets/index-Cm5TRDDe.css    29.43 kB │ gzip:   6.34 kB
+dist/assets/index-B-6BppLU.js    335.22 kB │ gzip: 106.78 kB
+✓ built in 4.86s
+```
+
+```text
+$ npm run test:e2e
+  28 skipped
+  96 passed (2.4m)
+```
+
+```text
+$ npx openspec validate --changes
+✓ change/portfolio-v3-organic-ferrofluid
+✓ change/vercel-preview-gating
+Totals: 2 passed, 0 failed (2 items)
+```
+
+```text
+$ npx openspec validate --specs
+Totals: 7 passed, 0 failed (7 items)
+```
+
+## Visual Checks (PATCH-05)
+
+- Hover card places in the top-left quadrant for a centered OpenDungeon node, avoiding the dense focal-edge cluster to its right.
+- Desktop drawer places to the left of the central cluster and exposes a subtle `Move` handle beside the close button; dragging moves it and clamps it to the viewport.
+- Focal tag pills remain visible after closing the drawer, then clear after a `250ms` dwell on a node.

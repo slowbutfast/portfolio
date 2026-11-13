@@ -14,6 +14,7 @@ import {
   RECOIL_MS,
   type GraphSimulation,
 } from '../physics/graphSimulation';
+import type { PopoverObstacles } from '../utils/popoverPlacement';
 import type { AmbientSynth } from '../audio/ambientSynth';
 
 interface GraphCanvasProps {
@@ -27,14 +28,26 @@ interface GraphCanvasProps {
   onHoverNode?: (
     project: ProjectData | null,
     position: { x: number; y: number } | null,
+    obstacles?: PopoverObstacles,
   ) => void;
   onCanvasDragStart?: () => void;
-  onResolveAnchor?: (id: string, anchor: { x: number; y: number }) => void;
-  onSelect: (id: string, anchor?: { x: number; y: number }) => void;
+  onResolveAnchor?: (
+    id: string,
+    anchor: { x: number; y: number },
+    obstacles?: PopoverObstacles,
+  ) => void;
+  onSelect: (
+    id: string,
+    anchor?: { x: number; y: number },
+    obstacles?: PopoverObstacles,
+  ) => void;
   /** Bumped by the 3-dot menu's "Reset layout" action. */
   layoutResetVersion?: number;
   /** Measured canvas-container center for peripheral hover-card anchoring. */
   onCanvasCenterChange?: (center: { x: number; y: number }) => void;
+  /** Highlighted node retained after the inspector closes. */
+  stickyFocalId?: string | null;
+  onClearStickyFocal?: () => void;
 }
 
 interface Size {
@@ -262,6 +275,8 @@ export function GraphCanvas({
   onSelect,
   layoutResetVersion = 0,
   onCanvasCenterChange,
+  stickyFocalId = null,
+  onClearStickyFocal,
 }: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -291,6 +306,13 @@ export function GraphCanvas({
   onCanvasCenterChangeRef.current = onCanvasCenterChange;
   const selectedIdRef = useRef<string | null>(initialSelectedId ?? null);
   selectedIdRef.current = initialSelectedId ?? null;
+  const stickyFocalRef = useRef<string | null>(stickyFocalId);
+  stickyFocalRef.current = stickyFocalId;
+  const onClearStickyFocalRef = useRef(onClearStickyFocal);
+  onClearStickyFocalRef.current = onClearStickyFocal;
+  const buildObstacleSnapshotRef = useRef<
+    () => PopoverObstacles | undefined
+  >(() => undefined);
   const ambientOffsetRef = useRef<Map<string, { x: number; y: number }>>(new Map());
   const lastAmbientAtRef = useRef(0);
   const visibleRef = useRef(true);
@@ -407,7 +429,11 @@ export function GraphCanvas({
       const focused = focusedRef.current;
       const visited = visitedRef.current;
       const focalId =
-        focused ?? sim.hovered?.id ?? selectedIdRef.current ?? null;
+        focused ??
+        sim.hovered?.id ??
+        selectedIdRef.current ??
+        stickyFocalRef.current ??
+        null;
 
       const dimmedEdgeList = edges
         .filter((edge) => dimmed.has(edge.source) || dimmed.has(edge.target))
@@ -789,10 +815,14 @@ export function GraphCanvas({
       if (!pos) return;
       const rect = canvas.getBoundingClientRect();
       const t = transformRef.current;
-      onResolveAnchorRef.current?.(initialSelectedId, {
-        x: rect.left + pos[0] * t.scale + t.x,
-        y: rect.top + pos[1] * t.scale + t.y,
-      });
+      onResolveAnchorRef.current?.(
+        initialSelectedId,
+        {
+          x: rect.left + pos[0] * t.scale + t.x,
+          y: rect.top + pos[1] * t.scale + t.y,
+        },
+        buildObstacleSnapshotRef.current(),
+      );
     };
     emit();
     const interval = window.setInterval(emit, 300);
@@ -845,6 +875,13 @@ export function GraphCanvas({
     wakeRef.current();
   }, [layoutResetVersion]);
 
+  // Inspector close/open and sticky-highlight changes must repaint a graph that
+  // may already be idle-suspended.
+  useEffect(() => {
+    renderRef.current();
+    wakeRef.current();
+  }, [stickyFocalId, initialSelectedId]);
+
   const worldPoint = (clientX: number, clientY: number) => {
     const canvas = canvasRef.current!;
     const rect = canvas.getBoundingClientRect();
@@ -882,6 +919,54 @@ export function GraphCanvas({
     };
   };
 
+  const buildObstacleSnapshot = (): PopoverObstacles | undefined => {
+    const sim = simRef.current;
+    const canvas = canvasRef.current;
+    if (!sim || !canvas) return undefined;
+    const rect = canvas.getBoundingClientRect();
+    const t = transformRef.current;
+    const nodes: PopoverObstacles['nodes'] = [];
+    for (const node of sim.nodes) {
+      const pos = nodeVisualPosition(node);
+      if (!pos) continue;
+      nodes.push({
+        id: node.id,
+        x: rect.left + pos.x * t.scale + t.x,
+        y: rect.top + pos.y * t.scale + t.y,
+        radius: node.radius * t.scale,
+      });
+    }
+
+    const focal =
+      focusedRef.current ??
+      sim.hovered?.id ??
+      selectedIdRef.current ??
+      stickyFocalRef.current ??
+      null;
+    const segments: PopoverObstacles['segments'] = [];
+    for (const edge of edges) {
+      const link = sim.findLink(edge.source, edge.target);
+      if (link?.isDetached && !reduceMotionRef.current) continue;
+      const source = sim.findNode(edge.source);
+      const target = sim.findNode(edge.target);
+      if (!source || !target) continue;
+      const a = nodeVisualPosition(source);
+      const b = nodeVisualPosition(target);
+      if (!a || !b) continue;
+      segments.push({
+        source: edge.source,
+        target: edge.target,
+        x1: rect.left + a.x * t.scale + t.x,
+        y1: rect.top + a.y * t.scale + t.y,
+        x2: rect.left + b.x * t.scale + t.x,
+        y2: rect.top + b.y * t.scale + t.y,
+        isFocal: focal !== null && (edge.source === focal || edge.target === focal),
+      });
+    }
+    return { nodes, segments };
+  };
+  buildObstacleSnapshotRef.current = buildObstacleSnapshot;
+
   const emitHover = (node: GraphNode | null) => {
     const nextId = node?.id ?? null;
     if (nextId === hoveredProjectIdRef.current) return;
@@ -894,8 +979,11 @@ export function GraphCanvas({
     synthRef.current?.onNodeHover(true);
     const project = getProjectById(node.id) ?? null;
     const anchor = nodeScreenPoint(node);
-    if (project && anchor) onHoverNodeRef.current?.(project, anchor);
-    else onHoverNodeRef.current?.(null, null);
+    if (project && anchor) {
+      onHoverNodeRef.current?.(project, anchor, buildObstacleSnapshot());
+    } else {
+      onHoverNodeRef.current?.(null, null);
+    }
   };
 
   const clearHoverDwell = () => {
@@ -944,6 +1032,7 @@ export function GraphCanvas({
       if (!currentSim || !candidate || reduceMotionRef.current) return;
       const current = currentSim.findNode(candidate.id);
       if (!current || currentSim.state === 'coasting' || currentSim.state === 'drag') return;
+      onClearStickyFocalRef.current?.();
       currentSim.hover(current);
       emitHover(current);
     }, HOVER_DWELL_MS);
@@ -1032,13 +1121,13 @@ export function GraphCanvas({
     if (reduceMotionRef.current) {
       if (moved < 6) {
         const node = hitNode(p.x, p.y);
-        if (node) onSelectRef.current(node.id, nodeScreenPoint(node));
+        if (node) onSelectRef.current(node.id, nodeScreenPoint(node), buildObstacleSnapshot());
       }
     } else if (sim.state === 'drag') {
       const node = sim.hovered ?? hitNode(p.x, p.y);
       sim.dragEnd();
       if (moved < 6 && node) {
-        onSelectRef.current(node.id, nodeScreenPoint(node));
+        onSelectRef.current(node.id, nodeScreenPoint(node), buildObstacleSnapshot());
       }
     }
     downPosRef.current = null;

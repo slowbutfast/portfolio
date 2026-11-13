@@ -1,8 +1,19 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ExternalLink, GitBranch, X } from 'lucide-react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
+import { ExternalLink, GitBranch, Move, X } from 'lucide-react';
 import type { Preview, ProjectData } from '../types/portfolio';
 import { projects } from '../data/projects';
 import { formatIndex } from '../utils/drafting';
+import {
+  chooseBestPopoverPosition,
+  type PopoverObstacles,
+} from '../utils/popoverPlacement';
 import { TerminalSimulator } from './TerminalSimulator';
 import { MediaView } from './MediaView';
 
@@ -16,6 +27,8 @@ interface DrawerTab {
 interface ProjectDrawerProps {
   project: ProjectData;
   anchor?: { x: number; y: number } | null;
+  canvasCenter?: { x: number; y: number };
+  obstacles?: PopoverObstacles;
   onClose: () => void;
 }
 
@@ -40,15 +53,31 @@ function scrambleTitle(target: string, progress: number): string {
   return out;
 }
 
-export function ProjectDrawer({ project, anchor, onClose }: ProjectDrawerProps) {
+export function ProjectDrawer({
+  project,
+  anchor,
+  canvasCenter,
+  obstacles,
+  onClose,
+}: ProjectDrawerProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<TabKind | null>(null);
   const [displayTitle, setDisplayTitle] = useState(project.title);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
-  const [isSheet, setIsSheet] = useState(false);
+  const [isSheet, setIsSheet] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth < 768,
+  );
   const positionRef = useRef<{ left: number; top: number } | null>(null);
   const targetRef = useRef<{ left: number; top: number } | null>(null);
   const pointerRafRef = useRef(0);
+  const hasUserDraggedRef = useRef(false);
+  const dragStateRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    startLeft: number;
+    startTop: number;
+  } | null>(null);
 
   const catalogIndex = projects.findIndex((p) => p.id === project.id);
   const safeIndex = catalogIndex >= 0 ? catalogIndex : 0;
@@ -129,17 +158,40 @@ export function ProjectDrawer({ project, anchor, onClose }: ProjectDrawerProps) 
         return;
       }
       setIsSheet(false);
-      const margin = 16;
-      const width = panel.offsetWidth;
-      const height = panel.offsetHeight;
-      const preferredLeft = anchor ? anchor.x + 32 : window.innerWidth / 2 - width / 2;
-      const preferredTop = anchor ? anchor.y - 40 : window.innerHeight / 2 - height / 2;
-      const maxLeft = Math.max(margin, window.innerWidth - width - margin);
-      const maxTop = Math.max(margin, window.innerHeight - height - margin);
-      targetRef.current = {
-        left: Math.min(Math.max(margin, preferredLeft), maxLeft),
-        top: Math.min(Math.max(margin, preferredTop), maxTop),
+      const viewport = {
+        width: window.innerWidth,
+        height: window.innerHeight,
       };
+      if (hasUserDraggedRef.current) {
+        const current = positionRef.current;
+        if (current) {
+          const maxLeft = Math.max(16, viewport.width - panel.offsetWidth - 16);
+          const maxTop = Math.max(72, viewport.height - panel.offsetHeight - 16);
+          targetRef.current = {
+            left: Math.min(Math.max(16, current.left), maxLeft),
+            top: Math.min(Math.max(72, current.top), maxTop),
+          };
+        }
+        return;
+      }
+      const resolvedAnchor = anchor ?? canvasCenter ?? {
+        x: viewport.width / 2,
+        y: viewport.height / 2,
+      };
+      targetRef.current = chooseBestPopoverPosition({
+        anchor: resolvedAnchor,
+        size: { width: panel.offsetWidth, height: panel.offsetHeight },
+        viewport,
+        canvasCenter: canvasCenter ?? {
+          x: viewport.width / 2,
+          y: viewport.height / 2,
+        },
+        margin: 16,
+        topMargin: 72,
+        gap: 36,
+        targetNodeId: project.id,
+        obstacles,
+      });
     };
 
     const frame = (now: number) => {
@@ -195,7 +247,7 @@ export function ProjectDrawer({ project, anchor, onClose }: ProjectDrawerProps) 
       window.removeEventListener('resize', place);
       resizeObserver.disconnect();
     };
-  }, [anchor]);
+  }, [anchor, canvasCenter, obstacles, project.id]);
 
   useLayoutEffect(() => {
     const el = panelRef.current;
@@ -237,6 +289,55 @@ export function ProjectDrawer({ project, anchor, onClose }: ProjectDrawerProps) 
       document.removeEventListener('keydown', handleKey);
     };
   }, [onClose]);
+
+  const handleDragStart = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (isSheet || event.button !== 0) return;
+    const panel = panelRef.current;
+    const current = positionRef.current;
+    if (!panel || !current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    hasUserDraggedRef.current = true;
+    dragStateRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startLeft: current.left,
+      startTop: current.top,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleDragMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const state = dragStateRef.current;
+    const panel = panelRef.current;
+    if (!state || !panel || state.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    const margin = 16;
+    const maxLeft = Math.max(margin, window.innerWidth - panel.offsetWidth - margin);
+    const maxTop = Math.max(72, window.innerHeight - panel.offsetHeight - 16);
+    const left = Math.min(
+      Math.max(margin, state.startLeft + event.clientX - state.startX),
+      maxLeft,
+    );
+    const top = Math.min(
+      Math.max(72, state.startTop + event.clientY - state.startY),
+      maxTop,
+    );
+    const next = { left: Math.round(left), top: Math.round(top) };
+    positionRef.current = next;
+    targetRef.current = next;
+    setPosition(next);
+  };
+
+  const handleDragEnd = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const state = dragStateRef.current;
+    if (!state || state.pointerId !== event.pointerId) return;
+    dragStateRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
 
   const mediaPreviews = project.previews.filter(
     (p): p is Extract<Preview, { kind: 'video' | 'screenshot' }> =>
@@ -330,15 +431,34 @@ export function ProjectDrawer({ project, anchor, onClose }: ProjectDrawerProps) 
                 )}
               </div>
             </div>
-            <button
-              type="button"
-              data-testid="drawer-close"
-              onClick={onClose}
-              aria-label="Close project drawer"
-              className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-[var(--color-outline)] p-2 text-[var(--color-muted)] transition-colors hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
-            >
-              <X className="h-5 w-5" aria-hidden="true" />
-            </button>
+            <div className="flex shrink-0 items-start gap-1">
+              {!isSheet && (
+                <button
+                  type="button"
+                  data-testid="drawer-drag-handle"
+                  aria-label="Drag project drawer"
+                  onPointerDown={handleDragStart}
+                  onPointerMove={handleDragMove}
+                  onPointerUp={handleDragEnd}
+                  onPointerCancel={handleDragEnd}
+                  className="group flex min-h-11 min-w-11 cursor-grab touch-none items-center justify-center rounded-full p-2 text-[var(--color-muted)] transition-colors hover:bg-[var(--color-surface-container)] hover:text-[var(--color-text)] active:cursor-grabbing"
+                >
+                  <Move
+                    className="h-4 w-4 opacity-60 transition-opacity group-hover:opacity-100"
+                    aria-hidden="true"
+                  />
+                </button>
+              )}
+              <button
+                type="button"
+                data-testid="drawer-close"
+                onClick={onClose}
+                aria-label="Close project drawer"
+                className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-[var(--color-outline)] p-2 text-[var(--color-muted)] transition-colors hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
+              >
+                <X className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
           </div>
         </header>
 

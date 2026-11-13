@@ -61,3 +61,10 @@
 
 - [x] P05A.1 Set connection-tag row pitch to 1.15 line spacing (`13.8px`) inside the contiguous rounded rectangle and document it in `DESIGN.md`
 - [x] P05A.2 Run `npm run typecheck && npm run test:unit && npm run build && npm run test:e2e && npx openspec validate --changes`, update `verification.md`, and mark `PATCH-05A` `RESOLVED`
+
+## Patch 05: Collision-Aware Popups & Sticky Inspected Connections
+
+- [x] P05.1 Scaffold failing unit tests in `src/utils/popoverPlacement.test.ts` (8-candidate scoring, heavy node-overlap penalty, `3x` focal-edge intersection penalty, viewport/top-margin clamping) and failing Playwright E2E tests in `e2e/portfolio.spec.ts` (`stickyFocalId` persists after closing `ProjectDrawer`, clears when `250ms` hover dwell activates on any node including the same node, clears on `Reset`, and desktop `ProjectDrawer` drags cleanly via its corner/header handle)
+- [x] P05.2 Create `src/utils/popoverPlacement.ts` implementing `chooseBestPopoverPosition` with circle-rect overlap and Liang-Barsky segment-AABB intersection
+- [x] P05.3 Update `src/components/GraphCanvas.tsx` (`L22-L29`, `L398-L419`, `L535-L575`), `src/components/NodeHoverCard.tsx` (`L5-L12`, `L51-L86`), `src/components/ProjectDrawer.tsx` (`L16-L20`, `L125-L143`, header/corner drag handle), and `src/App.tsx` (`L48-L56`, `L200-L221`, `L260-L266`, `L305-L375`) to emit live screen-space obstacle snapshots, place both popups via `chooseBestPopoverPosition`, make desktop `ProjectDrawer` draggable with a hover `Move`/grab corner cue, and manage `stickyFocalId`
+- [x] P05.4 Run `npm run typecheck && npm run test:unit && npm run build && npm run test:e2e && npx openspec validate --changes`, update `verification.md`, and mark `PATCH-05` `RESOLVED` in `patch.md`

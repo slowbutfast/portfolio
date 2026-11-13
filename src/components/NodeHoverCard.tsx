@@ -1,12 +1,17 @@
 import { ExternalLink, GitBranch } from 'lucide-react';
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { Preview, ProjectData } from '../types/portfolio';
+import {
+  chooseBestPopoverPosition,
+  type PopoverObstacles,
+} from '../utils/popoverPlacement';
 
 interface NodeHoverCardProps {
   project: ProjectData;
   position: { x: number; y: number };
   /** Canvas center used to project the card outward from the graph cluster. */
   canvasCenter?: { x: number; y: number };
+  obstacles?: PopoverObstacles;
   onPointerEnter?: () => void;
   onPointerLeave?: () => void;
 }
@@ -23,6 +28,7 @@ export function NodeHoverCard({
   project,
   position,
   canvasCenter,
+  obstacles,
   onPointerEnter,
   onPointerLeave,
 }: NodeHoverCardProps) {
@@ -53,36 +59,17 @@ export function NodeHoverCard({
   const viewportWidth = typeof window === 'undefined' ? 1024 : window.innerWidth;
   const viewportHeight = typeof window === 'undefined' ? 768 : window.innerHeight;
   const center = canvasCenter ?? { x: viewportWidth / 2, y: viewportHeight / 2 };
-  let outwardX = position.x - center.x;
-  let outwardY = position.y - center.y;
-  if (Math.hypot(outwardX, outwardY) < 1) {
-    outwardX = 1;
-    outwardY = 0;
-  }
-  const outwardLength = Math.hypot(outwardX, outwardY) || 1;
-  const ux = outwardX / outwardLength;
-  const uy = outwardY / outwardLength;
-
-  // Place the card's near edge just outside the node along the center-to-node
-  // ray, then fall back to the inward side if that quadrant clips the viewport.
-  let left = position.x + ux * NODE_GAP - (ux < 0 ? cardWidth : 0);
-  let top = position.y + uy * NODE_GAP - (uy < 0 ? cardHeight : 0);
-  if (
-    (ux > 0 && left + cardWidth + VIEWPORT_MARGIN > viewportWidth) ||
-    (ux < 0 && left - VIEWPORT_MARGIN < 0)
-  ) {
-    left = ux >= 0 ? position.x - NODE_GAP - cardWidth : position.x + NODE_GAP;
-  }
-  if (
-    (uy > 0 && top + cardHeight + VIEWPORT_MARGIN > viewportHeight) ||
-    (uy < 0 && top - VIEWPORT_MARGIN < 0)
-  ) {
-    top = uy >= 0 ? position.y - NODE_GAP - cardHeight : position.y + NODE_GAP;
-  }
-  const maxLeft = Math.max(VIEWPORT_MARGIN, viewportWidth - cardWidth - VIEWPORT_MARGIN);
-  const maxTop = Math.max(VIEWPORT_MARGIN, viewportHeight - cardHeight - VIEWPORT_MARGIN);
-  left = Math.min(Math.max(VIEWPORT_MARGIN, left), maxLeft);
-  top = Math.min(Math.max(VIEWPORT_MARGIN, top), maxTop);
+  const { left, top } = chooseBestPopoverPosition({
+    anchor: position,
+    size: { width: cardWidth, height: cardHeight },
+    viewport: { width: viewportWidth, height: viewportHeight },
+    canvasCenter: center,
+    margin: VIEWPORT_MARGIN,
+    topMargin: 72,
+    gap: NODE_GAP,
+    targetNodeId: project.id,
+    obstacles,
+  });
 
   const video = project.previews.find(
     (preview): preview is Extract<MediaPreview, { kind: 'video' }> => preview.kind === 'video',

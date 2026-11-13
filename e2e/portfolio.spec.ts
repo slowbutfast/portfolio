@@ -783,6 +783,44 @@ test.describe('portfolio graph SPA', () => {
 
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('project-drawer')).toHaveCount(0);
+    // The inspected focal connection stays sticky after closing the drawer.
+    await expect
+      .poll(async () => Number((await canvas.getAttribute('data-focal-tag-pills')) ?? 0))
+      .toBeGreaterThan(0);
+
+    // Leaving the node does not clear the sticky highlight.
+    await page.mouse.move(box.x + 12, box.y + box.height - 12);
+    await page.waitForTimeout(150);
+    await expect
+      .poll(async () => Number((await canvas.getAttribute('data-focal-tag-pills')) ?? 0))
+      .toBeGreaterThan(0);
+
+    // Re-center the node, dwell on it for 250ms, then leave and blur the
+    // semantic nav. The sticky highlight must already be cleared; otherwise
+    // the focal tag pills would remain after both hover and focus are gone.
+    await page.getByTestId('nav-open-dungeon').focus();
+    await page.waitForTimeout(1600);
+    await page.mouse.move(centerX, centerY);
+    await expect(page.getByTestId('node-hover-card')).toBeVisible();
+    await page.mouse.move(box.x + 12, box.y + box.height - 12);
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await expect
+      .poll(async () => Number((await canvas.getAttribute('data-focal-tag-pills')) ?? 0))
+      .toBe(0);
+  });
+
+  test('Reset clears the sticky inspected focus', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'sticky focus test runs on desktop');
+    await page.goto('/#/p/open-dungeon');
+    await expect(page.getByTestId('project-drawer')).toBeVisible();
+    await page.getByTestId('drawer-close').click();
+    const canvas = page.getByTestId('graph-canvas');
+    await expect
+      .poll(async () => Number((await canvas.getAttribute('data-focal-tag-pills')) ?? 0))
+      .toBeGreaterThan(0);
+
+    await openFilters(page);
+    await page.getByTestId('reset-layout').click();
     await expect
       .poll(async () => Number((await canvas.getAttribute('data-focal-tag-pills')) ?? 0))
       .toBe(0);
@@ -842,6 +880,42 @@ test.describe('portfolio graph SPA', () => {
     });
   }
 
+  test('desktop inspector drags by its handle and stays inside the viewport', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'drawer dragging runs on desktop');
+    await page.goto('/#/p/open-dungeon');
+    const drawer = page.getByTestId('project-drawer');
+    await expect(drawer).toBeVisible();
+    const handle = page.getByTestId('drawer-drag-handle');
+    await expect(handle).toBeVisible();
+    const before = await drawer.boundingBox();
+    const handleBox = await handle.boundingBox();
+    if (!before || !handleBox) throw new Error('drawer drag geometry is unavailable');
+
+    await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(
+      handleBox.x + handleBox.width / 2 + 140,
+      handleBox.y + handleBox.height / 2 + 90,
+      { steps: 8 },
+    );
+    await page.mouse.up();
+    await page.waitForTimeout(300);
+
+    const after = await drawer.boundingBox();
+    if (!after) throw new Error('drawer lost its bounding box after dragging');
+    expect(
+      Math.hypot(after.x - before.x, after.y - before.y),
+    ).toBeGreaterThan(60);
+    const viewport = page.viewportSize();
+    if (!viewport) throw new Error('viewport is unavailable');
+    expect(after.x).toBeGreaterThanOrEqual(15);
+    expect(after.y).toBeGreaterThanOrEqual(70);
+    expect(after.x + after.width).toBeLessThanOrEqual(viewport.width - 15);
+    expect(after.y + after.height).toBeLessThanOrEqual(viewport.height - 15);
+  });
+
   test('canvas selection anchors the inspector beside the node', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'anchored offset is only distinguishable on desktop');
     await page.goto('/');
@@ -850,8 +924,18 @@ test.describe('portfolio graph SPA', () => {
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     const drawer = page.getByTestId('project-drawer');
     await expect(drawer).toBeVisible();
-    const left = await drawer.evaluate((el) => Number.parseFloat((el as HTMLElement).style.left));
-    expect(left).toBeGreaterThan(box.width / 2 - 100);
+    const panel = await drawer.boundingBox();
+    if (!panel) throw new Error('project drawer has no bounding box');
+    const viewport = page.viewportSize();
+    if (!viewport) throw new Error('viewport is unavailable');
+    expect(panel.x).toBeGreaterThanOrEqual(15);
+    expect(panel.y).toBeGreaterThanOrEqual(70);
+    expect(panel.x + panel.width).toBeLessThanOrEqual(viewport.width - 15);
+    expect(panel.y + panel.height).toBeLessThanOrEqual(viewport.height - 15);
+    const anchorX = box.x + box.width / 2;
+    const besideNode =
+      panel.x + panel.width <= anchorX + 40 || panel.x >= anchorX - 40;
+    expect(besideNode).toBe(true);
   });
 
   test('accessibility: graph view has zero WCAG A/AA violations (dark)', async ({ page }) => {
