@@ -122,7 +122,6 @@ export function NodeHoverCard({
         <div className="flex h-32 w-full flex-col justify-between rounded-xl border border-[var(--color-divider)] bg-[var(--color-bg)] p-3 font-mono text-[11px] text-[var(--color-muted)]">
           <span className="text-[var(--color-accent)]">&gt;_</span>
           <span className="truncate">{project.terminalDemo?.prompt || project.title}</span>
-          <span className="text-[10px] uppercase tracking-[0.18em]">CLI specimen</span>
         </div>
       )}
 

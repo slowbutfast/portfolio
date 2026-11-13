@@ -21,3 +21,28 @@
   - `graphSimulation.ts` replaces `userPinnedIds`/`dragNeighborPins` with alpha-independent damped `home` springs, isolates the dragged node (charge strength 0, collide radius `0.4 * R`), applies 45ms viscous pointer lag, and stores `detachedAt`/`reconnectCooldownUntil` as `performance.now()` timestamps with a reconnect ripple.
   - `GraphCanvas.tsx` draws render-clock teardrop recoil from live endpoints, smoothsteps proximity alpha over `[R_A + R_B, R_A + R_B + 12]`, runs deterministic 3.5px visual drift at ~30fps shared with `hitNode`, handles reduced-motion transitions in both directions, hoists sorted ids/edge keys, and measures `canvasCenter`; `App.tsx` forwards that measured center.
   - Reproducing tests failed first, then passed: 173 unit tests, 88 e2e tests, typecheck/build clean, OpenSpec validation clean.
+
+### [PATCH-02] UI Polish, Node-Hover Crosshair, Active-Pair Edge Filtering, Focal Edge Tag Pills & Grid Layout
+- **Date**: 2026-11-13 17:48:07 UTC
+- **Feedback Source**: Manual Playtest & Design Review on PR #12 (`feat/portfolio-v3-organic-ferrofluid`)
+- **Reported Issue**:
+  1. 3-dot dropdown has two reset buttons (`"Reset"` w/ undo icon and `"Reset layout"`), and visited node colors don't reset.
+  2. Canvas cursor stays crosshair everywhere instead of only when hovering/dragging a node.
+  3. Filtering highlights all outgoing edges from an active node (`&&`) instead of only edges where both endpoints are active (`||`).
+  4. Focal/hovered connections don't show 1–3 stacked shared-tag pills between nodes.
+  5. Grid cards place `title` below preview instead of inline next to `01` with `summary` directly below (`DESIGN.md` needs update), and `[CLI Specimen]` badge still renders on terminal fallbacks.
+  6. GitHub Issue `#9` needs updated media requirements appended (without `[CLI Specimen]`).
+- **Root Cause**:
+  - `ControlsOverlay.tsx` renders both `reset-filters` and `reset-layout`, and `App.tsx` doesn't clear `visitedIds` on reset.
+  - `src/styles.css` `.canvas-interactive` sets `cursor: crosshair` globally; `GraphCanvas.tsx` uses `&&` for `isDim` and doesn't draw focal edge tag pills.
+  - `ListView.tsx` orders `index` -> `CardPreview` -> `title` -> `summary`, and `ListView.tsx`/`NodeHoverCard.tsx` render `[CLI Specimen]`.
+- **Target Files**: `src/components/ControlsOverlay.tsx`, `src/App.tsx`, `src/styles.css`, `src/components/GraphCanvas.tsx`, `src/components/ListView.tsx`, `src/components/NodeHoverCard.tsx`, `DESIGN.md`, `e2e/portfolio.spec.ts`, GitHub Issue `#9`
+- **Expected Resolution**: Singular `"Reset"` button resets filters + layout + visited node colors; crosshair cursor appears only on node hover/drag; edges illuminate only when both endpoints are active; 1–3 stacked shared-tag pills render on focal non-detached edges; `[CLI Specimen]` removed; Grid cards show `01  Title` -> `Subtitle` -> `CardPreview` -> `Tags` (codified in `DESIGN.md`); Issue `#9` updated.
+- **Status**: RESOLVED (2026-11-13 18:05:00 UTC)
+- **Resolution**:
+  - `ControlsOverlay` now renders one `data-testid="reset-layout"` button labelled/accessible-named `"Reset"`; `App.resetAll` clears active tags, search, layout version, and `visitedIds`.
+  - `styles.css` defaults the canvas to `cursor: default`; `GraphCanvas` switches to `crosshair` only when `hitNode` succeeds or `state === 'drag'`.
+  - Edge dimming now uses `dimmed.has(source) || dimmed.has(target)`; focal non-detached edges draw up to three stacked shared-tag pills at their midpoint. A `data-dimmed-edges` canvas attribute exposes the deterministic active-pair state for the E2E guard.
+  - `ListView` removes the `[CLI Specimen]` badge and reorders every Grid card to `01  Title` row -> summary -> 16:9 preview -> tags; `NodeHoverCard` removes the fallback `CLI specimen` subtitle; `DESIGN.md` codifies the hierarchy, singular Reset, node-hover crosshair, and active-pair filtering.
+  - GitHub Issue `#9` received the updated media list without `[CLI Specimen]`.
+  - Verification: typecheck clean, 173 unit tests, 92 e2e passed / 24 expected skips, build clean, OpenSpec changes/specs valid.

@@ -291,3 +291,76 @@ Totals: 7 passed, 0 failed (7 items)
 | Max ambient offset | none | `3.5px`, 0 crossings at desktop/mobile |
 | Neighbor follow-through | frozen via `fx/fy` | `< 12px` with neighbor `fx/fy === null` |
 | Recoil / cooldown clock | d3 tick-coupled | `performance.now()` render clock |
+
+---
+
+# PATCH-02 Verification Addendum: UI Polish, Crosshair, Active-Pair Edges & Grid Hierarchy
+
+## Status: RESOLVED
+
+- **Date**: 2026-11-13
+- **Patch**: `PATCH-02` (`patch.md`)
+- **Scope**: `ControlsOverlay.tsx`, `App.tsx`, `styles.css`, `GraphCanvas.tsx`, `ListView.tsx`, `NodeHoverCard.tsx`, `DESIGN.md`, `e2e/portfolio.spec.ts`, GitHub Issue `#9`.
+- **Data preservation**: 8 nodes and 13 permanent edges unchanged; reduced motion and zero Axe violations preserved.
+
+## Requirement Adherence Audit Matrix (PATCH-02)
+
+| Reported Issue | Resolution | Verification |
+| :--- | :--- | :--- |
+| Two reset buttons and visited colors not reset | One `Reset` button (`data-testid="reset-layout"`, aria-label `Reset`) replaces `reset-filters`. `App.resetAll` clears tags, search, layout version, and `visitedIds`. | `e2e/portfolio.spec.ts::3-dot menu exposes one Reset that clears filters, layout, and visited colors` | **PASS** |
+| Crosshair everywhere | `.canvas-interactive` defaults to `cursor: default`; `GraphCanvas` sets `crosshair` only when `hitNode()` succeeds or `state === 'drag'`, and resets on leave/up. | `e2e/portfolio.spec.ts::canvas cursor is crosshair only while over or dragging a node` | **PASS** |
+| Outgoing edges stay lit for one active endpoint | Edge dimming uses `dimmed.has(source) \|\| dimmed.has(target)`. | `e2e/portfolio.spec.ts::LLM filter dims every edge with a non-matching endpoint` (asserts mixed pair dims, both-active pair stays lit, 12/13 dimmed) | **PASS** |
+| Focal edges lack shared-tag pills | Focal, non-dimmed, non-detached permanent edges draw up to three shared tags stacked vertically at the edge midpoint using `LABEL_FONT`, `tokens.bg` pill fill, and `tokens.accent` text. | Canvas visual inspection at `1440x900`; bridge loop + focal pill pass code review | **PASS** |
+| Grid card hierarchy and CLI badges | Grid cards now render `01  Title` inline, then summary, then `CardPreview`, then tags. `[CLI Specimen]` badge removed from `ListView` and the hover fallback. `DESIGN.md` codifies the order. | `e2e/portfolio.spec.ts::grid cards render 16:9 thumbnails and a terminal specimen fallback` (geometry/order assertions, no badge); `terminal-only hover fallback omits the CLI specimen badge` | **PASS** |
+| Issue #9 media list stale | Appended the seven updated media requirements without `[CLI Specimen]`. | https://github.com/slowbutfast/portfolio/issues/9#issuecomment-6860772045 | **PASS** |
+
+## E2E Tests Updated/Added
+
+- Singular Reset clears filters, layout, and visited colors.
+- Node-hover-only crosshair cursor.
+- Active-pair (`||`) edge dimming via deterministic canvas dataset.
+- Grid card order and inline `01  Title` geometry.
+- Terminal-only hover fallback omits `CLI specimen`.
+- Existing grid card test updated to assert the badge is absent.
+
+## Empirical Execution Logs (PATCH-02)
+
+```text
+$ npm run typecheck
+> tsc --noEmit
+(exit 0, no diagnostics)
+```
+
+```text
+$ npm run test:unit
+ Test Files  16 passed (16)
+      Tests  173 passed (173)
+```
+
+```text
+$ npm run build
+✓ 1959 modules transformed.
+dist/assets/index-B7YC0Tpw.css    28.32 kB │ gzip:   6.13 kB
+dist/assets/index-B6PcxO_O.js    327.74 kB │ gzip: 104.45 kB
+✓ built in 3.28s
+```
+
+```text
+$ npm run test:e2e
+  24 skipped
+  92 passed (2.2m)
+```
+
+```text
+$ npx openspec validate --changes
+✓ change/portfolio-v3-organic-ferrofluid
+✓ change/vercel-preview-gating
+Totals: 2 passed, 0 failed (2 items)
+```
+
+## Visual Checks (PATCH-02)
+
+- **Hover (`1440x900`)**: focal edges show stacked shared-tag pills (`Express`/`LLM`, `Express`/`Vanilla JS`, `Agent Tooling`) centered between nodes and above the bridge fill.
+- **Grid**: `01  OpenDungeon` inline row, summary subtitle directly below, 16:9 media, then tag pills.
+- **Dropdown**: one `Reset` action with undo icon; no duplicate `Reset layout`.
+- **Cursor**: default over empty canvas, crosshair over nodes and during drag.

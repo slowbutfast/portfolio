@@ -109,7 +109,7 @@ body {
 }
 
 .canvas-interactive {
-  cursor: crosshair;
+  cursor: default;
 }
 
 .sr-only {

@@ -1,4 +1,4 @@
-import { LayoutGrid, MoreHorizontal, RotateCcw, Search } from 'lucide-react';
+import { MoreHorizontal, RotateCcw, Search } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { candidateProfile } from '../data/profile';
 import type { ParadigmTag, ThemeMode } from '../types/portfolio';
@@ -14,7 +14,6 @@ interface ControlsOverlayProps {
   search: string;
   onSearchChange: (query: string) => void;
   onReset: () => void;
-  onResetLayout: () => void;
   theme: ThemeMode;
   onToggleTheme: () => void;
   soundEnabled: boolean;
@@ -38,7 +37,6 @@ export function ControlsOverlay({
   search,
   onSearchChange,
   onReset,
-  onResetLayout,
   theme,
   onToggleTheme,
   soundEnabled,
@@ -201,23 +199,13 @@ export function ControlsOverlay({
                 <div className="mt-4 flex items-center justify-end gap-2 border-t border-[var(--color-divider)] pt-3">
                   <button
                     type="button"
-                    data-testid="reset-filters"
+                    data-testid="reset-layout"
                     onClick={onReset}
-                    aria-label="Reset filters"
+                    aria-label="Reset"
                     className="fluid-pill min-h-11 md:min-h-0"
                   >
                     <RotateCcw className="h-4 w-4" aria-hidden="true" />
                     Reset
-                  </button>
-                  <button
-                    type="button"
-                    data-testid="reset-layout"
-                    onClick={onResetLayout}
-                    aria-label="Reset layout"
-                    className="fluid-pill min-h-11 md:min-h-0"
-                  >
-                    <LayoutGrid className="h-4 w-4" aria-hidden="true" />
-                    Reset layout
                   </button>
                 </div>
               </div>

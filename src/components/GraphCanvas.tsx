@@ -207,6 +207,36 @@ function drawRecoilTips(
   }
 }
 
+/** Stacked shared-tag pills drawn on focal permanent edges. */
+function drawEdgeTagPills(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  tags: string[],
+  tokens: FluidTokens,
+): void {
+  if (tags.length === 0) return;
+  const visible = tags.slice(0, 3);
+  const pillHeight = 20;
+  const gap = 4;
+  const totalHeight = visible.length * pillHeight + (visible.length - 1) * gap;
+  let top = y - totalHeight / 2;
+  ctx.font = LABEL_FONT;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.globalAlpha = 1;
+  for (const tag of visible) {
+    const width = ctx.measureText(tag).width + 16;
+    ctx.beginPath();
+    ctx.roundRect(x - width / 2, top, width, pillHeight, pillHeight / 2);
+    ctx.fillStyle = tokens.bg;
+    ctx.fill();
+    ctx.fillStyle = tokens.accent;
+    ctx.fillText(tag, x, top + pillHeight / 2);
+    top += pillHeight + gap;
+  }
+}
+
 export function GraphCanvas({
   nodes,
   edges,
@@ -365,6 +395,15 @@ export function GraphCanvas({
       const visited = visitedRef.current;
       const focalId = focused ?? sim.hovered?.id ?? null;
 
+      const dimmedEdgeList = edges
+        .filter((edge) => dimmed.has(edge.source) || dimmed.has(edge.target))
+        .map((edge) => edgeKey(edge.source, edge.target))
+        .sort()
+        .join(',');
+      if (canvas.dataset.dimmedEdges !== dimmedEdgeList) {
+        canvas.dataset.dimmedEdges = dimmedEdgeList;
+      }
+
       const nodesById = new Map(sim.nodes.map((n) => [n.id, n]));
       const nodeColor = (id: string): string => {
         if (focused === id) return tokens.accent;
@@ -415,7 +454,7 @@ export function GraphCanvas({
         const link = sim.findLink(edge.source, edge.target);
         const ra = nodesById.get(edge.source)?.radius ?? 22;
         const rb = nodesById.get(edge.target)?.radius ?? 22;
-        const isDim = dimmed.has(edge.source) && dimmed.has(edge.target);
+        const isDim = dimmed.has(edge.source) || dimmed.has(edge.target);
         const isFocal = focalId !== null && (edge.source === focalId || edge.target === focalId);
         const sourceColor = nodeColor(edge.source);
         const targetColor = nodeColor(edge.target);
@@ -459,6 +498,27 @@ export function GraphCanvas({
             sag: reduceMotionRef.current ? 0 : link?.oscillator.sag ?? 0,
           },
         );
+      }
+
+      // Focal-only shared-tag pills ride above the bridges and beneath nodes.
+      if (focalId !== null) {
+        for (const edge of edges) {
+          if (edge.source !== focalId && edge.target !== focalId) continue;
+          const isDim = dimmed.has(edge.source) || dimmed.has(edge.target);
+          if (isDim) continue;
+          const link = sim.findLink(edge.source, edge.target);
+          if (link?.isDetached && !reduceMotionRef.current) continue;
+          const a = active.get(edge.source);
+          const b = active.get(edge.target);
+          if (!a || !b) continue;
+          drawEdgeTagPills(
+            ctx,
+            (a[0] + b[0]) / 2,
+            (a[1] + b[1]) / 2,
+            edge.tags,
+            tokens,
+          );
+        }
       }
 
       // Pure circular primitives, with a background-matched pill behind each
@@ -892,6 +952,11 @@ export function GraphCanvas({
     );
   };
 
+  const setCanvasCursor = (cursor: 'default' | 'crosshair') => {
+    const canvas = canvasRef.current;
+    if (canvas && canvas.style.cursor !== cursor) canvas.style.cursor = cursor;
+  };
+
   const onPointerMove = (e: ReactPointerEvent<HTMLCanvasElement>) => {
     const sim = simRef.current;
     if (!sim) return;
@@ -899,6 +964,7 @@ export function GraphCanvas({
     emitAudioPointer(e.clientX, e.clientY);
     const p = worldPoint(e.clientX, e.clientY);
     if (sim.state === 'drag') {
+      setCanvasCursor('crosshair');
       const last = lastDragPointRef.current;
       if (last) {
         const dtS = Math.max(0.004, (e.timeStamp - last.t) / 1000);
@@ -911,6 +977,7 @@ export function GraphCanvas({
       return;
     }
     const node = hitNode(p.x, p.y);
+    setCanvasCursor(node ? 'crosshair' : 'default');
     beginHoverDwell(node);
   };
 
@@ -924,6 +991,7 @@ export function GraphCanvas({
     if (sim.state === 'hover') sim.hover(null);
     const p = worldPoint(e.clientX, e.clientY);
     const node = hitNode(p.x, p.y);
+    setCanvasCursor(node ? 'crosshair' : 'default');
     downPosRef.current = { x: p.x, y: p.y };
     lastDragPointRef.current = { x: p.x, y: p.y, t: e.timeStamp };
     if (node) {
@@ -955,10 +1023,12 @@ export function GraphCanvas({
       }
     }
     downPosRef.current = null;
+    setCanvasCursor(hitNode(p.x, p.y) ? 'crosshair' : 'default');
   };
 
   const onPointerLeave = () => {
     wakeRef.current();
+    setCanvasCursor('default');
     clearHoverDwell();
     emitHover(null);
     const sim = simRef.current;

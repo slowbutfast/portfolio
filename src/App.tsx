@@ -257,13 +257,11 @@ export default function App() {
     });
   }, []);
 
-  const resetFilters = useCallback(() => {
+  const resetAll = useCallback(() => {
     setActiveTags(new Set());
     setSearch('');
-  }, []);
-
-  const resetLayout = useCallback(() => {
     setLayoutResetVersion((version) => version + 1);
+    setVisitedIds(new Set());
   }, []);
 
   const toggleTheme = useCallback(() => {
@@ -295,8 +293,7 @@ export default function App() {
         onToggleTag={toggleTag}
         search={search}
         onSearchChange={setSearch}
-        onReset={resetFilters}
-        onResetLayout={resetLayout}
+        onReset={resetAll}
         theme={theme}
         onToggleTheme={toggleTheme}
         soundEnabled={soundEnabled}

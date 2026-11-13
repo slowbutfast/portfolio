@@ -14,6 +14,8 @@ const PROJECT_IDS = [
 
 const GITHUB_URL = 'https://github.com/slowbutfast';
 
+const edgeKey = (a: string, b: string) => [a, b].sort().join('\u0000');
+
 // Vercel injects its Preview Comments toolbar (vercel.live/_next-live/feedback)
 // into preview deployments. Our strict CSP (`script-src 'self'`) correctly
 // blocks it, which logs a console error that is not an application defect.
@@ -260,10 +262,31 @@ test.describe('portfolio graph SPA', () => {
 
     const terminalCard = page.getByTestId('card-agentic-resume-builder');
     await expect(page.getByTestId('terminal-specimen-agentic-resume-builder')).toBeVisible();
-    await expect(page.getByTestId('terminal-specimen-agentic-resume-builder')).toContainText(
+    await expect(page.getByTestId('terminal-specimen-agentic-resume-builder')).not.toContainText(
       '[CLI Specimen]',
     );
     await expect(terminalCard.locator('img')).toHaveCount(0);
+
+    const index = mediaCard.getByText('01', { exact: true });
+    const heading = mediaCard.locator('h2');
+    const summary = mediaCard.locator('p');
+    const preview = mediaCard.locator('img');
+    const firstTag = mediaCard.locator('.fluid-pill').first();
+    const indexBox = await index.boundingBox();
+    const headingBox = await heading.boundingBox();
+    const summaryBox = await summary.boundingBox();
+    const previewBox = await preview.boundingBox();
+    const tagBox = await firstTag.boundingBox();
+    if (!indexBox || !headingBox || !summaryBox || !previewBox || !tagBox) {
+      throw new Error('grid card hierarchy is missing a measurable element');
+    }
+    expect(headingBox.x).toBeGreaterThan(indexBox.x);
+    expect(Math.abs(
+      headingBox.y + headingBox.height / 2 - (indexBox.y + indexBox.height / 2),
+    )).toBeLessThan(12);
+    expect(summaryBox.y).toBeGreaterThan(headingBox.y + headingBox.height - 2);
+    expect(previewBox.y).toBeGreaterThan(summaryBox.y + summaryBox.height - 2);
+    expect(tagBox.y).toBeGreaterThan(previewBox.y + previewBox.height - 2);
   });
 
   test('terminal command chip executes and displays captured output', async ({ page }) => {
@@ -526,6 +549,18 @@ test.describe('portfolio graph SPA', () => {
     await expect(page.getByTestId('node-hover-card')).toHaveCount(0);
   });
 
+  test('terminal-only hover fallback omits the CLI specimen badge', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'hover previews are desktop-only');
+    await page.goto('/');
+    await hoverCenteredNode(page, 'kintsugi-fracture');
+    const card = page.getByTestId('node-hover-card');
+    await expect(card).toContainText('Kintsugi Fracture');
+    await expect(card).not.toContainText('CLI specimen');
+    await expect(card).not.toContainText('[CLI Specimen]');
+  });
+
   test('hover card survives a 150ms pointer transfer and dismisses on drag', async ({
     page,
   }, testInfo) => {
@@ -553,19 +588,94 @@ test.describe('portfolio graph SPA', () => {
     await page.mouse.up();
   });
 
-  test('3-dot controls menu contains the Filters heading and Reset layout action', async ({
+  test('3-dot menu exposes one Reset that clears filters, layout, and visited colors', async ({
     page,
   }) => {
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem('portfolio_visited', JSON.stringify(['open-dungeon']));
+      } catch {
+        // ignore storage denial
+      }
+    });
     await page.goto('/');
     const trigger = await openFilters(page);
     const dropdown = page.getByTestId('controls-dropdown');
     await expect(trigger).toHaveAccessibleName('Filters & Layout');
     await expect(dropdown.getByRole('heading', { name: 'Filters' })).toBeVisible();
-    const resetLayout = dropdown.getByTestId('reset-layout');
-    await expect(resetLayout).toBeVisible();
-    await expect(resetLayout).toHaveAccessibleName('Reset layout');
-    await resetLayout.click();
+
+    await page.getByTestId('tag-pill-LLM').click();
+    await page.getByTestId('search-input').fill('dungeon');
+    await expect(page.getByTestId('nav-transcribe-plus')).toHaveAttribute('data-dimmed', 'true');
+
+    await expect(dropdown.getByTestId('reset-filters')).toHaveCount(0);
+    const reset = dropdown.getByTestId('reset-layout');
+    await expect(reset).toHaveAccessibleName('Reset');
+    await expect(reset).toHaveText('Reset');
+
+    await reset.click();
+    await expect(page.getByTestId('tag-pill-LLM')).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.getByTestId('search-input')).toHaveValue('');
+    await expect(page.getByTestId('nav-transcribe-plus')).not.toHaveAttribute(
+      'data-dimmed',
+      'true',
+    );
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const raw = localStorage.getItem('portfolio_visited');
+          return raw ? (JSON.parse(raw) as string[]).length : 0;
+        }),
+      )
+      .toBe(0);
     await expect(page.getByTestId('graph-canvas')).toBeVisible();
+  });
+
+  test('canvas cursor is crosshair only while over or dragging a node', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'pointer cursor test runs on desktop');
+    await page.goto('/');
+    await page.waitForTimeout(1500);
+    await page.getByTestId('nav-open-dungeon').focus();
+    await page.waitForTimeout(1600);
+    const canvas = page.getByTestId('graph-canvas');
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error('graph canvas has no bounding box');
+    const cursorAt = async (x: number, y: number) => {
+      await page.mouse.move(x, y);
+      await page.waitForTimeout(60);
+      return canvas.evaluate((element) => getComputedStyle(element).cursor);
+    };
+
+    await expect
+      .poll(() => cursorAt(box.x + 10, box.y + box.height - 10))
+      .toBe('default');
+    await expect
+      .poll(() => cursorAt(box.x + box.width / 2, box.y + box.height / 2))
+      .toBe('crosshair');
+
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    expect(await canvas.evaluate((element) => getComputedStyle(element).cursor)).toBe(
+      'crosshair',
+    );
+    await page.mouse.up();
+  });
+
+  test('LLM filter dims every edge with a non-matching endpoint', async ({ page }) => {
+    await page.goto('/');
+    await openFilters(page);
+    await page.getByTestId('tag-pill-LLM').click();
+    const raw = await page.getByTestId('graph-canvas').getAttribute('data-dimmed-edges');
+    const dimmedEdges = new Set((raw ?? '').split(',').filter(Boolean));
+
+    // Both LLM projects stay bright; the edge between them remains active.
+    expect(dimmedEdges.has(edgeKey('open-dungeon', 'pict-climate-risk-viz-chatbot'))).toBe(false);
+    // A mixed active/dimmed pair must dim, unlike the old `&&` behavior.
+    expect(dimmedEdges.has(edgeKey('open-dungeon', 'transcribe-plus'))).toBe(true);
+    expect(dimmedEdges.has(edgeKey('attention-max', 'kintsugi-fracture'))).toBe(true);
+    expect(dimmedEdges.size).toBe(12);
   });
 
   test('hover dwell suppresses fast sweeps and opens after 200ms', async ({ page }, testInfo) => {

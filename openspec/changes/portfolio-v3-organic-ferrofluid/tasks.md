@@ -34,3 +34,11 @@
 - [x] P01.3 Replace hard user pins and neighbor freezing with soft `home` springs, isolated charge/collision footprint during drag, viscous pointer lag, and `performance.now()` recoil/cooldown timestamps plus reconnect ripple
 - [x] P01.4 Add render-clock teardrop recoil, smoothstep proximity fade, visual-only ~30fps ambient drift shared with hit testing, bidirectional reduced-motion transitions, hoisted sorted ids, and measured `canvasCenter`
 - [x] P01.5 Sync specs, run the full verification suite, update `verification.md`, resolve `PATCH-01` in `patch.md`, and push to PR #12
+
+## Patch 02: UI Polish, Node-Hover Crosshair, Active-Pair Edge Filtering, Focal Edge Tag Pills & Grid Layout
+
+- [x] P02.1 Scaffold/update failing Playwright E2E / unit tests in `e2e/portfolio.spec.ts` for singular `"Reset"` (clearing filters, layout, and visited node colors), node-hover-only crosshair cursor, active-pair (`||`) edge dimming, and Grid card header/subtitle hierarchy
+- [x] P02.2 Update `src/components/ControlsOverlay.tsx` (`L1`, `L201-L222`) and `src/App.tsx` (`L51`, `L249-L253`, `L283`) to remove the duplicate undo `"Reset"` button and wire the singular `"Reset"` button (`data-testid="reset-layout"`) to reset filters, layout, and `visitedIds`
+- [x] P02.3 Update `src/styles.css` (`L111-L113`) and `src/components/GraphCanvas.tsx` (`L418`, `L455-L465`, `L910-L970`) for node-hover-only `'crosshair'` cursor, strict active-pair (`||`) edge dimming, and focal-only (`isFocal && !isDim`) 1–3 stacked shared-tag pills
+- [x] P02.4 Update `src/components/ListView.tsx` (`L70-L72`, `L103-L121`), `src/components/NodeHoverCard.tsx` (`L65-L69`), and `DESIGN.md` (`L166-L167`, `L209`, `L236-L237`, `L258`) to remove `[CLI Specimen]` and move Grid `title` inline right of `01` with `summary` directly below; append updated media list to GitHub Issue `#9` (`gh issue comment 9`)
+- [x] P02.5 Run `npm run typecheck && npm run test:unit && npm run build && npm run test:e2e && npx openspec validate --changes`, update `verification.md`, and mark `PATCH-02` `RESOLVED` in `patch.md`
