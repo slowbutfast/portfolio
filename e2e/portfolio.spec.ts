@@ -559,6 +559,7 @@ test.describe('portfolio graph SPA', () => {
     await expect(card).toContainText('Kintsugi Fracture');
     await expect(card).not.toContainText('CLI specimen');
     await expect(card).not.toContainText('[CLI Specimen]');
+    await expect(card).not.toContainText('>_');
   });
 
   test('hover card survives a 150ms pointer transfer and dismisses on drag', async ({
@@ -678,7 +679,7 @@ test.describe('portfolio graph SPA', () => {
     expect(dimmedEdges.size).toBe(12);
   });
 
-  test('hover dwell suppresses fast sweeps and opens after 200ms', async ({ page }, testInfo) => {
+  test('hover dwell suppresses fast sweeps and opens after 250ms', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'hover previews are desktop-only');
     await page.goto('/');
     await page.waitForTimeout(1500);
@@ -691,7 +692,7 @@ test.describe('portfolio graph SPA', () => {
     const centerX = box.x + box.width / 2;
     const centerY = box.y + box.height / 2;
 
-    // Cross the centered node and leave well inside the 200ms dwell window.
+    // Cross the centered node and leave well inside the 250ms dwell window.
     await page.mouse.move(centerX, centerY);
     await page.mouse.move(box.x + 12, box.y + box.height - 12);
     await page.waitForTimeout(120);
@@ -699,7 +700,40 @@ test.describe('portfolio graph SPA', () => {
 
     // Returning and dwelling opens the card only after the timer fires.
     await page.mouse.move(centerX, centerY);
+    await page.waitForTimeout(180);
+    await expect(page.getByTestId('node-hover-card')).toHaveCount(0);
     await expect(page.getByTestId('node-hover-card')).toBeVisible();
+  });
+
+  test('focal edge tag pills persist while the inspector is open', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'hover previews are desktop-only');
+    await page.goto('/');
+    await page.waitForTimeout(1500);
+    await page.getByTestId('nav-open-dungeon').focus();
+    await page.waitForTimeout(1600);
+    const canvas = page.getByTestId('graph-canvas');
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error('graph canvas has no bounding box');
+    const centerX = box.x + box.width / 2;
+    const centerY = box.y + box.height / 2;
+
+    await page.mouse.move(centerX, centerY);
+    await expect(page.getByTestId('node-hover-card')).toBeVisible();
+    await expect
+      .poll(async () => Number((await canvas.getAttribute('data-focal-tag-pills')) ?? 0))
+      .toBeGreaterThan(0);
+
+    await page.mouse.click(centerX, centerY);
+    await expect(page.getByTestId('project-drawer')).toBeVisible();
+    await expect
+      .poll(async () => Number((await canvas.getAttribute('data-focal-tag-pills')) ?? 0))
+      .toBeGreaterThan(0);
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('project-drawer')).toHaveCount(0);
+    await expect
+      .poll(async () => Number((await canvas.getAttribute('data-focal-tag-pills')) ?? 0))
+      .toBe(0);
   });
 
   test('live reduced-motion transitions freeze and resume hover capability', async ({

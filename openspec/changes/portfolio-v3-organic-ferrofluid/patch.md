@@ -46,3 +46,27 @@
   - `ListView` removes the `[CLI Specimen]` badge and reorders every Grid card to `01  Title` row -> summary -> 16:9 preview -> tags; `NodeHoverCard` removes the fallback `CLI specimen` subtitle; `DESIGN.md` codifies the hierarchy, singular Reset, node-hover crosshair, and active-pair filtering.
   - GitHub Issue `#9` received the updated media list without `[CLI Specimen]`.
   - Verification: typecheck clean, 173 unit tests, 92 e2e passed / 24 expected skips, build clean, OpenSpec changes/specs valid.
+
+### [PATCH-03] Contiguous Edge Tags, Inspector Persistence, Kintsugi Media Cleanup & 250ms Hover Dwell
+- **Date**: 2026-11-13 18:20:00 UTC
+- **Feedback Source**: Manual Design Review (PR #12 follow-up)
+- **Reported Issue**:
+  1. Edge connection tags have vertical gaps; multiple shared tags should read as one contiguous rounded rectangle.
+  2. Connection tags disappear when the project inspector opens; they should persist for the inspected node.
+  3. The Kintsugi Fracture hover popup still shows a terminal placeholder.
+  4. Set the hover-card initiation timer to the requested `0.25s` (`250ms`); the previous value was `200ms`.
+- **Root Cause**:
+  - `drawEdgeTagPills` rendered a separate rounded pill per tag with a `4px` gap.
+  - `GraphCanvas` focal id only considered `focusedId`/hover, not the active inspector selection.
+  - `NodeHoverCard` rendered its terminal fallback for any project without video/screenshot, including linkout-only Kintsugi.
+  - `HOVER_DWELL_MS` was `200`.
+- **Target Files**: `src/components/GraphCanvas.tsx`, `src/components/NodeHoverCard.tsx`, `e2e/portfolio.spec.ts`, graph-simulation specs, `design.md`, `tests.md`, `DESIGN.md`, `patch.md`, `tasks.md`, `verification.md`.
+- **Expected Resolution**: One contiguous rounded rectangle with flush tag rows; tags persist while the inspector is open and clear on close; Kintsugi (and other linkout-only projects) omit the terminal placeholder; hover dwell is `250ms`; covering E2E and documentation updated.
+- **Status**: RESOLVED (2026-11-13 18:10:00 UTC)
+- **Resolution**:
+  - `drawEdgeTagPills` now measures the widest tag and paints one `roundRect` of total height `n * 20px`; all rows are flush with zero inter-row spacing, so two or three shared tags read as one rounded rectangle.
+  - `GraphCanvas` now uses `selectedIdRef` as the final focal fallback (`focused ?? hovered ?? selected`), so connection labels persist for the inspected node while the drawer is open and clear when it closes.
+  - `NodeHoverCard` only renders the terminal specimen when `project.terminalDemo` exists; linkout-only Kintsugi and Ivy omit the media block entirely.
+  - `HOVER_DWELL_MS` is now `250ms` (`0.25s`), with graph-simulation specs, `design.md`, `tests.md`, and `DESIGN.md` updated.
+  - Added `data-focal-tag-pills` dataset and E2E coverage for inspector persistence; dwell E2E now asserts no card at ~180ms and visibility after `250ms`.
+  - Verification: typecheck clean, 173 unit tests, 93 e2e passed / 25 expected skips, build clean, OpenSpec changes/specs valid.

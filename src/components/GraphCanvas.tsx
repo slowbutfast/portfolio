@@ -72,7 +72,7 @@ const LABEL_FONT =
   '500 12px "Helvetica Neue", Helvetica, -apple-system, BlinkMacSystemFont, Arial, sans-serif';
 
 /** Unified hover gate shared by simulation pinning and the DOM preview card. */
-const HOVER_DWELL_MS = 200;
+const HOVER_DWELL_MS = 250;
 /** Proximity-only webbing appears for non-edge pairs inside this distance. */
 const PROXIMITY_MAX_DIST = 96;
 
@@ -207,34 +207,37 @@ function drawRecoilTips(
   }
 }
 
-/** Stacked shared-tag pills drawn on focal permanent edges. */
+/** Stacked shared-tag labels drawn inside one contiguous rounded rectangle. */
 function drawEdgeTagPills(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
   tags: string[],
   tokens: FluidTokens,
-): void {
-  if (tags.length === 0) return;
+): number {
+  if (tags.length === 0) return 0;
   const visible = tags.slice(0, 3);
   const pillHeight = 20;
-  const gap = 4;
-  const totalHeight = visible.length * pillHeight + (visible.length - 1) * gap;
-  let top = y - totalHeight / 2;
+  const totalHeight = visible.length * pillHeight;
   ctx.font = LABEL_FONT;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.globalAlpha = 1;
-  for (const tag of visible) {
-    const width = ctx.measureText(tag).width + 16;
-    ctx.beginPath();
-    ctx.roundRect(x - width / 2, top, width, pillHeight, pillHeight / 2);
-    ctx.fillStyle = tokens.bg;
-    ctx.fill();
-    ctx.fillStyle = tokens.accent;
-    ctx.fillText(tag, x, top + pillHeight / 2);
-    top += pillHeight + gap;
+
+  const width =
+    Math.max(...visible.map((tag) => ctx.measureText(tag).width)) + 16;
+  const left = x - width / 2;
+  const top = y - totalHeight / 2;
+  ctx.beginPath();
+  ctx.roundRect(left, top, width, totalHeight, 10);
+  ctx.fillStyle = tokens.surfaceContainer;
+  ctx.fill();
+
+  ctx.fillStyle = tokens.accent;
+  for (let index = 0; index < visible.length; index += 1) {
+    ctx.fillText(visible[index], x, top + pillHeight / 2 + index * pillHeight);
   }
+  return visible.length;
 }
 
 export function GraphCanvas({
@@ -278,6 +281,8 @@ export function GraphCanvas({
   onResolveAnchorRef.current = onResolveAnchor;
   const onCanvasCenterChangeRef = useRef(onCanvasCenterChange);
   onCanvasCenterChangeRef.current = onCanvasCenterChange;
+  const selectedIdRef = useRef<string | null>(initialSelectedId ?? null);
+  selectedIdRef.current = initialSelectedId ?? null;
   const ambientOffsetRef = useRef<Map<string, { x: number; y: number }>>(new Map());
   const lastAmbientAtRef = useRef(0);
   const visibleRef = useRef(true);
@@ -393,7 +398,8 @@ export function GraphCanvas({
       const dimmed = dimmedRef.current;
       const focused = focusedRef.current;
       const visited = visitedRef.current;
-      const focalId = focused ?? sim.hovered?.id ?? null;
+      const focalId =
+        focused ?? sim.hovered?.id ?? selectedIdRef.current ?? null;
 
       const dimmedEdgeList = edges
         .filter((edge) => dimmed.has(edge.source) || dimmed.has(edge.target))
@@ -500,7 +506,8 @@ export function GraphCanvas({
         );
       }
 
-      // Focal-only shared-tag pills ride above the bridges and beneath nodes.
+      // Focal-only shared-tag labels ride above the bridges and beneath nodes.
+      let focalTagCount = 0;
       if (focalId !== null) {
         for (const edge of edges) {
           if (edge.source !== focalId && edge.target !== focalId) continue;
@@ -511,7 +518,7 @@ export function GraphCanvas({
           const a = active.get(edge.source);
           const b = active.get(edge.target);
           if (!a || !b) continue;
-          drawEdgeTagPills(
+          focalTagCount += drawEdgeTagPills(
             ctx,
             (a[0] + b[0]) / 2,
             (a[1] + b[1]) / 2,
@@ -519,6 +526,10 @@ export function GraphCanvas({
             tokens,
           );
         }
+      }
+      const focalTagValue = String(focalTagCount);
+      if (canvas.dataset.focalTagPills !== focalTagValue) {
+        canvas.dataset.focalTagPills = focalTagValue;
       }
 
       // Pure circular primitives, with a background-matched pill behind each

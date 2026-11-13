@@ -364,3 +364,63 @@ Totals: 2 passed, 0 failed (2 items)
 - **Grid**: `01  OpenDungeon` inline row, summary subtitle directly below, 16:9 media, then tag pills.
 - **Dropdown**: one `Reset` action with undo icon; no duplicate `Reset layout`.
 - **Cursor**: default over empty canvas, crosshair over nodes and during drag.
+
+---
+
+# PATCH-03 Verification Addendum: Contiguous Edge Tags, Inspector Persistence, Kintsugi Cleanup & 250ms Dwell
+
+## Status: RESOLVED
+
+- **Date**: 2026-11-13
+- **Patch**: `PATCH-03` (`patch.md`)
+- **Changes**: `src/components/GraphCanvas.tsx`, `src/components/NodeHoverCard.tsx`, `e2e/portfolio.spec.ts`, graph-simulation specs, `design.md`, `tests.md`, `DESIGN.md`.
+
+## Requirement Adherence Audit Matrix (PATCH-03)
+
+| Request | Resolution | Verification |
+| :--- | :--- | :--- |
+| No spacing between connection tags; multiple shared tags form one rounded rectangle | `drawEdgeTagPills` now paints one `roundRect` with height `visible.length * 20px` and zero inter-row gap; text rows share the same max-width container. | Visual inspection at `1440x900` (Express/LLM and Express/Vanilla JS render as single flush blocks) | **PASS** |
+| Connection tags persist while inspector is open | `GraphCanvas` focal id is now `focused ?? hovered ?? selectedIdRef.current`; drawer selection remains the focal node until close. | `e2e/portfolio.spec.ts::focal edge tag pills persist while the inspector is open` (hover >0, drawer open >0, close ->0) | **PASS** |
+| Remove terminal from Kintsugi hover popup | `NodeHoverCard` renders the terminal specimen only when `project.terminalDemo` exists; linkout-only Kintsugi/Ivy omit the media block. | `e2e/portfolio.spec.ts::terminal-only hover fallback omits the CLI specimen badge` (also asserts no `>_` prompt) | **PASS** |
+| Hover initiation timer `0.25s` | `HOVER_DWELL_MS` changed from `200` to `250`; graph-simulation specs and design docs now state `250ms`. | `e2e/portfolio.spec.ts::hover dwell suppresses fast sweeps and opens after 250ms` (no card at ~180ms, visible after timer) | **PASS** |
+
+## Empirical Execution Logs (PATCH-03)
+
+```text
+$ npm run typecheck
+> tsc --noEmit
+(exit 0, no diagnostics)
+```
+
+```text
+$ npm run test:unit
+ Test Files  16 passed (16)
+      Tests  173 passed (173)
+```
+
+```text
+$ npm run build
+dist/assets/index-B7YC0Tpw.css    28.32 kB │ gzip:   6.13 kB
+dist/assets/index-BkH_dDLp.js    327.97 kB │ gzip: 104.53 kB
+✓ built in 4.57s
+```
+
+```text
+$ npm run test:e2e
+  25 skipped
+  93 passed (2.3m)
+```
+
+```text
+$ npx openspec validate --changes
+✓ change/portfolio-v3-organic-ferrofluid
+✓ change/vercel-preview-gating
+Totals: 2 passed, 0 failed (2 items)
+```
+
+## Visual Checks (PATCH-03)
+
+- Multiple shared-tag labels render as one contiguous rounded rectangle with no vertical seams.
+- The labels remain visible for the selected node while the inspector drawer is open and disappear when it closes.
+- The Kintsugi Fracture hover card now starts directly with the title/summary instead of a terminal placeholder.
+- The hover card appears after the `250ms` dwell.

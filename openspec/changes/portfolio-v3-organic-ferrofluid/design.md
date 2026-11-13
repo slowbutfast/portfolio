@@ -92,16 +92,16 @@ rounded:
 | Viewport | Breakpoint | Layout Pattern | Navigation / Sizing Rules |
 | :--- | :--- | :--- | :--- |
 | **Mobile** | `< 768px` | Full-bleed canvas, 3-dot dropdown width `min(22rem, calc(100vw - 2rem))` | All interactive buttons & pills $\ge 44\text{px}$ height (`min-h-11`) |
-| **Desktop** | `≥ 768px` | Full-bleed canvas, peripheral hover card | Compact `md:min-h-0` header bareText, `200ms` hover dwell enabled |
+| **Desktop** | `≥ 768px` | Full-bleed canvas, peripheral hover card | Compact `md:min-h-0` header bareText, `250ms` hover dwell enabled |
 
 ---
 
 ## 6. Interaction, Motion & Sound
 
-- **Hover Dwell**: `200ms` dwell gates both `sim.hover` and `NodeHoverCard`; cancelled synchronously on `pointerdown`, `dragStart`, `pointerleave`, `focusedId`, `reduceMotion`, and `coasting`.
+- **Hover Dwell**: `250ms` dwell gates both `sim.hover` and `NodeHoverCard`; cancelled synchronously on `pointerdown`, `dragStart`, `pointerleave`, `focusedId`, `reduceMotion`, and `coasting`.
 - **Hover Drift**: Slow `0 -> 0.025` ramp outside a `110px` soft exclusion zone.
 - **Reduced Motion**: `prefers-reduced-motion: reduce` bypasses dynamic oscillations, recoil, hover drift, and proximity dynamics, rendering static planar seeds.
-- **Sound**: Existing `synth.onNodeHover` / `onDragVelocity` triggers respect the `200ms` hover gate so cursor sweeps do not misfire hover audio.
+- **Sound**: Existing `synth.onNodeHover` / `onDragVelocity` triggers respect the `250ms` hover gate so cursor sweeps do not misfire hover audio.
 
 ---
 

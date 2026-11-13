@@ -118,12 +118,12 @@ export function NodeHoverCard({
           alt={project.title}
           className="h-32 w-full rounded-xl object-cover"
         />
-      ) : (
+      ) : project.terminalDemo ? (
         <div className="flex h-32 w-full flex-col justify-between rounded-xl border border-[var(--color-divider)] bg-[var(--color-bg)] p-3 font-mono text-[11px] text-[var(--color-muted)]">
           <span className="text-[var(--color-accent)]">&gt;_</span>
-          <span className="truncate">{project.terminalDemo?.prompt || project.title}</span>
+          <span className="truncate">{project.terminalDemo.prompt || project.title}</span>
         </div>
-      )}
+      ) : null}
 
       <div className="mt-3 flex items-start justify-between gap-2">
         <h3

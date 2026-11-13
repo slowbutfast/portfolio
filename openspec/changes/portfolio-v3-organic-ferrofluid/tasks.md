@@ -42,3 +42,10 @@
 - [x] P02.3 Update `src/styles.css` (`L111-L113`) and `src/components/GraphCanvas.tsx` (`L418`, `L455-L465`, `L910-L970`) for node-hover-only `'crosshair'` cursor, strict active-pair (`||`) edge dimming, and focal-only (`isFocal && !isDim`) 1–3 stacked shared-tag pills
 - [x] P02.4 Update `src/components/ListView.tsx` (`L70-L72`, `L103-L121`), `src/components/NodeHoverCard.tsx` (`L65-L69`), and `DESIGN.md` (`L166-L167`, `L209`, `L236-L237`, `L258`) to remove `[CLI Specimen]` and move Grid `title` inline right of `01` with `summary` directly below; append updated media list to GitHub Issue `#9` (`gh issue comment 9`)
 - [x] P02.5 Run `npm run typecheck && npm run test:unit && npm run build && npm run test:e2e && npx openspec validate --changes`, update `verification.md`, and mark `PATCH-02` `RESOLVED` in `patch.md`
+
+## Patch 03: Contiguous Edge Tags, Inspector Persistence, Kintsugi Cleanup & 250ms Dwell
+
+- [x] P03.1 Update edge tag rendering to stack 1–3 shared tags with no inter-row spacing inside one rounded rectangle, and keep focal tags active while the inspector selection is open
+- [x] P03.2 Remove the terminal placeholder from linkout-only hover cards (Kintsugi/Ivy) and raise the unified hover dwell to `250ms`
+- [x] P03.3 Update E2E coverage for 250ms dwell and inspector tag persistence, then run `npm run typecheck && npm run test:unit && npm run build && npm run test:e2e && npx openspec validate --changes`
+- [x] P03.4 Update graph-simulation specs, `design.md`, `tests.md`, `DESIGN.md`, `verification.md`, and mark `PATCH-03` `RESOLVED` in `patch.md`

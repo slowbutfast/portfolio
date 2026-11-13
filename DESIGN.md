@@ -223,7 +223,7 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 ### Canvas Primitives & Bilateral Bridges
 - Pure flat circles at `r = 22px`; visited nodes in cobalt; hovered/focused nodes in the active accent.
 - Cubic boundaries attach flush to both circumferences along exact tangent rays and mirror exactly across the center-to-center axis, producing a symmetrical hourglass waist. Every control-point normal offset stays non-negative.
-- Filtering illuminates an edge only when both endpoint nodes match; any dimmed endpoint dims the whole connection. Focal permanent edges display up to three shared-tag pills stacked vertically at their midpoint.
+- Filtering illuminates an edge only when both endpoint nodes match; any dimmed endpoint dims the whole connection. Focal permanent edges display up to three shared tags inside one contiguous rounded rectangle (no inter-row spacing) at their midpoint, and the labels persist while that node's inspector is open.
 - A close-node guard returns `null` when circles touch or overlap, so no inverted or crossed geometry renders during a drag.
 - Title knockout pills are filled with the theme background only — no stroke, no outline, no border — and use the Helvetica sans stack.
 
@@ -236,7 +236,7 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 
 ### Publication List & Media
 - Asymmetric two-column Swiss editorial rhythm with 16:9 thumbnails, understated monospaced index stamps, and fluid pill tags.
-- Grid card hierarchy is fixed: `01  Title` inline in one row, then the summary subtitle, then the 16:9 preview, then tag pills. Cards with visual previews render a lazy-loaded video or screenshot. Terminal-only projects render an authentic dark CLI specimen without a `[CLI Specimen]` badge or broken image.
+- Grid card hierarchy is fixed: `01  Title` inline in one row, then the summary subtitle, then the 16:9 preview, then tag pills. Cards with visual previews render a lazy-loaded video or screenshot. Projects with terminal data render a dark CLI specimen without a `[CLI Specimen]` badge; linkout-only projects omit the media block entirely instead of showing a placeholder terminal.
 - Media previews render video and screenshots without figcaption captions; accessible names live on the media elements.
 
 ---
@@ -246,6 +246,7 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 - **Silky Physics:** `d3-force` with 22px nodes, 36px collision clearance, weak seed homing (`strength: 0.02`), and `0.18` coasting decay.
 - **Planar Resting State:** Initial, reduced-motion, and settled layouts derive from `PLANAR_NODE_SEEDS`; active dragging may temporarily displace nodes and homing returns them to the planar basin.
 - **Ferrofluid Tension:** Bridge width and waist respond continuously to distance; no interpolation loops or keyframes are needed.
+- **Hover Dwell:** `250ms` pointer dwell gates both simulation hover and the media card, cancelled synchronously on press, drag, leave, focus change, coasting, or reduced motion.
 - **Stepped Title Decode:** 12fps, <=350ms, once per drawer open, bypassed under `prefers-reduced-motion`.
 - **Theme Transition:** 180ms background/color ease; reduced-motion users receive instant changes. `theme-init.js` prevents first-paint theme flashes.
 

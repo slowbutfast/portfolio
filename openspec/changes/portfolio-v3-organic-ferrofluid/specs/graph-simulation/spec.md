@@ -8,16 +8,16 @@ The system SHALL simulate nodes using uniform visual radius (22px) and uniform r
 - **THEN** nodes distribute buoyantly across the viewport area maintaining at least 44 pixels center-to-center clearance without settling against viewport margins or collapsing onto OpenDungeon.
 
 ### Requirement: Dynamic hover gravitation wave
-The system SHALL gate both simulation hover physics (`sim.hover(node)`) and preview card opening behind a single `200ms` pointer dwell timer, cancelling the dwell timer and clearing hover synchronously on `pointerdown`, `dragStart`, `pointerleave`, `focusedId` change, a bidirectional `prefers-reduced-motion` transition, or while `state === 'coasting'`. Once dwell completes, the hovered node is transiently pinned (`fx = x; fy = y`) without becoming a persistent user placement.
+The system SHALL gate both simulation hover physics (`sim.hover(node)`) and preview card opening behind a single `250ms` pointer dwell timer, cancelling the dwell timer and clearing hover synchronously on `pointerdown`, `dragStart`, `pointerleave`, `focusedId` change, a bidirectional `prefers-reduced-motion` transition, or while `state === 'coasting'`. Once dwell completes, the hovered node is transiently pinned (`fx = x; fy = y`) without becoming a persistent user placement.
 
 The system SHALL render a purely visual deterministic ambient drift for every node with amplitude `3.5px`, updated at roughly `30fps`, paused while `document.hidden`, while the canvas is off-screen (`IntersectionObserver`), and under reduced motion. Rendering, pointer hit testing, and hover-card anchoring SHALL consume the same drift offset so the painted circle and its interactive target remain aligned. Ambient drift SHALL NOT exert any `d3-force` attraction or repulsion.
 
 #### Scenario: Pointer sweeps across a node without dwelling
-- **WHEN** the pointer crosses a node for less than `200ms` or while `state === 'coasting'`
+- **WHEN** the pointer crosses a node for less than `250ms` or while `state === 'coasting'`
 - **THEN** neither `sim.hover` nor `NodeHoverCard` activates.
 
-#### Scenario: Pointer dwells on a stationary node for 200ms
-- **WHEN** the pointer remains on node H for `200ms` in `idle` state
+#### Scenario: Pointer dwells on a stationary node for 250ms
+- **WHEN** the pointer remains on node H for `250ms` in `idle` state
 - **THEN** `sim.hover(H)` pins node H, the visual ambient drift continues within its `3.5px` bound, and `NodeHoverCard` opens peripherally away from the measured canvas center.
 
 #### Scenario: Pointer leaves or clicks a hovered node
@@ -96,7 +96,7 @@ The system SHALL render transient proximity-only bridges exclusively between nod
 The system SHALL position `NodeHoverCard` using measured card bounds (`ResizeObserver`) projected outward from the measured canvas-container center (`getBoundingClientRect()`), not the window center, along `(nodeScreenPos - canvasCenter)`, and clamped to viewport + safe-area margins (`20px`), with an inward fallback only when the outward quadrant clips on narrow viewports (`393x852`).
 
 #### Scenario: Hover card opens on desktop or mobile
-- **WHEN** `NodeHoverCard` opens for a node after the `200ms` dwell
+- **WHEN** `NodeHoverCard` opens for a node after the `250ms` dwell
 - **THEN** the card anchors peripherally outside the central graph cluster without overflowing viewport bounds.
 
 ## REMOVED Requirements

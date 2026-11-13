@@ -7,7 +7,7 @@
 - `npm run typecheck`: Verifies zero TypeScript errors across modified simulation, canvas, and UI components.
 - `npm run build`: Verifies clean production bundle with no build regressions.
 - `npm run test:e2e`:
-  - Verifies 3-dot dropdown trigger (`data-testid="controls-dropdown-trigger"`), `"Filters"` heading inside dropdown, `"Reset layout"` (`data-testid="reset-layout"`) restoring node positions after drag, hover dwell suppression during cursor sweeps / drag / coasting, peripheral `NodeHoverCard` positioning without viewport overflow on desktop (`1440x900`) and mobile (`393x852`), and zero Axe accessibility violations.
+  - Verifies 3-dot dropdown trigger (`data-testid="controls-dropdown-trigger"`), `"Filters"` heading inside dropdown, `"Reset"` (`data-testid="reset-layout"`) clearing filters, visited colors, and node positions after drag, hover dwell suppression during cursor sweeps / drag / coasting, peripheral `NodeHoverCard` positioning without viewport overflow on desktop (`1440x900`) and mobile (`393x852`), and zero Axe accessibility violations.
 
 ## Manual Verification
 
@@ -18,5 +18,5 @@
   - **WHEN** dragging a node past `1.6x` rest distance and releasing, or bringing two non-linked nodes within `96px`
   - **THEN** neighboring nodes stay settled in place, the stretched bridge snaps with a quick retracting droplet recoil, the dragged node remains pinned where placed, and non-linked nodes form subtle matching hourglass webbing without exerting force.
 - **Hover Dwell & 3-Dot Reset Layout**:
-  - **WHEN** sweeping the pointer quickly across nodes, dwelling for `200ms` on a node, and then opening the 3-dot menu to click `"Reset layout"`
-  - **THEN** fast sweeps do not flash hover cards, `200ms` dwell opens the card peripherally outside the cluster while neighbors gently part, and `"Reset layout"` glides all nodes back to the planar layout.
+  - **WHEN** sweeping the pointer quickly across nodes, dwelling for `250ms` on a node, and then opening the 3-dot menu to click `"Reset"`
+  - **THEN** fast sweeps do not flash hover cards, `250ms` dwell opens the card peripherally outside the cluster while neighbors gently part, and `"Reset"` clears filters, visited colors, and glides all nodes back to the planar layout.
