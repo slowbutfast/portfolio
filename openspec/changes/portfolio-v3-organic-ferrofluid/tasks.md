@@ -68,3 +68,11 @@
 - [x] P05.2 Create `src/utils/popoverPlacement.ts` implementing `chooseBestPopoverPosition` with circle-rect overlap and Liang-Barsky segment-AABB intersection
 - [x] P05.3 Update `src/components/GraphCanvas.tsx` (`L22-L29`, `L398-L419`, `L535-L575`), `src/components/NodeHoverCard.tsx` (`L5-L12`, `L51-L86`), `src/components/ProjectDrawer.tsx` (`L16-L20`, `L125-L143`, header/corner drag handle), and `src/App.tsx` (`L48-L56`, `L200-L221`, `L260-L266`, `L305-L375`) to emit live screen-space obstacle snapshots, place both popups via `chooseBestPopoverPosition`, make desktop `ProjectDrawer` draggable with a hover `Move`/grab corner cue, and manage `stickyFocalId`
 - [x] P05.4 Run `npm run typecheck && npm run test:unit && npm run build && npm run test:e2e && npx openspec validate --changes`, update `verification.md`, and mark `PATCH-05` `RESOLVED` in `patch.md`
+
+## Patch 06: Mid-Drag Reduced-Motion Guard, Frame-Clock Drag Follower, 30fps Idle Throttle & Spec Sync
+
+- [x] P06.1 Scaffold failing tests in `src/physics/graphSimulation.test.ts` (frame-clock `dragTarget` converges smoothly across `sim.tick()` even without repeated `dragMove` calls) and `e2e/portfolio.spec.ts` (toggling `prefers-reduced-motion` on mid-drag -> releasing -> toggling off leaves `sim` cleanly idle/unpinned)
+- [x] P06.2 Update `src/components/GraphCanvas.tsx` (`L618-L645`, `L690-L718`, `L1121-L1132`) to finalize active drag on reduced-motion transition & `pointerup`, throttle idle ambient `render()` calls to ~30 fps (`>= 33ms`), and hoist per-frame allocations
+- [x] P06.3 Update `src/physics/graphSimulation.ts` (`L460-L470`, `L542-L561`) to store `dragTarget` in `dragMove` and advance the critically damped viscous follower in `afterTick(dtMs)`
+- [x] P06.4 Sync `openspec/specs/portfolio-controls/spec.md` and `openspec/specs/graph-simulation/spec.md` with singular `Reset`, volume popover, `stickyFocalId`, collision-aware popups, draggable drawer, and initial vs. live reduced-motion behavior
+- [x] P06.5 Run `npm run typecheck && npm run test:unit && npm run build && npm run test:e2e && npx openspec validate --changes && npx openspec validate --specs`, update `verification.md`, and mark `PATCH-06` `RESOLVED` in `patch.md`

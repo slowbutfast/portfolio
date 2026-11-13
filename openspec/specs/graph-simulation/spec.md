@@ -57,11 +57,19 @@ The system SHALL render a purely visual deterministic ambient drift for every no
 - **THEN** the dwell timer is cancelled synchronously, node H is unpinned while any soft home anchor remains, `alphaTarget` cools to `0`, and `NodeHoverCard` closes.
 
 ### Requirement: Reduced motion accessibility
-The system SHALL respect the user's `prefers-reduced-motion` browser setting by pausing continuous force simulation and rendering the static graph directly from the authoritative planar seeds scaled to the viewport, with zero edge crossings and no coasting or write-in animations.
+The system SHALL respect the user's `prefers-reduced-motion` browser setting. On initial mount with reduced motion, it SHALL pause continuous force simulation and render the static graph directly from the authoritative planar seeds scaled to the viewport, with zero edge crossings. On a live transition to reduced motion, it SHALL finalize any active drag, freeze the current graph positions, stop the simulation and render loop, and dismiss hover. Returning to standard motion SHALL restore the frozen frame, reheat the simulation, and resume pointer hover.
 
-#### Scenario: User has reduced motion enabled
-- **WHEN** `prefers-reduced-motion: reduce` is active
+#### Scenario: User has reduced motion enabled on first load
+- **WHEN** `prefers-reduced-motion: reduce` is active before the canvas mounts
 - **THEN** continuous force simulation is paused, nodes render at their scaled planar seed positions with zero edge crossings, and all nodes and labels appear immediately in their resting state.
+
+#### Scenario: User toggles reduced motion during an active drag
+- **WHEN** reduced motion becomes active while a node is being dragged
+- **THEN** the drag ends cleanly, the current layout freezes, and releasing the pointer cannot leave the simulation stuck in the `drag` state.
+
+#### Scenario: User returns to standard motion
+- **WHEN** `prefers-reduced-motion` returns to `no-preference`
+- **THEN** the frozen layout resumes as the starting frame, the simulation reheats, and hover interactions become available again.
 
 ### Requirement: Canvas label typography and native font rendering
 The system SHALL render canvas node label pills with `'500 12px "Helvetica Neue", Helvetica, -apple-system, BlinkMacSystemFont, Arial, sans-serif'` and paint them without blocking on a webfont load, eliminating `document.fonts.load(...)` gates for the removed variable mono face.
@@ -208,12 +216,23 @@ The system SHALL render transient proximity-only bridges exclusively between nod
 - **WHEN** a detached permanent edge pair moves within `96px` during cooldown or above `1.25x` reconnect distance
 - **THEN** no proximity bridge is drawn for that pair, preserving the snap cue until permanent-edge reconnection occurs.
 
-### Requirement: Measured peripheral hover card placement
-The system SHALL position `NodeHoverCard` using measured card bounds (`ResizeObserver`) projected outward from the measured canvas-container center (`getBoundingClientRect()`), not the window center, along `(nodeScreenPos - canvasCenter)`, and clamped to viewport + safe-area margins (`20px`), with an inward fallback only when the outward quadrant clips on narrow viewports (`393x852`).
+### Requirement: Collision-aware popup placement
+The system SHALL place `NodeHoverCard` and the desktop `ProjectDrawer` by scoring eight candidate rectangles around the anchor using measured card/panel bounds (`ResizeObserver` for the card), circle-rect node overlap (`5000` target node, `1000` neighbors), Liang-Barsky segment-AABB intersections (`3x` weight for focal edges), a `72px` top-header clearance, viewport margins, and an outward-ray tie-breaker. The card SHALL use the measured canvas-container center, not the window center.
 
-#### Scenario: Hover card opens on desktop or mobile
-- **WHEN** `NodeHoverCard` opens for a node after the `250ms` dwell
-- **THEN** the card anchors peripherally outside the central graph cluster without overflowing viewport bounds.
+#### Scenario: Hover or inspect popup opens near a dense focal hub
+- **WHEN** a popup opens for a node after the `250ms` dwell or a project click
+- **THEN** the solver chooses the clamped candidate that covers the fewest nodes and connections, especially focal edges, without overflowing the viewport or header.
+
+### Requirement: Sticky inspected focal context and draggable inspector
+The system SHALL retain the inspected project's focal connections and contiguous shared-tag labels after the desktop `ProjectDrawer` closes. The sticky focus SHALL clear when the `250ms` hover dwell activates on any node (including the inspected node), on `Reset`, or when switching to Grid view. The desktop `ProjectDrawer` SHALL expose a hover-revealed `Move` / `cursor-grab` header handle (`data-testid="drawer-drag-handle"`) that supports pointer-captured dragging clamped to the viewport, with a user-drag lock preventing anchor updates from snapping it back. The mobile `< 768px` bottom-sheet drawer SHALL remain non-draggable.
+
+#### Scenario: User closes the inspector
+- **WHEN** the user closes `ProjectDrawer`
+- **THEN** the inspected node's focal edges and tag labels remain highlighted until a hover dwell, Reset, or Grid view clears the sticky focus.
+
+#### Scenario: User drags the desktop inspector
+- **WHEN** the user drags the `Move` handle on a desktop `ProjectDrawer`
+- **THEN** the panel follows the pointer, stays inside viewport bounds and below the header, and does not snap back to its computed anchor position.
 
 ### Requirement: Idle simulation suspend and continuous rAF throttling
 The system SHALL throttle or suspend the continuous `requestAnimationFrame` canvas render loop when all node velocities $\|\vec{v}\| < 0.01\text{ px/tick}$, all bridge oscillator amplitudes $|\delta| < 0.1\text{ px}$, and camera transform lerps have converged, instantly resuming the loop upon any pointer event, window resize, theme change, filter selection, or hover update.

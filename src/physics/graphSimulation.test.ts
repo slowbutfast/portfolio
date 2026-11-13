@@ -288,6 +288,7 @@ describe('drag-time bridge snapping and recovery', () => {
     // Pull the node far to the left. The tether caps the visual displacement,
     // but it is still well beyond twice the 100px rest distance.
     sim.dragMove(-5000, 500);
+    sim.tick();
     expect(link.isDetached).toBe(true);
 
     sim.dragEnd();
@@ -322,6 +323,7 @@ describe('drag-time bridge snapping and recovery', () => {
     const node = sim.findNode('attention-max')!;
     sim.dragStart(node);
     sim.dragMove(node.x + 900, node.y + 400);
+    sim.tick();
     expect(sim.linkStates.some((link) => link.isDetached)).toBe(true);
     sim.dragEnd();
     sim.resetLayout();
@@ -353,6 +355,31 @@ describe('decoupled drag and persistent user pinning', () => {
 
     const displacement = Math.hypot(neighbor.x - before.x, neighbor.y - before.y);
     expect(displacement).toBeLessThan(12);
+    sim.destroy();
+  });
+
+  it('advances the viscous drag follower on the frame clock, not pointer events', () => {
+    const sim = twoNodeSim();
+    const node = sim.findNode('a')!;
+    const startX = node.x;
+
+    sim.dragStart(node);
+    sim.dragMove(startX + 160, node.y);
+    // The pointer sample only stores a target; the next physics frame moves it.
+    expect(node.fx).toBeCloseTo(startX, 6);
+
+    const positions: number[] = [];
+    for (let tick = 0; tick < 20; tick += 1) {
+      sim.tick();
+      positions.push(node.fx ?? node.x);
+    }
+
+    expect(positions[0]).toBeGreaterThan(startX);
+    expect(positions[0]).toBeLessThan(startX + 160);
+    for (let index = 1; index < positions.length; index += 1) {
+      expect(positions[index]).toBeGreaterThanOrEqual(positions[index - 1] - 1e-6);
+    }
+    expect(positions.at(-1)!).toBeGreaterThan(startX + 100);
     sim.destroy();
   });
 
@@ -411,6 +438,7 @@ describe('decoupled drag and persistent user pinning', () => {
 
     sim.dragStart(node);
     sim.dragMove(-5000, 500);
+    sim.tick();
     expect(link.isDetached).toBe(true);
     sim.dragEnd();
 
@@ -446,6 +474,7 @@ describe('snap hysteresis, recoil, and reconnect cooldown', () => {
 
     sim.dragStart(node);
     sim.dragMove(-5000, 500);
+    sim.tick();
     expect(link.isDetached).toBe(true);
     expect(link.detachedAt).not.toBeNull();
     const detachedAt = link.detachedAt!;
@@ -550,6 +579,7 @@ describe('mobile snap reachability', () => {
         source.x + (dx / distance) * 100000,
         source.y + (dy / distance) * 100000,
       );
+      sim.tick();
       expect(
         link.isDetached,
         `${link.source} -> ${link.target} (rest ${link.restDistance.toFixed(1)}px)`,
@@ -643,6 +673,7 @@ describe('d3 tick event path', () => {
 
     sim.dragStart(node);
     sim.dragMove(node.x - 2000, node.y);
+    sim.tick();
     expect(sim.linkStates.some((link) => link.isDetached)).toBe(true);
 
     sim.dragEnd();
@@ -666,6 +697,7 @@ describe('d3 tick event path', () => {
 
     sim.dragStart(node);
     sim.dragMove(-5000, 500);
+    sim.tick();
     expect(link.isDetached).toBe(true);
     sim.dragEnd();
 

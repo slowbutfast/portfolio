@@ -826,6 +826,34 @@ test.describe('portfolio graph SPA', () => {
       .toBe(0);
   });
 
+  test('mid-drag reduced-motion transition releases the drag cleanly', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'pointer drag test runs on desktop');
+    await page.goto('/');
+    await page.waitForTimeout(1500);
+    await page.getByTestId('nav-open-dungeon').focus();
+    await page.waitForTimeout(1600);
+    const canvas = page.getByTestId('graph-canvas');
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error('graph canvas has no bounding box');
+    const centerX = box.x + box.width / 2;
+    const centerY = box.y + box.height / 2;
+
+    await page.mouse.move(centerX, centerY);
+    await page.waitForTimeout(300);
+    await page.mouse.down();
+    await page.mouse.move(centerX + 120, centerY + 80, { steps: 8 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.waitForTimeout(100);
+    await page.mouse.up();
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await expect(canvas).toBeVisible();
+    await expect
+      .poll(async () => canvas.getAttribute('data-sim-state'))
+      .toBe('idle');
+  });
+
   test('live reduced-motion transitions freeze and resume hover capability', async ({
     page,
   }, testInfo) => {

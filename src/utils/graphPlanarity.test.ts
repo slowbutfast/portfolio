@@ -188,6 +188,7 @@ describe('graph planarity after unperturbed d3-force ticks', () => {
     const node = sim.findNode('attention-max')!;
     sim.dragStart(node);
     sim.dragMove(node.x + 900, node.y + 400);
+    sim.tick();
     sim.dragEnd();
     expect(sim.linkStates.some((link) => link.isDetached)).toBe(true);
 

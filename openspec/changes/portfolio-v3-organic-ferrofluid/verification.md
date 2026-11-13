@@ -598,3 +598,57 @@ Totals: 7 passed, 0 failed (7 items)
 - Hover card places in the top-left quadrant for a centered OpenDungeon node, avoiding the dense focal-edge cluster to its right.
 - Desktop drawer places to the left of the central cluster and exposes a subtle `Move` handle beside the close button; dragging moves it and clamps it to the viewport.
 - Focal tag pills remain visible after closing the drawer, then clear after a `250ms` dwell on a node.
+
+---
+
+# PATCH-06 Verification Addendum: Mid-Drag Reduced Motion, Frame-Clock Drag Follower, 30fps Idle Throttle & Spec Sync
+
+## Status: RESOLVED
+
+- **Date**: 2026-11-13
+- **Patch**: `PATCH-06` (`patch.md`)
+- **Changes**: `GraphCanvas.tsx`, `graphSimulation.ts`, `graphSimulation.test.ts`, `e2e/portfolio.spec.ts`, `openspec/specs/portfolio-controls/spec.md`, `openspec/specs/graph-simulation/spec.md`.
+
+## Requirement Adherence Audit Matrix (PATCH-06)
+
+| Reported Issue | Resolution | Verification |
+| :--- | :--- | :--- |
+| Mid-drag reduced-motion transition leaves `sim.state === 'drag'` | `handleMotionChange` finalizes the drag before freezing/stoping the simulation; `onPointerUp` always calls `sim.dragEnd()` when dragging, independent of reduced motion. | `e2e/portfolio.spec.ts::mid-drag reduced-motion transition releases the drag cleanly` polls `data-sim-state` back to `idle` | **PASS** |
+| Drag follower is pointer-polling dependent | `dragMove` stores the rubber-band `dragTarget`; `afterTick(dtMs)` advances the 45ms viscous follower on the frame clock. | `graphSimulation.test.ts::advances the viscous drag follower on the frame clock, not pointer events` (single pointer sample, 20 fixed ticks, monotone convergence) | **PASS** |
+| Idle ambient redraws at 60–120 Hz | The loop throttles `render()` to `>= 33ms` when `cameraMoving === false`, `sim.isIdle`, and only ambient drift is active; active maps/offsets/dimmed edge keys are reused or cached. | Full E2E (including frame-rate and zero-React-commit tests); code review | **PASS** |
+| Specs out of sync | Synced main specs for singular Reset, 500ms volume popover/persisted gain, initial vs live reduced motion, collision-aware popups, sticky inspected focus, and draggable desktop drawer. | `npx openspec validate --changes` and `npx openspec validate --specs` | **PASS** |
+
+## Empirical Execution Logs (PATCH-06)
+
+```text
+$ npm run typecheck
+> tsc --noEmit
+(exit 0, no diagnostics)
+```
+
+```text
+$ npm run test:unit
+ Test Files  17 passed (17)
+      Tests  182 passed (182)
+```
+
+```text
+$ npm run build
+dist/assets/index-Cm5TRDDe.css    29.43 kB │ gzip:   6.34 kB
+dist/assets/index-ku6rTdZL.js    335.64 kB │ gzip: 106.93 kB
+✓ built in 4.81s
+```
+
+```text
+$ npm run test:e2e
+  29 skipped
+  97 passed (2.5m)
+```
+
+```text
+$ npx openspec validate --changes
+Totals: 2 passed, 0 failed (2 items)
+
+$ npx openspec validate --specs
+Totals: 7 passed, 0 failed (7 items)
+```

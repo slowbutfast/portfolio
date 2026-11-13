@@ -119,3 +119,25 @@
   - Kept the last obstacle snapshot during the 150ms hover-card transfer grace period so the card cannot re-place itself away from the pointer mid-transfer.
   - Desktop `ProjectDrawer` now exposes a hover-revealed `Move` / `cursor-grab` / `cursor-grabbing` header handle (`data-testid="drawer-drag-handle"`) with pointer capture, viewport-clamped dragging, and a `hasUserDraggedRef` lock that prevents anchor updates from snapping the panel back. Mobile remains an unchanged bottom sheet.
   - Verification: typecheck clean, 181 unit tests, 96 e2e passed / 28 expected skips, build clean, OpenSpec changes/specs valid.
+
+### [PATCH-06] Mid-Drag Reduced-Motion Guard, Frame-Clock Drag Follower, 30fps Idle Throttle & Spec Sync
+- **Date**: 2026-11-13 19:34:08 UTC
+- **Feedback Source**: Code Review on PR #12 (`afc0751`, Agent 1 `REQUEST CHANGES`, Agent 2 `APPROVE` w/ Important follow-ups)
+- **Reported Issue**:
+  1. `GraphCanvas.tsx:618-643, 1121-1132`: Switching to `prefers-reduced-motion: reduce` mid-drag stops `sim.sim` without ending the active drag, and `onPointerUp` skips `sim.dragEnd()` while reduced motion is active, leaving `sim.state === 'drag'` with a pinned node if motion is re-enabled.
+  2. `graphSimulation.ts:542-561`: Viscous follower `dragMove` runs per `pointermove` event instead of on the frame clock, causing polling-rate-dependent drag speed and stalling short of a stationary cursor.
+  3. `GraphCanvas.tsx:690-718`: `loop` runs `render()` at full 60–120 Hz even when `sim.isIdle && !cameraMoving` and only 30 fps ambient drift is active.
+  4. `openspec/specs/portfolio-controls/spec.md` & `openspec/specs/graph-simulation/spec.md` are out of sync with the shipped singular `Reset`, volume slider, `stickyFocalId`, collision-aware popups, draggable drawer, and live reduced-motion freeze.
+- **Root Cause**:
+  - `handleMotionChange` does not call `sim.dragEnd()` when transitioning to reduced motion, and `onPointerUp` gates `sim.dragEnd()` behind `!reduceMotionRef.current`.
+  - `dragMove` integrates `DRAG_LAG_MS` inside pointer events rather than storing `dragTarget` for `afterTick(dtMs)`.
+  - `loop` calls `render()` unconditionally on every rAF tick when `ambientRunning` is true.
+- **Target Files**: `src/components/GraphCanvas.tsx`, `src/physics/graphSimulation.ts`, `src/physics/graphSimulation.test.ts`, `e2e/portfolio.spec.ts`, `openspec/specs/portfolio-controls/spec.md`, `openspec/specs/graph-simulation/spec.md`
+- **Expected Resolution**: Active drag is cleanly ended on mid-drag reduced-motion transition and `pointerup`; `dragMove` stores `dragTarget` and `afterTick` advances the viscous follower at frame `dt`; idle ambient redraws throttle to 30 fps (`>= 33ms`); specs are synced and validated.
+- **Status**: RESOLVED (2026-11-13 19:42:00 UTC)
+- **Resolution**:
+  - `GraphCanvas.handleMotionChange` now finalizes an active drag (`sim.dragEnd()`, clear pointer samples, zero drag velocity) before freezing `staticPosRef` and stopping the simulation; `onPointerUp` always calls `sim.dragEnd()` when `state === 'drag'` regardless of reduced motion.
+  - `graphSimulation.dragMove` now stores a rubber-band `dragTarget`; `afterTick(dtMs)` advances the critically damped follower (`1 - exp(-clampedDt / 45ms)`) on the frame clock, so high-polling mice and stationary cursors behave identically. Drag end/reset clear the target.
+  - The idle ambient loop now renders at ~30 fps (`>= 33ms`) when the sim is idle and only ambient drift is active; node maps, active positions, ambient offsets, and dimmed-edge keys are reused/cached instead of reallocated each frame. `data-sim-state` exposes the current state for regression testing.
+  - Synced `openspec/specs/portfolio-controls/spec.md` (singular Reset, 500ms volume popover, persisted gain) and `openspec/specs/graph-simulation/spec.md` (initial vs live reduced-motion behavior, collision-aware popups, sticky inspected focus, draggable desktop drawer).
+  - Verification: typecheck clean, 182 unit tests, 97 e2e passed / 29 expected skips, build clean, `openspec validate --changes` and `--specs` clean.

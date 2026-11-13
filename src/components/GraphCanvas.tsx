@@ -315,6 +315,10 @@ export function GraphCanvas({
   >(() => undefined);
   const ambientOffsetRef = useRef<Map<string, { x: number; y: number }>>(new Map());
   const lastAmbientAtRef = useRef(0);
+  const lastRenderAtRef = useRef(0);
+  const activePositionsRef = useRef<Map<string, [number, number]>>(new Map());
+  const lastDimmedSetRef = useRef<Set<string> | null>(null);
+  const dimmedEdgesRef = useRef('');
   const visibleRef = useRef(true);
   const hoveredProjectIdRef = useRef<string | null>(null);
   const canHoverRef = useRef(false);
@@ -367,6 +371,7 @@ export function GraphCanvas({
     // out of the 60fps render loop.
     const sortedNodeIds = sim.nodes.map((node) => node.id).sort();
     const permanentEdgeKeys = new Set(edges.map((edge) => edgeKey(edge.source, edge.target)));
+    const nodesById = new Map(sim.nodes.map((node) => [node.id, node]));
 
     const ctx = canvas.getContext('2d');
     let raf = 0;
@@ -401,29 +406,38 @@ export function GraphCanvas({
       const now = performance.now();
       const ambientActive =
         !reduceMotionRef.current && visibleRef.current && !document.hidden;
+      const ambientOffsets = ambientOffsetRef.current;
       if (ambientActive) {
         if (now - lastAmbientAtRef.current >= 1000 / 30) {
-          const offsets = new Map<string, { x: number; y: number }>();
+          ambientOffsets.clear();
           for (const node of sim.nodes) {
-            offsets.set(node.id, ambientDriftOffset(node.id, now));
+            ambientOffsets.set(node.id, ambientDriftOffset(node.id, now));
           }
-          ambientOffsetRef.current = offsets;
           lastAmbientAtRef.current = now;
         }
-      } else if (ambientOffsetRef.current.size > 0) {
-        ambientOffsetRef.current = new Map();
+      } else if (ambientOffsets.size > 0) {
+        ambientOffsets.clear();
       }
 
-      const active = reduceMotionRef.current
-        ? staticPosRef.current
-        : new Map(
-            sim.nodes.map((n) => {
-              const offset = ambientActive
-                ? ambientOffsetRef.current.get(n.id) ?? { x: 0, y: 0 }
-                : { x: 0, y: 0 };
-              return [n.id, [n.x + offset.x, n.y + offset.y] as [number, number]];
-            }),
-          );
+      let active: Map<string, [number, number]>;
+      if (reduceMotionRef.current) {
+        active = staticPosRef.current;
+      } else {
+        const positions = activePositionsRef.current;
+        for (const node of sim.nodes) {
+          const offset = ambientActive
+            ? ambientOffsets.get(node.id) ?? { x: 0, y: 0 }
+            : { x: 0, y: 0 };
+          const entry = positions.get(node.id);
+          if (entry) {
+            entry[0] = node.x + offset.x;
+            entry[1] = node.y + offset.y;
+          } else {
+            positions.set(node.id, [node.x + offset.x, node.y + offset.y]);
+          }
+        }
+        active = positions;
+      }
 
       const dimmed = dimmedRef.current;
       const focused = focusedRef.current;
@@ -435,16 +449,21 @@ export function GraphCanvas({
         stickyFocalRef.current ??
         null;
 
-      const dimmedEdgeList = edges
-        .filter((edge) => dimmed.has(edge.source) || dimmed.has(edge.target))
-        .map((edge) => edgeKey(edge.source, edge.target))
-        .sort()
-        .join(',');
-      if (canvas.dataset.dimmedEdges !== dimmedEdgeList) {
-        canvas.dataset.dimmedEdges = dimmedEdgeList;
+      if (dimmed !== lastDimmedSetRef.current) {
+        lastDimmedSetRef.current = dimmed;
+        dimmedEdgesRef.current = edges
+          .filter((edge) => dimmed.has(edge.source) || dimmed.has(edge.target))
+          .map((edge) => edgeKey(edge.source, edge.target))
+          .sort()
+          .join(',');
+      }
+      if (canvas.dataset.dimmedEdges !== dimmedEdgesRef.current) {
+        canvas.dataset.dimmedEdges = dimmedEdgesRef.current;
+      }
+      if (canvas.dataset.simState !== sim.state) {
+        canvas.dataset.simState = sim.state;
       }
 
-      const nodesById = new Map(sim.nodes.map((n) => [n.id, n]));
       const nodeColor = (id: string): string => {
         if (focused === id) return tokens.accent;
         if (!focused && sim.hovered?.id === id) return tokens.accent;
@@ -631,7 +650,12 @@ export function GraphCanvas({
           synthRef.current?.onNodeHover(false);
           onHoverNodeRef.current?.(null, null);
         }
-        simRef.current?.hover(null);
+        if (sim.state === 'drag') {
+          sim.dragEnd();
+          lastDragPointRef.current = null;
+          synthRef.current?.onDragVelocity(0, 0);
+        }
+        sim.hover(null);
         // Freeze the current graph in place, not the original planar seeds.
         staticPosRef.current = new Map(
           sim.nodes.map((node) => [node.id, [node.x, node.y] as [number, number]]),
@@ -690,6 +714,7 @@ export function GraphCanvas({
     const loop = () => {
       if (disposed) return;
       raf = 0;
+      const now = performance.now();
       const t = transformRef.current;
       const goal = targetRef.current;
       const dx = goal.x - t.x;
@@ -700,7 +725,15 @@ export function GraphCanvas({
       if (!reduceMotionRef.current) {
         t.x += dx * 0.12;
         t.y += dy * 0.12;
-        render();
+        const idleAmbientOnly =
+          ambientRunning && !cameraMoving && sim.isIdle;
+        if (
+          !idleAmbientOnly ||
+          now - lastRenderAtRef.current >= 1000 / 30
+        ) {
+          render();
+          lastRenderAtRef.current = now;
+        }
       }
       if (
         !reduceMotionRef.current &&
@@ -1118,17 +1151,15 @@ export function GraphCanvas({
     const p = worldPoint(e.clientX, e.clientY);
     const start = downPosRef.current;
     const moved = start ? Math.hypot(p.x - start.x, p.y - start.y) : 10;
-    if (reduceMotionRef.current) {
-      if (moved < 6) {
-        const node = hitNode(p.x, p.y);
-        if (node) onSelectRef.current(node.id, nodeScreenPoint(node), buildObstacleSnapshot());
-      }
-    } else if (sim.state === 'drag') {
-      const node = sim.hovered ?? hitNode(p.x, p.y);
+    if (sim.state === 'drag') {
+      const node = hitNode(p.x, p.y);
       sim.dragEnd();
-      if (moved < 6 && node) {
+      if (!reduceMotionRef.current && moved < 6 && node) {
         onSelectRef.current(node.id, nodeScreenPoint(node), buildObstacleSnapshot());
       }
+    } else if (reduceMotionRef.current && moved < 6) {
+      const node = hitNode(p.x, p.y);
+      if (node) onSelectRef.current(node.id, nodeScreenPoint(node), buildObstacleSnapshot());
     }
     downPosRef.current = null;
     setCanvasCursor(hitNode(p.x, p.y) ? 'crosshair' : 'default');

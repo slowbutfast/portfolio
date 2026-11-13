@@ -314,7 +314,7 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
   let dragNode: GraphNode | null = null;
   let coastingNode: GraphNode | null = null;
   let dragAnchor = { x: 0, y: 0 };
-  let lastDragMoveAt: number | null = null;
+  let dragTarget: { x: number; y: number } | null = null;
   // The diagonal tether lets every planarity-preserving edge reach its 1.6x
   // snap radius even on the 393x852 mobile viewport.
   let tetherRadius = Math.max(120, Math.hypot(width, height) * 0.75);
@@ -458,6 +458,17 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
   };
 
   const afterTick = (dtMs: number): void => {
+    if (state === 'drag' && dragNode && dragTarget) {
+      const clampedDt = Math.max(
+        1,
+        Math.min(32, Number.isFinite(dtMs) ? dtMs : TICK_MS),
+      );
+      const lag = 1 - Math.exp(-clampedDt / DRAG_LAG_MS);
+      const currentX = dragNode.fx ?? dragNode.x;
+      const currentY = dragNode.fy ?? dragNode.y;
+      dragNode.fx = currentX + (dragTarget.x - currentX) * lag;
+      dragNode.fy = currentY + (dragTarget.y - currentY) * lag;
+    }
     updateLinkTopology();
     stepLinkOscillators(dtMs);
   };
@@ -528,9 +539,9 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
     node.fx = node.x;
     node.fy = node.y;
     dragAnchor = { x: node.x, y: node.y };
+    dragTarget = { x: node.x, y: node.y };
     dragSamples.length = 0;
     dragSamples.push({ x: node.x, y: node.y, t: performance.now() });
-    lastDragMoveAt = performance.now();
     state = 'drag';
     // Zero the link spring and isolate this node's charge/collision footprint
     // so neighbors follow through by less than 12px without being frozen.
@@ -541,23 +552,9 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
 
   function dragMove(x: number, y: number): void {
     if (state !== 'drag' || !dragNode) return;
-    const now = performance.now();
-    const dt = Math.max(
-      TICK_MS,
-      Math.min(32, lastDragMoveAt === null ? TICK_MS : now - lastDragMoveAt),
-    );
-    lastDragMoveAt = now;
-    const target = rubberBandDisplacement(dragAnchor, { x, y }, tetherRadius);
-    const currentX = dragNode.fx ?? dragNode.x;
-    const currentY = dragNode.fy ?? dragNode.y;
-    // Viscous pointer lag (tau ~45ms) keeps the node trailing the cursor
-    // smoothly instead of snapping to every sample.
-    const lag = 1 - Math.exp(-dt / DRAG_LAG_MS);
-    dragNode.fx = currentX + (target.x - currentX) * lag;
-    dragNode.fy = currentY + (target.y - currentY) * lag;
-    dragSamples.push({ x: dragNode.fx, y: dragNode.fy, t: now });
+    dragTarget = rubberBandDisplacement(dragAnchor, { x, y }, tetherRadius);
+    dragSamples.push({ x: dragTarget.x, y: dragTarget.y, t: performance.now() });
     if (dragSamples.length > 3) dragSamples.shift();
-    updateLinkTopology();
   }
 
   function dragEnd(): void {
@@ -594,7 +591,7 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
 
     coastingNode = node;
     dragNode = null;
-    lastDragMoveAt = null;
+    dragTarget = null;
     dragSamples.length = 0;
     state = 'coasting';
     const releasedAt = performance.now();
@@ -655,7 +652,7 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
     hoveredNode = null;
     dragNode = null;
     coastingNode = null;
-    lastDragMoveAt = null;
+    dragTarget = null;
     state = 'idle';
     for (const node of nodes) {
       node.fx = null;
