@@ -163,10 +163,6 @@ body {
   .mobile-sound-row {
     display: none;
   }
-
-  .sound-indicator {
-    display: none;
-  }
 }
 
 .sr-only {

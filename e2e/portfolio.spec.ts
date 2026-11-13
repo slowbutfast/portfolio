@@ -259,9 +259,15 @@ test.describe('portfolio graph SPA', () => {
     await expect(toggle).toHaveAttribute('aria-pressed', 'false');
     await expect(toggle).toHaveAccessibleName('Sound');
 
+    const settingsTrigger = page.getByTestId('controls-dropdown-trigger');
+    const settingsIcon = page.getByTestId('controls-dropdown-icon');
+    await expect(settingsTrigger).toHaveAttribute('data-sound-active', 'false');
+
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-pressed', 'true');
     await expect(toggle).toHaveAccessibleName('Sound');
+    await expect(settingsTrigger).toHaveAttribute('data-sound-active', 'true');
+    await expect(settingsIcon).toHaveClass(/text-\[var\(--color-accent\)\]/);
     expect(
       await page.evaluate(() => localStorage.getItem('portfolio_sound_enabled')),
     ).toBe('true');
@@ -270,6 +276,8 @@ test.describe('portfolio graph SPA', () => {
     await expect(page.getByTestId('audio-toggle')).toHaveAttribute('aria-pressed', 'true');
     await page.getByTestId('audio-toggle').click();
     await expect(page.getByTestId('audio-toggle')).toHaveAttribute('aria-pressed', 'false');
+    await expect(settingsTrigger).toHaveAttribute('data-sound-active', 'false');
+    await expect(settingsIcon).not.toHaveClass(/text-\[var\(--color-accent\)\]/);
     expect(
       await page.evaluate(() => localStorage.getItem('portfolio_sound_enabled')),
     ).toBe('false');
@@ -622,12 +630,17 @@ test.describe('portfolio graph SPA', () => {
     expect(toggleBox?.height ?? 0).toBeGreaterThanOrEqual(44);
     expect(sliderBox?.height ?? 0).toBeGreaterThanOrEqual(44);
 
+    const trigger = page.getByTestId('controls-dropdown-trigger');
+    const triggerIcon = page.getByTestId('controls-dropdown-icon');
+    await expect(trigger).toHaveAttribute('data-sound-active', 'false');
+    await expect(page.getByTestId('controls-sound-indicator')).toHaveCount(0);
+    await expect(triggerIcon).not.toHaveClass(/text-\[var\(--color-accent\)\]/);
+
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-pressed', 'true');
-    const indicator = page.getByTestId('controls-sound-indicator');
-    await expect(indicator).toBeVisible();
-    const dotBox = await indicator.boundingBox();
-    expect(dotBox?.width ?? 0).toBeGreaterThanOrEqual(5);
+    await expect(trigger).toHaveAttribute('data-sound-active', 'true');
+    await expect(triggerIcon).toHaveClass(/text-\[var\(--color-accent\)\]/);
+    await expect(page.getByTestId('controls-sound-indicator')).toHaveCount(0);
 
     await slider.evaluate((element, next) => {
       const input = element as HTMLInputElement;

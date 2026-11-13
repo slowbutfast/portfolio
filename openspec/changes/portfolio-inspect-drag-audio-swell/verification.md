@@ -2,7 +2,7 @@
 
 ## Executive Summary & Environment
 
-- **Status**: All automated specs verified passing. `typecheck`, production build, unit suite, and the full desktop + mobile Playwright suite are green; `openspec validate --strict` reports zero issues. The user also confirmed on-device sound quality manually (`"the sound looks good on my end"`, 2026-11-13).
+- **Status**: All automated specs verified passing. `typecheck`, production build, unit suite, and the full desktop + mobile Playwright suite are green; `openspec validate --strict` reports zero issues. The user also confirmed on-device sound quality manually (`"the sound looks good on my end"`, 2026-11-13) and requested that the 3-dot settings glyph itself carry the sound-active accent instead of a separate dot.
 - **Date**: 2026-11-13
 - **Branch**: `feat/portfolio-inspect-drag-audio-swell` (branched from `ca2a15d`)
 - **Environment**:
@@ -20,8 +20,12 @@ Delta capability: `ambient-audio` → `### Requirement: Node hover harmonic reso
 | :--- | :--- | :--- | :--- |
 | `ambient-audio` | **Requirement: Node hover harmonic resonance swell** — non-clipping `HOVER_SWELL_GAIN = 1.0`, `50ms` ramps, `35%` plateau after `1.2s`, active on hover/drag/Graph+Grid inspect | `src/audio/audioConstants.ts:14-17`; `src/audio/ambientSynth.ts:452-479`; `src/utils/audioSwell.ts`; `src/audio/ambientSynth.test.ts` (18 tests); `src/utils/audioSwell.test.ts` (9 tests) | **PASS** |
 | `ambient-audio` | **Scenario: Pointer hovers over a canvas node** — opens to `1.0` with a `50ms` time constant, no clipping | `src/audio/ambientSynth.test.ts:347` `swells the hover bandpass gain to HOVER_SWELL_GAIN and returns to zero`; `src/audio/ambientSynth.test.ts:280` `uses setTargetAtTime for every parameter ramp` (asserts `RAMP_TIME_CONSTANT = 0.05`); `src/audio/ambientSynth.test.ts:184` `HOVER_SWELL_GAIN` is `1.0` | **PASS** |
-| `ambient-audio` | **Scenario: Pointer leaves a canvas node** — gain decays to zero when no drag/inspect remains | `src/audio/ambientSynth.test.ts:347` (asserts `hoverGain.gain.value === 0` after `onNodeHover(false)`); `src/utils/audioSwell.test.ts` (8-combination truth table, all-false → `false`); `e2e/portfolio.spec.ts:279` (canvas returns to `data-audio-swell="false"` after release/close) | **PASS** |
-| `ambient-audio` | **Scenario: User drags a node or inspects a project** — `pointerdown` on a node through release, or `ProjectDrawer` open from Graph or Grid view, settles to `0.35` if held | `e2e/portfolio.spec.ts:279` `canvas mirrors inspect and drag audio swell state` (deep-link inspect → `"true"`, close → `"false"`, drag → `"true"`, release → `"false"`); `src/components/GraphCanvas.tsx:355-367` (`syncSynthSwell` covers hover/select/drag); `src/App.tsx:303-308` (Grid-view inspect while `GraphCanvas` is unmounted); `src/audio/ambientSynth.test.ts:357` (plateau at `1199ms` vs `1200ms`), `:377` (idempotent repeats), `:396` (dispose clears timer) | **PASS** |
+| `ambient-audio` | **Scenario: Pointer leaves a canvas node** — gain decays to zero when no drag/inspect remains | `src/audio/ambientSynth.test.ts:347` (asserts `hoverGain.gain.value === 0` after `onNodeHover(false)`); `src/utils/audioSwell.test.ts` (8-combination truth table, all-false → `false`); `e2e/portfolio.spec.ts:287` (canvas returns to `data-audio-swell="false"` after release/close) | **PASS** |
+| `ambient-audio` | **Scenario: User drags a node or inspects a project** — `pointerdown` on a node through release, or `ProjectDrawer` open from Graph or Grid view, settles to `0.35` if held | `e2e/portfolio.spec.ts:287` `canvas mirrors inspect and drag audio swell state` (deep-link inspect → `"true"`, close → `"false"`, drag → `"true"`, release → `"false"`); `src/components/GraphCanvas.tsx:355-367` (`syncSynthSwell` covers hover/select/drag); `src/App.tsx:303-308` (Grid-view inspect while `GraphCanvas` is unmounted); `src/audio/ambientSynth.test.ts:357` (plateau at `1199ms` vs `1200ms`), `:377` (idempotent repeats), `:396` (dispose clears timer) | **PASS** |
+| `portfolio-controls` | **Requirement: Top-right header navigation sequence and theme toggle** — sound-active state is carried by the 3-dot `Filters & Layout` glyph itself, not a separate dot | `src/components/ControlsOverlay.tsx` (`data-sound-active`, accent class on `controls-dropdown-icon`); `openspec/specs/portfolio-controls/spec.md`; E2E desktop + mobile assertions | **PASS** |
+| `portfolio-controls` | **Scenario: Desktop visitor views top-right header options** — 3-dot glyph renders in `--color-accent` while sound is enabled | `e2e/portfolio.spec.ts` `Sound toggle persists the user preference across reloads` (asserts `data-sound-active="true"` and glyph accent, then reverts after disabling) | **PASS** |
+| `portfolio-controls` | **Scenario: Mobile visitor views top-right header options** — 3-dot glyph renders in `--color-accent`, no `controls-sound-indicator` dot | `e2e/portfolio.spec.ts` `mobile 3-dot menu hosts Sound, volume, and a reachable Reset` (asserts `data-sound-active`, glyph accent, and dot count `0`) | **PASS** |
+| `portfolio-controls` | **Scenario: User opens the 3-dot menu and resets graph layout** — unchanged `Filters`/Reset behavior | `e2e/portfolio.spec.ts` `3-dot menu exposes one Reset that clears filters, layout, and visited colors` | **PASS** |
 
 ## Resolved Assumptions & Empirical Proof
 
@@ -54,6 +58,7 @@ Delta capability: `ambient-audio` → `### Requirement: Node hover harmonic reso
 | Pure state helper mirroring `stickyFocal.ts` | `src/utils/audioSwell.ts`, `src/utils/audioSwell.test.ts` | `npm run test:unit` (`audioSwell.test.ts`, 9 tests) |
 | Idempotent envelope + plateau timer | `src/audio/ambientSynth.ts:452-479`; constants in `src/audio/audioConstants.ts:14-17` | `npm run test:unit` (`ambientSynth.test.ts`, 18 tests) |
 | DOM observability mirroring `data-sim-state` | `src/components/GraphCanvas.tsx:355-367` (`canvas.dataset.audioSwell`) | `npm run test:e2e` (`canvas mirrors inspect and drag audio swell state`) |
+| Glyph-as-indicator (no badge/dot) | `src/components/ControlsOverlay.tsx` (`data-sound-active`, accent class on `controls-dropdown-icon`); `src/styles.css` (unused `.sound-indicator` removed) | `npm run test:e2e` (`Sound toggle persists…`, `mobile 3-dot menu hosts Sound…`) |
 | Single reconciler across hover/drag/inspect | `src/components/GraphCanvas.tsx` (`emitHover`, reduced-motion handler, `focusedId` effect, `initialSelectedId` effect, pointer down/up/cancel/leave, unmount cleanup) | `npm run typecheck`, `npm run test:e2e` |
 | Graph/Grid view parity | `src/App.tsx:303-308` | `npm run typecheck`; Grid-view behavior is code-verified (`GraphCanvas` is unmounted in list view) |
 
@@ -64,6 +69,7 @@ Delta capability: `ambient-audio` → `### Requirement: Node hover harmonic reso
 | A test can find the hover gain by looking for `gain.value === HOVER_SWELL_GAIN` | With `HOVER_SWELL_GAIN = 1.0`, the master gain also equals `1.0`, so the old lookup could select the master node and falsely fail the return-to-zero assertion | Added `findHoverGain()`, which captures the only gain still at `0` after `setSoundEnabled(true)` (`src/audio/ambientSynth.test.ts:322-329`) | Keeps the test deterministic without exposing private nodes |
 | Reduced-motion `pointerleave`/motion change could return early after clearing hover | Direct `onNodeHover(false)` calls bypassed drag/selected state, which could silence a still-open inspector | All paths now call `syncSynthSwell()`, and the derived helper keeps the swell alive while `selectedId` is set | Satisfies the spec clause for reduced motion with an open inspector |
 | Grid-view inspection could be covered only by `GraphCanvas` | `ListView` unmounts `GraphCanvas`, so no canvas attribute exists and no pointer lifecycle runs | `App.tsx` now calls `synth.onNodeHover(selectedId !== null)` when `view === 'list'` | Preserves audio parity across views |
+| A separator dot was the right way to signal that sound controls are active | Review feedback preferred the settings glyph itself to carry the state; the dot was mobile-only and visually detached from the three dots | Removed `controls-sound-indicator`; `MoreHorizontal` takes `--color-accent` when `soundEnabled`, with `data-sound-active` on the trigger | Cleaner affordance and desktop/mobile parity |
 
 ## Implementation-Discovered Deferrals
 
@@ -121,8 +127,8 @@ Exit code: `0`. On a tree without `dist/`, the same command reports `198 passed 
 ```bash
 $ npm run test:e2e
 ...
-✓ [desktop] › e2e/portfolio.spec.ts:279:3 › portfolio graph SPA › canvas mirrors inspect and drag audio swell state
-✓ [mobile]  › e2e/portfolio.spec.ts:279:3 › portfolio graph SPA › canvas mirrors inspect and drag audio swell state
+✓ [desktop] › e2e/portfolio.spec.ts:287:3 › portfolio graph SPA › canvas mirrors inspect and drag audio swell state
+✓ [mobile]  › e2e/portfolio.spec.ts:287:3 › portfolio graph SPA › canvas mirrors inspect and drag audio swell state
 ...
   36 skipped
   106 passed (3.5m)
@@ -180,6 +186,21 @@ Test Files  2 failed (2)
   > the sound looks good on my end
 - **Result**: **PASS** — the user confirmed the audible result is good; no clipping or harsh sustained buzz was reported.
 
+### PATCH-01 targeted E2E (sound-active glyph)
+
+```bash
+$ npx playwright test -g "Sound toggle persists|mobile 3-dot menu hosts Sound"
+Running 4 tests using 1 worker
+  ✓  1 [desktop] › e2e/portfolio.spec.ts:254:3 › portfolio graph SPA › Sound toggle persists the user preference across reloads
+  -  2 [desktop] › e2e/portfolio.spec.ts:617:3 › portfolio graph SPA › mobile 3-dot menu hosts Sound, volume, and a reachable Reset
+  -  3 [mobile] › e2e/portfolio.spec.ts:254:3 › portfolio graph SPA › Sound toggle persists the user preference across reloads
+  ✓  4 [mobile] › e2e/portfolio.spec.ts:617:3 › portfolio graph SPA › mobile 3-dot menu hosts Sound, volume, and a reachable Reset
+  2 skipped
+  2 passed (8.3s)
+```
+
+Exit code: `0`. Desktop verifies the accent glyph on the desktop trigger; mobile verifies it inside the 3-dot menu flow, including `controls-sound-indicator` count `0`.
+
 ### Metrics & Data Invariants
 
 | Metric / Count | Before | After | Delta / Observation |
@@ -190,6 +211,8 @@ Test Files  2 failed (2)
 | New unit tests | `0` | `12` | +9 `deriveSwellActive` truth-table cases, +3 envelope/idempotency/dispose cases |
 | New E2E scenarios | `0` | `2` | Desktop + mobile `data-audio-swell` inspect/drag coverage |
 | On-device sound check | Manual pending | User-confirmed good | Manual **PASS** on 2026-11-13 |
+| Sound-active affordance | Mobile-only corner dot (`controls-sound-indicator`) | Accent 3-dot settings glyph on desktop + mobile | One fewer DOM node; `.sound-indicator` CSS removed |
+| Sound-state E2E assertions | Dot visibility/width | `data-sound-active` + accent class + dot count `0` | Covers both enabled and disabled states |
 | Persistent data / storage schema | — | — | No storage or catalog changes; no data-loss surface |
 
 ## Quick Re-Verification (60-Second Audit)
@@ -212,7 +235,7 @@ Change 'portfolio-inspect-drag-audio-swell' is valid
 To re-check the browser behavior only:
 
 ```bash
-npx playwright test -g "canvas mirrors inspect and drag audio swell state"
+npx playwright test -g "canvas mirrors inspect and drag audio swell state|Sound toggle persists|mobile 3-dot menu hosts Sound"
 ```
 
-Expected: `2 passed` (desktop + mobile).
+Expected: `4 passed, 2 skipped` (desktop + mobile audio-swell, desktop sound persistence, mobile 3-dot menu).

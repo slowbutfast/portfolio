@@ -8,6 +8,7 @@
 - [x] 2.2 Create `src/utils/audioSwell.ts` exporting `deriveSwellActive(hovered, selected, dragging)`
 - [x] 2.3 Add `draggingNodeRef` and `syncSynthSwell()` (updating `synthRef.current?.onNodeHover(active)` and `data-audio-swell` on `<canvas>`) in `src/components/GraphCanvas.tsx`, routing all 4 existing call sites (`handleMotionChange` at `L684` resetting `draggingNodeRef`, `focusedId` effect at `L1062`, and `emitHover` at `L1172`/`L1176`), plus `initialSelectedId` effect, `onPointerDown`/`Up`/`Cancel`/`Leave`, and unmount cleanup
 - [x] 2.4 Sync `synth.onNodeHover(selectedId !== null)` when `view === 'list'` in `src/App.tsx` so Grid-view inspection also triggers the swell
+- [x] 2.5 Replace the mobile-only sound indicator dot with an accent-colored 3-dot `Filters & Layout` glyph, remove the unused `.sound-indicator` CSS, and update the `portfolio-controls` spec, design, tests, and E2E assertions
 
 ## 3. Verification & Empirical Audit
 

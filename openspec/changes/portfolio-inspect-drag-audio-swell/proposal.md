@@ -6,6 +6,7 @@ On mobile devices, the `65 Hz` resting drone rolls off below phone speaker range
 
 - **Inspect & Drag Bandpass Swell**: Extract `deriveSwellActive(hovered, selected, dragging)` in `src/utils/audioSwell.ts`, wire `syncSynthSwell()` across all 4 call sites in `GraphCanvas.tsx` (including `handleMotionChange`) plus `onPointerDown`/`Up`/`Cancel`/`Leave`, `initialSelectedId` effect, and unmount cleanup, expose `data-audio-swell` on `<canvas>`, and sync `synth.onNodeHover(selectedId !== null)` in `App.tsx` when `view === 'list'`.
 - **Non-clipping Gain & Plateau Envelope**: Lower `HOVER_SWELL_GAIN` in `src/audio/audioConstants.ts` from `2.0` to `1.0` (keeping peaks below `0 dBFS`) and settle `hoverGain` to `HOVER_SWELL_GAIN * 0.35` after `1.2 s` in `src/audio/ambientSynth.ts` so sustained inspection does not buzz loudly.
+- **Settings Glyph Active State**: Replace the mobile-only `controls-sound-indicator` dot with an accent-colored 3-dot `Filters & Layout` glyph (`controls-dropdown-trigger`) whenever sound is enabled, and remove the now-unused `.sound-indicator` CSS.
 
 ## Capabilities
 
@@ -14,9 +15,11 @@ On mobile devices, the `65 Hz` resting drone rolls off below phone speaker range
 
 ### Modified Capabilities
 - `ambient-audio`: Extend `Node hover harmonic resonance swell` to activate on hover, drag (starting on `pointerdown` over a node), and `ProjectDrawer` inspect across Graph and Grid views, with `HOVER_SWELL_GAIN = 1.0` (`50 ms` time constant) settling to a `35%` plateau after `1.2 s`.
+- `portfolio-controls`: Replace the conditional sound indicator dot with an accent-colored 3-dot settings glyph on desktop and mobile whenever sound is enabled.
 
 ## Impact
 
 - **Audio & Utils**: `src/audio/audioConstants.ts`, `src/audio/ambientSynth.ts`, `src/utils/audioSwell.ts` (new), `src/utils/audioSwell.test.ts` (new), `src/audio/ambientSynth.test.ts`.
-- **Components**: `src/components/GraphCanvas.tsx`, `src/App.tsx`.
-- **Tests**: `e2e/portfolio.spec.ts` (`data-audio-swell` E2E check).
+- **Components**: `src/components/GraphCanvas.tsx`, `src/App.tsx`, `src/components/ControlsOverlay.tsx`.
+- **Styles**: `src/styles.css` (remove the unused `.sound-indicator` rule).
+- **Tests**: `e2e/portfolio.spec.ts` (`data-audio-swell` E2E check plus accent 3-dot glyph assertions on desktop and mobile).
