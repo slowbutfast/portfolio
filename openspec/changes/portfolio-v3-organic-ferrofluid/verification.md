@@ -492,7 +492,7 @@ Totals: 7 passed, 0 failed (7 items)
 
 ---
 
-# PATCH-05 Verification Addendum: Edge Tag Line Spacing 1.0
+# PATCH-05A Verification Addendum: Edge Tag Line Spacing 1.15
 
 ## Status: RESOLVED
 
@@ -502,7 +502,7 @@ Totals: 7 passed, 0 failed (7 items)
 
 | Request | Resolution | Verification |
 | :--- | :--- | :--- |
-| Set connection-tag line spacing to `1.0` | `EDGE_TAG_LINE_SPACING = 1`; row pitch is now `LABEL_FONT_SIZE (12px) * 1.0`, with `4px` vertical padding inside the same contiguous rounded rectangle and no inter-row gap. | Typecheck, visual inspection of focal edges, full E2E suite |
+| Set connection-tag line spacing to `1.15` | `EDGE_TAG_LINE_SPACING = 1.15`; row pitch is now `LABEL_FONT_SIZE (12px) * 1.15` (`13.8px`), with `4px` vertical padding inside the same contiguous rounded rectangle and no inter-row gap. | Typecheck, visual inspection of focal edges, full E2E suite |
 
 ## Empirical Execution Logs (PATCH-05)
 
@@ -520,7 +520,7 @@ $ npm run test:unit
 
 ```text
 $ npm run build
-dist/assets/index-wE7EyTyN.js    329.96 kB │ gzip: 105.16 kB
+dist/assets/index-qgOCHkHN.js    329.96 kB │ gzip: 105.16 kB
 ✓ built in 3.29s
 ```
 

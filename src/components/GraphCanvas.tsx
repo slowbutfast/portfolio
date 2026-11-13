@@ -70,8 +70,8 @@ const DEFAULT_TOKENS: FluidTokens = {
 /** Canvas node labels use the same Swiss sans stack as the DOM interface. */
 const LABEL_FONT_SIZE = 12;
 const LABEL_FONT = `500 ${LABEL_FONT_SIZE}px "Helvetica Neue", Helvetica, -apple-system, BlinkMacSystemFont, Arial, sans-serif`;
-/** Edge-tag rows use 1.0 line spacing inside one contiguous rounded rect. */
-const EDGE_TAG_LINE_SPACING = 1;
+/** Edge-tag rows use 1.15 line spacing inside one contiguous rounded rect. */
+const EDGE_TAG_LINE_SPACING = 1.15;
 const EDGE_TAG_VERTICAL_PADDING = 4;
 
 /** Unified hover gate shared by simulation pinning and the DOM preview card. */

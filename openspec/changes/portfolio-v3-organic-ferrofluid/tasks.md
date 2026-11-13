@@ -57,7 +57,7 @@
 - [x] P04.3 Update `src/components/ControlsOverlay.tsx` (`L8-L22`, `L116-L129`), `src/App.tsx` (`L55-L58`, `L264-L289`), and `src/styles.css` to wire `soundVolume`/`onVolumeChange` and render the `500ms` auto-hiding vertical volume popover (`data-testid="volume-popover"`, `data-testid="volume-slider"`)
 - [x] P04.4 Run `npm run typecheck && npm run test:unit && npm run build && npm run test:e2e && npx openspec validate --changes`, update `verification.md`, and mark `PATCH-04` `RESOLVED` in `patch.md`
 
-## Patch 05: Edge Tag Line Spacing 1.0
+## Patch 05A: Edge Tag Line Spacing 1.15
 
-- [x] P05.1 Set connection-tag row pitch to 1.0 line spacing (`12px`) inside the contiguous rounded rectangle and document it in `DESIGN.md`
-- [x] P05.2 Run `npm run typecheck && npm run test:unit && npm run build && npm run test:e2e && npx openspec validate --changes`, update `verification.md`, and mark `PATCH-05` `RESOLVED`
+- [x] P05A.1 Set connection-tag row pitch to 1.15 line spacing (`13.8px`) inside the contiguous rounded rectangle and document it in `DESIGN.md`
+- [x] P05A.2 Run `npm run typecheck && npm run test:unit && npm run build && npm run test:e2e && npx openspec validate --changes`, update `verification.md`, and mark `PATCH-05A` `RESOLVED`

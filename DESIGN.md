@@ -223,7 +223,7 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 ### Canvas Primitives & Bilateral Bridges
 - Pure flat circles at `r = 22px`; visited nodes in cobalt; hovered/focused nodes in the active accent.
 - Cubic boundaries attach flush to both circumferences along exact tangent rays and mirror exactly across the center-to-center axis, producing a symmetrical hourglass waist. Every control-point normal offset stays non-negative.
-- Filtering illuminates an edge only when both endpoint nodes match; any dimmed endpoint dims the whole connection. Focal permanent edges display up to three shared tags inside one contiguous rounded rectangle (no inter-row gap, 1.0 line spacing) at their midpoint, and the labels persist while that node's inspector is open.
+- Filtering illuminates an edge only when both endpoint nodes match; any dimmed endpoint dims the whole connection. Focal permanent edges display up to three shared tags inside one contiguous rounded rectangle (no inter-row gap, 1.15 line spacing) at their midpoint, and the labels persist while that node's inspector is open.
 - A close-node guard returns `null` when circles touch or overlap, so no inverted or crossed geometry renders during a drag.
 - Title knockout pills are filled with the theme background only — no stroke, no outline, no border — and use the Helvetica sans stack.
 

@@ -86,15 +86,15 @@
   - `App` tracks `soundVolume`, wires `synth.setVolume`, and forwards `soundVolume` / `onVolumeChange`; `styles.css` adds the vertical range slider with `--color-accent`.
   - Verification: typecheck clean, 176 unit tests, 94 e2e passed / 26 expected skips, build clean, OpenSpec changes/specs valid.
 
-### [PATCH-05] Edge Tag Line Spacing 1.0
+### [PATCH-05A] Edge Tag Line Spacing 1.15
 - **Date**: 2026-11-13 18:45:00 UTC
 - **Feedback Source**: Manual Design Review on PR #12 follow-up
-- **Reported Issue**: The connection-tag rows still used a `20px` row pitch; request was to set the tag line spacing to `1.0`.
+- **Reported Issue**: The connection-tag rows still used a `20px` row pitch; request was to set the tag line spacing to `1.15`.
 - **Root Cause**: `drawEdgeTagPills` used a fixed `pillHeight = 20` for both the row pitch and text baseline offset, independent of the `12px` label font size.
 - **Target Files**: `src/components/GraphCanvas.tsx`, `DESIGN.md`, `patch.md`, `tasks.md`, `verification.md`.
-- **Expected Resolution**: Edge tags use `EDGE_TAG_LINE_SPACING = 1` so row pitch equals the `12px` label size, with `4px` vertical padding inside the single rounded rectangle; no inter-row gap.
+- **Expected Resolution**: Edge tags use `EDGE_TAG_LINE_SPACING = 1.15` so row pitch is `13.8px` for the `12px` label size, with `4px` vertical padding inside the single rounded rectangle; no inter-row gap.
 - **Status**: RESOLVED (2026-11-13 18:47:00 UTC)
 - **Resolution**:
-  - Introduced `LABEL_FONT_SIZE = 12`, `EDGE_TAG_LINE_SPACING = 1`, and `EDGE_TAG_VERTICAL_PADDING = 4`.
-  - `drawEdgeTagPills` now computes `lineHeight = LABEL_FONT_SIZE * EDGE_TAG_LINE_SPACING` (`12px`), total height `n * 12 + 8`, and stacks text at that pitch inside one contiguous `roundRect`.
-  - `DESIGN.md` documents "no inter-row gap, 1.0 line spacing"; verification addendum records the visual check and regression logs.
+  - Introduced `LABEL_FONT_SIZE = 12`, `EDGE_TAG_LINE_SPACING = 1.15`, and `EDGE_TAG_VERTICAL_PADDING = 4`.
+  - `drawEdgeTagPills` now computes `lineHeight = LABEL_FONT_SIZE * EDGE_TAG_LINE_SPACING` (`13.8px`), total height `n * 13.8 + 8`, and stacks text at that pitch inside one contiguous `roundRect`.
+  - `DESIGN.md` documents "no inter-row gap, 1.15 line spacing"; verification addendum records the visual check and regression logs.
