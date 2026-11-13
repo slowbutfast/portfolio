@@ -68,8 +68,11 @@ const DEFAULT_TOKENS: FluidTokens = {
 };
 
 /** Canvas node labels use the same Swiss sans stack as the DOM interface. */
-const LABEL_FONT =
-  '500 12px "Helvetica Neue", Helvetica, -apple-system, BlinkMacSystemFont, Arial, sans-serif';
+const LABEL_FONT_SIZE = 12;
+const LABEL_FONT = `500 ${LABEL_FONT_SIZE}px "Helvetica Neue", Helvetica, -apple-system, BlinkMacSystemFont, Arial, sans-serif`;
+/** Edge-tag rows use 1.0 line spacing inside one contiguous rounded rect. */
+const EDGE_TAG_LINE_SPACING = 1;
+const EDGE_TAG_VERTICAL_PADDING = 4;
 
 /** Unified hover gate shared by simulation pinning and the DOM preview card. */
 const HOVER_DWELL_MS = 250;
@@ -217,8 +220,9 @@ function drawEdgeTagPills(
 ): number {
   if (tags.length === 0) return 0;
   const visible = tags.slice(0, 3);
-  const pillHeight = 20;
-  const totalHeight = visible.length * pillHeight;
+  const lineHeight = LABEL_FONT_SIZE * EDGE_TAG_LINE_SPACING;
+  const totalHeight =
+    visible.length * lineHeight + EDGE_TAG_VERTICAL_PADDING * 2;
   ctx.font = LABEL_FONT;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -235,7 +239,11 @@ function drawEdgeTagPills(
 
   ctx.fillStyle = tokens.accent;
   for (let index = 0; index < visible.length; index += 1) {
-    ctx.fillText(visible[index], x, top + pillHeight / 2 + index * pillHeight);
+    ctx.fillText(
+      visible[index],
+      x,
+      top + EDGE_TAG_VERTICAL_PADDING + lineHeight / 2 + index * lineHeight,
+    );
   }
   return visible.length;
 }

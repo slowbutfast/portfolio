@@ -489,3 +489,48 @@ Totals: 7 passed, 0 failed (7 items)
 - Sound is underlined/accented while enabled; the popover floats beneath it with a bordered surface, backdrop blur, and a vertical accent-colored range control.
 - 100% places the thumb at the top; 40% lowers it; dragging to 0 leaves the Sound label enabled without disabling audio state.
 - The popover does not appear while Sound is off.
+
+---
+
+# PATCH-05 Verification Addendum: Edge Tag Line Spacing 1.0
+
+## Status: RESOLVED
+
+- **Date**: 2026-11-13
+- **Patch**: `PATCH-05` (`patch.md`)
+- **Changes**: `src/components/GraphCanvas.tsx`, `DESIGN.md`.
+
+| Request | Resolution | Verification |
+| :--- | :--- | :--- |
+| Set connection-tag line spacing to `1.0` | `EDGE_TAG_LINE_SPACING = 1`; row pitch is now `LABEL_FONT_SIZE (12px) * 1.0`, with `4px` vertical padding inside the same contiguous rounded rectangle and no inter-row gap. | Typecheck, visual inspection of focal edges, full E2E suite |
+
+## Empirical Execution Logs (PATCH-05)
+
+```text
+$ npm run typecheck
+> tsc --noEmit
+(exit 0, no diagnostics)
+```
+
+```text
+$ npm run test:unit
+ Test Files  16 passed (16)
+      Tests  176 passed (176)
+```
+
+```text
+$ npm run build
+dist/assets/index-wE7EyTyN.js    329.96 kB │ gzip: 105.16 kB
+✓ built in 3.29s
+```
+
+```text
+$ npm run test:e2e
+  26 skipped
+  94 passed (2.3m)
+```
+
+```text
+$ npx openspec validate --changes
+Totals: 2 passed, 0 failed (2 items)
+```
