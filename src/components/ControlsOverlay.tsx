@@ -17,7 +17,9 @@ interface ControlsOverlayProps {
   theme: ThemeMode;
   onToggleTheme: () => void;
   soundEnabled: boolean;
+  soundVolume: number;
   onToggleSound: () => void;
+  onVolumeChange: (volume: number) => void;
   onOpenAbout: () => void;
 }
 
@@ -40,11 +42,60 @@ export function ControlsOverlay({
   theme,
   onToggleTheme,
   soundEnabled,
+  soundVolume,
   onToggleSound,
+  onVolumeChange,
   onOpenAbout,
 }: ControlsOverlayProps) {
   const [open, setOpen] = useState(false);
+  const [volumeOpen, setVolumeOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const volumeHideTimerRef = useRef<number | null>(null);
+  const volumeDraggingRef = useRef(false);
+
+  const clearVolumeHide = () => {
+    if (volumeHideTimerRef.current !== null) {
+      window.clearTimeout(volumeHideTimerRef.current);
+      volumeHideTimerRef.current = null;
+    }
+  };
+
+  const scheduleVolumeHide = () => {
+    clearVolumeHide();
+    volumeHideTimerRef.current = window.setTimeout(() => {
+      volumeHideTimerRef.current = null;
+      if (!volumeDraggingRef.current) setVolumeOpen(false);
+    }, 500);
+  };
+
+  const showVolume = () => {
+    if (!soundEnabled) return;
+    clearVolumeHide();
+    setVolumeOpen(true);
+  };
+
+  useEffect(() => {
+    if (soundEnabled) return;
+    clearVolumeHide();
+    setVolumeOpen(false);
+  }, [soundEnabled]);
+
+  useEffect(() => {
+    const handlePointerUp = () => {
+      if (!volumeDraggingRef.current) return;
+      volumeDraggingRef.current = false;
+      scheduleVolumeHide();
+    };
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+    return () => {
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
+      clearVolumeHide();
+    };
+    // Timer helpers intentionally read the current refs and props.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -113,19 +164,68 @@ export function ControlsOverlay({
           >
             {view === 'graph' ? 'Grid' : 'Graph'}
           </button>
-          <button
-            type="button"
-            data-testid="audio-toggle"
-            aria-pressed={soundEnabled}
-            onClick={onToggleSound}
-            className={`${bareTextBase} ${
-              soundEnabled
-                ? 'text-[var(--color-accent)] underline underline-offset-4'
-                : 'text-[var(--color-muted)]'
-            }`}
+          <div
+            className="relative inline-flex"
+            onPointerEnter={showVolume}
+            onPointerLeave={scheduleVolumeHide}
+            onFocus={showVolume}
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                scheduleVolumeHide();
+              }
+            }}
           >
-            Sound
-          </button>
+            <button
+              type="button"
+              data-testid="audio-toggle"
+              aria-pressed={soundEnabled}
+              onClick={() => {
+                const next = !soundEnabled;
+                onToggleSound();
+                if (next) {
+                  clearVolumeHide();
+                  setVolumeOpen(true);
+                } else {
+                  clearVolumeHide();
+                  setVolumeOpen(false);
+                }
+              }}
+              className={`${bareTextBase} ${
+                soundEnabled
+                  ? 'text-[var(--color-accent)] underline underline-offset-4'
+                  : 'text-[var(--color-muted)]'
+              }`}
+            >
+              Sound
+            </button>
+            {soundEnabled && volumeOpen && (
+              <div
+                data-testid="volume-popover"
+                role="group"
+                aria-label="Sound volume"
+                onPointerEnter={clearVolumeHide}
+                onPointerLeave={scheduleVolumeHide}
+                className="absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 rounded-2xl border border-[var(--color-outline)] bg-[var(--color-surface)]/95 px-2.5 py-3 shadow-2xl backdrop-blur-md"
+              >
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={soundVolume}
+                  aria-label="Sound volume"
+                  aria-orientation="vertical"
+                  data-testid="volume-slider"
+                  onChange={(event) => onVolumeChange(Number(event.target.value))}
+                  onPointerDown={() => {
+                    volumeDraggingRef.current = true;
+                    clearVolumeHide();
+                  }}
+                  className="volume-slider"
+                />
+              </div>
+            )}
+          </div>
           <button
             type="button"
             data-testid="theme-toggle"

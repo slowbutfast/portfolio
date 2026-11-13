@@ -49,3 +49,10 @@
 - [x] P03.2 Remove the terminal placeholder from linkout-only hover cards (Kintsugi/Ivy) and raise the unified hover dwell to `250ms`
 - [x] P03.3 Update E2E coverage for 250ms dwell and inspector tag persistence, then run `npm run typecheck && npm run test:unit && npm run build && npm run test:e2e && npx openspec validate --changes`
 - [x] P03.4 Update graph-simulation specs, `design.md`, `tests.md`, `DESIGN.md`, `verification.md`, and mark `PATCH-03` `RESOLVED` in `patch.md`
+
+## Patch 04: Vertical Sound Volume Slider Popover
+
+- [x] P04.1 Scaffold failing unit tests in `src/audio/ambientSynth.test.ts` (`getVolume`/`setVolume`, `[0, 1]` clamping, `portfolio_sound_volume` persistence, `master.gain` scaling, `0` volume keeping `enabled === true`) and failing Playwright E2E tests in `e2e/portfolio.spec.ts` (hidden when sound off, opens on hover when sound enabled, adjusts volume, auto-hides ~`500ms` after `pointerleave`)
+- [x] P04.2 Update `src/audio/audioConstants.ts` (`L18-L23`) and `src/audio/ambientSynth.ts` (`L110-L130`, `L344-L382`) to persist `volume` (`[0, 1]`, default `1`) and scale `master.gain` by `this.volume * MASTER_GAIN`
+- [x] P04.3 Update `src/components/ControlsOverlay.tsx` (`L8-L22`, `L116-L129`), `src/App.tsx` (`L55-L58`, `L264-L289`), and `src/styles.css` to wire `soundVolume`/`onVolumeChange` and render the `500ms` auto-hiding vertical volume popover (`data-testid="volume-popover"`, `data-testid="volume-slider"`)
+- [x] P04.4 Run `npm run typecheck && npm run test:unit && npm run build && npm run test:e2e && npx openspec validate --changes`, update `verification.md`, and mark `PATCH-04` `RESOLVED` in `patch.md`

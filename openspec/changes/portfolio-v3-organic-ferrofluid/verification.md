@@ -424,3 +424,68 @@ Totals: 2 passed, 0 failed (2 items)
 - The labels remain visible for the selected node while the inspector drawer is open and disappear when it closes.
 - The Kintsugi Fracture hover card now starts directly with the title/summary instead of a terminal placeholder.
 - The hover card appears after the `250ms` dwell.
+
+---
+
+# PATCH-04 Verification Addendum: Vertical Sound Volume Slider Popover
+
+## Status: RESOLVED
+
+- **Date**: 2026-11-13
+- **Patch**: `PATCH-04` (`patch.md`)
+- **Scope**: `src/audio/audioConstants.ts`, `src/audio/ambientSynth.ts`, `src/audio/ambientSynth.test.ts`, `src/components/ControlsOverlay.tsx`, `src/App.tsx`, `src/styles.css`, `e2e/portfolio.spec.ts`.
+
+## Requirement Adherence Audit Matrix (PATCH-04)
+
+| Request | Resolution | Verification |
+| :--- | :--- | :--- |
+| Vertical volume slider on Sound | `ControlsOverlay` wraps `Sound` in a relative hover/focus container and renders a vertical range input in a floating surface popover beneath it. | `e2e/portfolio.spec.ts::volume popover appears only while Sound is enabled and hides after 500ms`; visual inspection at `1440x900` | **PASS** |
+| Popover only while enabled | The popover renders only when `soundEnabled && volumeOpen`; the effect hides immediately when Sound turns off. | Same E2E test (hidden before enabling, shown on enable, hidden immediately on disable) | **PASS** |
+| Auto-hide ~500ms after pointer leave | `scheduleVolumeHide` starts a `500ms` timer; entering Sound/popover or dragging the slider cancels it. | Same E2E test (move away -> hidden after 650ms) | **PASS** |
+| Volume `[0, 1]` persisted and applied | `VOLUME_STORAGE_KEY = portfolio_sound_volume`, `DEFAULT_SOUND_VOLUME = 1`; `setVolume` clamps/persists and ramps master gain to `volume * MASTER_GAIN` when enabled. | `ambientSynth.test.ts::reads, clamps, and persists volume in [0, 1]`; `scales master gain...`; `restores stored volume...`; E2E localStorage poll | **PASS** |
+| 0% volume keeps Sound enabled | `setVolume(0)` leaves `enabled` unchanged; Sound stays `aria-pressed="true"` and master gain ramps to `0`. | `ambientSynth.test.ts::scales master gain and keeps Sound enabled at zero volume`; E2E asserts `aria-pressed="true"` at slider `0` | **PASS** |
+
+## Empirical Execution Logs (PATCH-04)
+
+```text
+$ npm run typecheck
+> tsc --noEmit
+(exit 0, no diagnostics)
+```
+
+```text
+$ npm run test:unit
+ Test Files  16 passed (16)
+      Tests  176 passed (176)
+```
+
+```text
+$ npm run build
+dist/assets/index-BwChWWOr.css    28.91 kB │ gzip:   6.26 kB
+dist/assets/index-BbLoH3Ul.js    329.93 kB │ gzip: 105.13 kB
+✓ built in 4.45s
+```
+
+```text
+$ npm run test:e2e
+  26 skipped
+  94 passed (2.4m)
+```
+
+```text
+$ npx openspec validate --changes
+✓ change/portfolio-v3-organic-ferrofluid
+✓ change/vercel-preview-gating
+Totals: 2 passed, 0 failed (2 items)
+```
+
+```text
+$ npx openspec validate --specs
+Totals: 7 passed, 0 failed (7 items)
+```
+
+## Visual Checks (PATCH-04)
+
+- Sound is underlined/accented while enabled; the popover floats beneath it with a bordered surface, backdrop blur, and a vertical accent-colored range control.
+- 100% places the thumb at the top; 40% lowers it; dragging to 0 leaves the Sound label enabled without disabling audio state.
+- The popover does not appear while Sound is off.

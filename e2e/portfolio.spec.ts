@@ -205,6 +205,58 @@ test.describe('portfolio graph SPA', () => {
     expect(errors).toEqual([]);
   });
 
+  test('volume popover appears only while Sound is enabled and hides after 500ms', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'hover volume popover runs on desktop');
+    await page.goto('/');
+    const toggle = page.getByTestId('audio-toggle');
+    const popover = page.getByTestId('volume-popover');
+    const slider = page.getByTestId('volume-slider');
+
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await toggle.hover();
+    await expect(popover).toHaveCount(0);
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(popover).toBeVisible();
+    await expect(slider).toHaveValue('1');
+
+    const setVolume = async (value: number) => {
+      await slider.evaluate((element, next) => {
+        const input = element as HTMLInputElement;
+        const setter = Object.getOwnPropertyDescriptor(
+          HTMLInputElement.prototype,
+          'value',
+        )?.set;
+        setter?.call(input, String(next));
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      }, value);
+    };
+
+    await setVolume(0.35);
+    await expect(slider).toHaveValue('0.35');
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem('portfolio_sound_volume')))
+      .toBe('0.35');
+
+    await setVolume(0);
+    await expect(slider).toHaveValue('0');
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+
+    await page.mouse.move(12, 800);
+    await page.waitForTimeout(650);
+    await expect(popover).toHaveCount(0);
+
+    await toggle.hover();
+    await expect(popover).toBeVisible();
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await expect(popover).toHaveCount(0);
+  });
+
   test('Ivy Film Fest drawer renders Visit without a Code action', async ({ page }) => {
     await page.goto('/#/p/ivy-film-festival-2026');
     await expect(page.getByTestId('project-drawer')).toBeVisible();

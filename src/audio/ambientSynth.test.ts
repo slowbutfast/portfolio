@@ -7,6 +7,7 @@ import {
   BASE_DRONE_GAIN,
   BASE_FREQ,
   BASE_LOWPASS_FREQ,
+  DEFAULT_SOUND_VOLUME,
   HOVER_SWELL_GAIN,
   MASTER_GAIN,
   NOISE_FLOOR_GAIN,
@@ -14,10 +15,12 @@ import {
   PAN_MIN,
   RAMP_TIME_CONSTANT,
   STORAGE_KEY,
+  VOLUME_STORAGE_KEY,
 } from './audioConstants';
 import {
   AmbientSynth,
   readSoundPreference,
+  readVolumePreference,
   type AudioContextLike,
   type AudioNodeLike,
   type AudioParamLike,
@@ -152,10 +155,11 @@ class FakeDocument implements DocumentLike {
   }
 }
 
-function setup(stored: string | null = null) {
+function setup(stored: string | null = null, storedVolume: string | null = null) {
   const ctx = new FakeContext();
   const storage = new FakeStorage();
   if (stored !== null) storage.setItem(STORAGE_KEY, stored);
+  if (storedVolume !== null) storage.setItem(VOLUME_STORAGE_KEY, storedVolume);
   const doc = new FakeDocument();
   const synth = new AmbientSynth({
     createContext: () => ctx,
@@ -180,6 +184,54 @@ describe('audio constants', () => {
     expect(PAN_MAX).toBe(0.75);
     expect(RAMP_TIME_CONSTANT).toBe(0.05);
     expect(STORAGE_KEY).toBe('portfolio_sound_enabled');
+    expect(VOLUME_STORAGE_KEY).toBe('portfolio_sound_volume');
+    expect(DEFAULT_SOUND_VOLUME).toBe(1);
+  });
+});
+
+describe('sound volume preference', () => {
+  it('reads, clamps, and persists volume in [0, 1]', () => {
+    const storage = new FakeStorage();
+    storage.setItem(VOLUME_STORAGE_KEY, '0.35');
+    expect(readVolumePreference(storage)).toBeCloseTo(0.35, 6);
+    storage.setItem(VOLUME_STORAGE_KEY, 'not-a-number');
+    expect(readVolumePreference(storage)).toBe(DEFAULT_SOUND_VOLUME);
+
+    const { storage: liveStorage, synth } = setup();
+    expect(synth.getVolume()).toBe(DEFAULT_SOUND_VOLUME);
+    synth.setVolume(0.35);
+    expect(synth.getVolume()).toBeCloseTo(0.35, 6);
+    expect(liveStorage.getItem(VOLUME_STORAGE_KEY)).toBe('0.35');
+    synth.setVolume(2);
+    expect(synth.getVolume()).toBe(1);
+    synth.setVolume(-1);
+    expect(synth.getVolume()).toBe(0);
+    expect(liveStorage.getItem(VOLUME_STORAGE_KEY)).toBe('0');
+  });
+
+  it('scales master gain and keeps Sound enabled at zero volume', () => {
+    const { ctx, synth } = setup();
+    synth.setSoundEnabled(true);
+    synth.setVolume(0);
+    expect(synth.isEnabled()).toBe(true);
+    expect(ctx.gains[0].gain.ramps.at(-1)?.target).toBe(0);
+
+    synth.setVolume(0.4);
+    expect(ctx.gains[0].gain.ramps.at(-1)?.target).toBeCloseTo(
+      0.4 * MASTER_GAIN,
+      6,
+    );
+    expect(synth.isEnabled()).toBe(true);
+  });
+
+  it('restores stored volume and applies it when starting audio', () => {
+    const { ctx, synth } = setup('true', '0.25');
+    expect(synth.getVolume()).toBeCloseTo(0.25, 6);
+    synth.setSoundEnabled(true);
+    expect(ctx.gains[0].gain.ramps.at(-1)?.target).toBeCloseTo(
+      0.25 * MASTER_GAIN,
+      6,
+    );
   });
 });
 

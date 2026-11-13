@@ -15,6 +15,7 @@ import {
   BASE_FREQ,
   BASE_LOWPASS_FREQ,
   DEFAULT_SOUND_ENABLED,
+  DEFAULT_SOUND_VOLUME,
   DRAG_VELOCITY_FULL_SCALE,
   HOVER_SWELL_GAIN,
   MASTER_GAIN,
@@ -23,6 +24,7 @@ import {
   PAN_MIN,
   RAMP_TIME_CONSTANT,
   STORAGE_KEY,
+  VOLUME_STORAGE_KEY,
 } from './audioConstants';
 
 export interface AudioParamLike {
@@ -128,6 +130,33 @@ export function writeSoundPreference(
   }
 }
 
+export function readVolumePreference(
+  storage: StorageLike | null | undefined,
+): number {
+  if (!storage) return DEFAULT_SOUND_VOLUME;
+  try {
+    const raw = storage.getItem(VOLUME_STORAGE_KEY);
+    if (raw === null) return DEFAULT_SOUND_VOLUME;
+    const parsed = Number.parseFloat(raw);
+    if (!Number.isFinite(parsed)) return DEFAULT_SOUND_VOLUME;
+    return clamp(parsed, 0, 1);
+  } catch {
+    return DEFAULT_SOUND_VOLUME;
+  }
+}
+
+export function writeVolumePreference(
+  storage: StorageLike | null | undefined,
+  volume: number,
+): void {
+  if (!storage) return;
+  try {
+    storage.setItem(VOLUME_STORAGE_KEY, String(clamp(volume, 0, 1)));
+  } catch {
+    // Storage denial is non-fatal; the in-memory volume still applies.
+  }
+}
+
 function resolveStorage(deps: AmbientSynthDeps): StorageLike | null {
   if (deps.storage !== undefined) return deps.storage;
   try {
@@ -184,6 +213,7 @@ export class AmbientSynth {
   private ctx: AudioContextLike | null = null;
   private nodes: SynthNodes | null = null;
   private enabled = false;
+  private volume = DEFAULT_SOUND_VOLUME;
   private sourcesStarted = false;
   private visibilityBound = false;
   private visibilityHandler: (() => void) | null = null;
@@ -193,6 +223,7 @@ export class AmbientSynth {
   constructor(deps: AmbientSynthDeps = {}) {
     this.deps = deps;
     this.enabled = readSoundPreference(this.storage);
+    this.volume = readVolumePreference(this.storage);
   }
 
   private get storage(): StorageLike | null {
@@ -205,6 +236,20 @@ export class AmbientSynth {
 
   isEnabled(): boolean {
     return this.enabled;
+  }
+
+  getVolume(): number {
+    return this.volume;
+  }
+
+  setVolume(volume: number): void {
+    this.volume = clamp(Number.isFinite(volume) ? volume : DEFAULT_SOUND_VOLUME, 0, 1);
+    writeVolumePreference(this.storage, this.volume);
+    if (!this.enabled) return;
+    const ctx = this.ensureContext();
+    if (ctx && this.nodes) {
+      ramp(this.nodes.master.gain, this.volume * MASTER_GAIN, ctx);
+    }
   }
 
   isRunning(): boolean {
@@ -343,7 +388,7 @@ export class AmbientSynth {
       // the graph but never started the sources or opened the master gain.
       if (this.enabled && this.nodes) {
         this.startSources();
-        ramp(this.nodes.master.gain, MASTER_GAIN, ctx);
+        ramp(this.nodes.master.gain, this.volume * MASTER_GAIN, ctx);
       }
       this.disarmRecovery();
     } catch {
@@ -357,7 +402,7 @@ export class AmbientSynth {
     const ctx = this.ensureContext();
     if (!ctx || !this.nodes) return;
     this.startSources();
-    ramp(this.nodes.master.gain, MASTER_GAIN, ctx);
+    ramp(this.nodes.master.gain, this.volume * MASTER_GAIN, ctx);
     if (ctx.state === 'running') {
       // Already unlocked by a prior gesture.
     } else {

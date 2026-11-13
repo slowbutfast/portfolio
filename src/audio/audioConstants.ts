@@ -19,5 +19,7 @@ export const MASTER_GAIN = 1;
 /** Pointer speed (px/s) at which the drag pitch modulation reaches its 5% cap. */
 export const DRAG_VELOCITY_FULL_SCALE = 1200;
 export const STORAGE_KEY = 'portfolio_sound_enabled';
+export const VOLUME_STORAGE_KEY = 'portfolio_sound_volume';
 /** Audio only begins after an explicit gesture; stored preferences arm it. */
 export const DEFAULT_SOUND_ENABLED = false;
+export const DEFAULT_SOUND_VOLUME = 1;

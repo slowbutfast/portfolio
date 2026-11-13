@@ -70,3 +70,18 @@
   - `HOVER_DWELL_MS` is now `250ms` (`0.25s`), with graph-simulation specs, `design.md`, `tests.md`, and `DESIGN.md` updated.
   - Added `data-focal-tag-pills` dataset and E2E coverage for inspector persistence; dwell E2E now asserts no card at ~180ms and visibility after `250ms`.
   - Verification: typecheck clean, 173 unit tests, 93 e2e passed / 25 expected skips, build clean, OpenSpec changes/specs valid.
+
+### [PATCH-04] Vertical Sound Volume Slider Popover
+- **Date**: 2026-11-13 18:08:13 UTC
+- **Feedback Source**: Feature Request / UI Enhancement on PR #12 (`feat/portfolio-v3-organic-ferrofluid`)
+- **Reported Issue**: Add a vertical volume slider popover to the `Sound` toggle that appears when sound is enabled and the user hovers (or toggles on / focuses) `Sound`, and disappears ~`500ms` after the pointer leaves. Dragging to `0%` keeps `Sound` enabled (`aria-pressed="true"`) at `0` master gain.
+- **Root Cause**: `AmbientSynth` hardcodes `MASTER_GAIN = 1` on `start()` / `resumeFromGesture()` and has no `volume` state or UI slider control.
+- **Target Files**: `src/audio/audioConstants.ts`, `src/audio/ambientSynth.ts`, `src/components/ControlsOverlay.tsx`, `src/App.tsx`, `src/styles.css`, `src/audio/ambientSynth.test.ts`, `e2e/portfolio.spec.ts`
+- **Expected Resolution**: `AmbientSynth` persists `volume` (`[0, 1]`) under `portfolio_sound_volume` and scales `master.gain`; `ControlsOverlay` renders a vertical volume popover (`data-testid="volume-popover"`, `data-testid="volume-slider"`) only when `soundEnabled` is `true`, revealing on hover/focus and auto-hiding `500ms` after pointer leave; dragging to `0` keeps `Sound` enabled at `0` gain.
+- **Status**: RESOLVED (2026-11-13 18:35:00 UTC)
+- **Resolution**:
+  - Added `VOLUME_STORAGE_KEY = 'portfolio_sound_volume'` and `DEFAULT_SOUND_VOLUME = 1`; `readVolumePreference` / `writeVolumePreference` clamp and persist `[0, 1]`.
+  - `AmbientSynth` now stores `volume`, exposes `getVolume()` / `setVolume()`, and ramps `master.gain` to `volume * MASTER_GAIN` in `start()`, `resumeFromGesture()`, and live volume changes. Volume `0` leaves `isEnabled()` true.
+  - `ControlsOverlay` wraps `Sound` in a hover/focus wrapper, shows the vertical popover when enabled, keeps it open while pointer/focus remains inside or the slider is dragged, and hides it `500ms` after pointer leave or immediately when Sound turns off.
+  - `App` tracks `soundVolume`, wires `synth.setVolume`, and forwards `soundVolume` / `onVolumeChange`; `styles.css` adds the vertical range slider with `--color-accent`.
+  - Verification: typecheck clean, 176 unit tests, 94 e2e passed / 26 expected skips, build clean, OpenSpec changes/specs valid.

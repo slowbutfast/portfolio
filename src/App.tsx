@@ -59,6 +59,7 @@ export default function App() {
   }));
   const synth = useMemo(() => getAmbientSynth(), []);
   const [soundEnabled, setSoundEnabled] = useState(() => synth.isEnabled());
+  const [soundVolume, setSoundVolume] = useState(() => synth.getVolume());
   const soundEnabledRef = useRef(soundEnabled);
   soundEnabledRef.current = soundEnabled;
   const triggerRef = useRef<HTMLElement | null>(null);
@@ -281,6 +282,14 @@ export default function App() {
     setSoundEnabled(next);
   }, [synth]);
 
+  const handleVolumeChange = useCallback(
+    (volume: number) => {
+      synth.setVolume(volume);
+      setSoundVolume(volume);
+    },
+    [synth],
+  );
+
   return (
     <div className="relative h-full w-full overflow-hidden bg-[var(--color-bg)] text-[var(--color-text)]">
       <h1 className="sr-only">Portfolio</h1>
@@ -297,7 +306,9 @@ export default function App() {
         theme={theme}
         onToggleTheme={toggleTheme}
         soundEnabled={soundEnabled}
+        soundVolume={soundVolume}
         onToggleSound={toggleSound}
+        onVolumeChange={handleVolumeChange}
         onOpenAbout={openAbout}
       />
 
