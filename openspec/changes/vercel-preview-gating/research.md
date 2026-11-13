@@ -106,6 +106,10 @@ All rows verified against `master` at `de357c0` in the worktree on 2026-11-12 un
 | Workflow PR opened | PR #3 `ci/deployment-workflows` → `master`; first `ci` run pending at the time of writing | `gh pr create`, `gh pr checks 3` | 2026-11-12 | decays |
 | Vercel creates no GitHub Deployments for this repo | `gh api repos/slowbutfast/portfolio/deployments` returned nothing after 4 Vercel deployments, and no `deployment-gate` run started after a preview and a production deployment completed | `gh api`, `gh run list` | 2026-11-12 | decays |
 | Workflow PRs | PR #3 (workflows) merged; `ci` passed in 1m23s on its first run; PR #4 carries the implementation | `gh pr checks`, `gh pr merge` | 2026-11-12 | decays |
+| `x-vercel-set-bypass-cookie` redirects to set a cookie | A cookie-less `fetch` with that header looped to `redirect count exceeded` against a real deployment, with an accepted secret; Vercel's docs say it "sets the authorization bypass as a cookie using a redirect with a Set-Cookie header" | Gate run 43150714016 plus Vercel docs via MCP | 2026-11-12 | stable |
+| Vercel injects a toolbar script into previews | `https://vercel.live/_next-live/feedback/feedback.js` is blocked by `script-src 'self'` and logged as a console error on preview deployments only | Gate run 43151419916 logs | 2026-11-12 | decays |
+| Gate proven for both kinds with synthetic dispatches | production run 43151244941 and preview run 43222189038 both succeeded and posted statuses | `gh run view`, commit statuses | 2026-11-12 | decays |
+| Vercel emitted no `repository_dispatch` by itself | Several deployments completed after `preview.yml` landed; `gh run list --workflow deployment-gate` shows only synthetic runs | `gh run list` | 2026-11-12 | decays |
 
 ## Unverified assumptions
 

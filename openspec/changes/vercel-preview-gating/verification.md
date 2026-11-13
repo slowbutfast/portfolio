@@ -1,10 +1,10 @@
-# Verification — vercel-preview-gating (partial: local verification complete, deployment verification pending)
+# Verification — vercel-preview-gating (gate proven with synthetic dispatches; Vercel-emitted trigger still open)
 
 Change: `vercel-preview-gating`
 Branch: `worktree-vercel-preview-gating` (worktree off `master` at `de357c0`)
 Verified: 2026-11-12
 
-> **Status: PARTIAL.** Everything that can be verified without a Vercel deployment is verified below. Tasks 3.4, 3.5, 4.4, 4.5, 4.6, 6.2, 6.3, 6.4 need Vercel team access (MCP approval pending), repository secrets, or branch-protection changes, and are listed under *Open*.
+> **Status: gate verified end to end, trigger unresolved.** `deployment-gate` passes for both deployment kinds when fed a `repository_dispatch` event, but Vercel itself has not emitted one for this project (see *Still Open*).
 
 ## Outcome Summary
 
@@ -78,13 +78,28 @@ Verified: 2026-11-12
 | **Rollback drill passed**: rollback to `dpl_5yUJ…` moved all three production aliases and the header spec passed (5/5); promoting `dpl_3XnSJi83…` restored them and the header spec passed again | `request_rollback`, `request_promote`, `get_deployment`, Playwright |
 | Project Node setting is `26.x` while `package.json` `engines.node` is `22.x` and CI uses 22 | `get_project`; `package.json` |
 
+## Gate Verification (2026-11-12)
+
+Each run below was started with a synthetic `repository_dispatch` (`client_payload.synthetic: true`) carrying real deployment data. They prove the workflow, the secret, and Playwright against protected deployment URLs. They do not prove that Vercel emits the event.
+
+| Run | Kind | Result | What it showed |
+| :--- | :--- | :--- | :--- |
+| 43149934369 | production | failure | Reached Playwright; the pre-flight reported only `fetch failed` |
+| 43150714016 | production | failure | After the diagnostics fix: `redirect count exceeded`, caused by sending `x-vercel-set-bypass-cookie` from a cookie-less `fetch` (documented behaviour: it redirects to set a cookie). Proved the secret is accepted |
+| 43151244941 | production | **success** | After dropping that header from the pre-flight: header spec 5/5, load test, `production-smoke` status posted |
+| 43151419916 | preview | failure | Pre-flight passed; 48 passed, 12 skipped, 7 failed: every test asserting zero console errors, all on `https://vercel.live/_next-live/feedback/feedback.js` blocked by `script-src 'self'` (Vercel's injected Preview Comments toolbar) |
+| 43222189038 | preview | **success** | After ignoring only that script in `trackErrors()`: 62 passed, 12 skipped, `preview-e2e` status posted |
+
+- **Secret handling:** run logs show only the masked value; the failed preview run's uploaded artifacts (28 files, all `error-context.md`, no traces) contain no bypass header names and no 32-character tokens.
+- **Side effect:** the strict CSP blocks Vercel's Preview Comments toolbar on previews. Allowing it would need `https://vercel.live` in `script-src` for previews, a policy decision not taken here.
+
 ## Still Open
 
-- **`preview.yml` must be replaced on `master`.** The merged version listens for `deployment_status`, which never fires. The corrected `repository_dispatch` version is staged in `openspec/changes/vercel-preview-gating/workflows/preview.yml`; `.github/` is write-denied in this session, so it needs to be copied to `.github/workflows/preview.yml` and merged to `master`.
-- **Bypass secret in GitHub.** Created in Vercel (`isEnvVar: true`); `gh secret set` was denied. Until `VERCEL_AUTOMATION_BYPASS_SECRET` exists as a repository secret, every gate run fails fast by design.
-- **Real gate proof** (tasks 3.4, 3.5, 6.2, 6.3): a dispatch-triggered run, the recorded payload shape, a commit status, and the artifact secret scan.
-- **`preview-e2e` as a required check** (after it has reported once).
-- **Node version**: decide whether the project's `26.x` setting should match `engines` (`22.x`).
+- **Vercel does not emit `repository_dispatch` for this project.** After the corrected `preview.yml` landed on `master`, several production and preview deployments completed and no `deployment-gate` run started by itself; the only runs are the synthetic ones above. `update_project` exposes no setting for it, so it is either a dashboard-only option or unavailable on this plan. Options: find the dashboard setting; trigger from the `Vercel` commit status instead (`on: status`, deriving the branch alias URL); or call the Vercel API from the workflow with a token (broader secret).
+- **`preview-e2e` is not a required check** and should not be until a real trigger exists; requiring it now would block every merge.
+- **Node version**: the project's Node setting reads `26.x` while `package.json` `engines.node` is `22.x` and CI uses 22. `update_project` only accepts `24.x` and below.
+- **`VERCEL_GIT_COMMIT_SHA` exposure** to builds remains unverified (`get_project` does not show `autoExposeSystemEnvs`).
+- **`actionlint`** was not available; workflow validation was YAML parse, review, and the real runs above.
 
 ## Open (superseded by *Still Open* above where noted)
 
