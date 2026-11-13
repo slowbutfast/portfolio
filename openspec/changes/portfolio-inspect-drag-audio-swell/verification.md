@@ -2,7 +2,7 @@
 
 ## Executive Summary & Environment
 
-- **Status**: All automated specs verified passing. `typecheck`, production build, unit suite, and the full desktop + mobile Playwright suite are green; `openspec validate --strict` reports zero issues.
+- **Status**: All automated specs verified passing. `typecheck`, production build, unit suite, and the full desktop + mobile Playwright suite are green; `openspec validate --strict` reports zero issues. The user also confirmed on-device sound quality manually (`"the sound looks good on my end"`, 2026-11-13).
 - **Date**: 2026-11-13
 - **Branch**: `feat/portfolio-inspect-drag-audio-swell` (branched from `ca2a15d`)
 - **Environment**:
@@ -29,9 +29,9 @@ Delta capability: `ambient-audio` → `### Requirement: Node hover harmonic reso
 | :--- | :--- | :--- | :--- |
 | `onNodeHover` has four call sites in `GraphCanvas.tsx` (`L684`, `L1062`, `L1172`, `L1176`) | `grep -n "onNodeHover" src/components/GraphCanvas.tsx` after refactor shows a single routed call inside `syncSynthSwell`; every original path now calls `syncSynthSwell()` | All four entry points plus pointer lifecycle and effects covered | stable |
 | `selectedIdRef` already tracks `initialSelectedId` | `src/components/GraphCanvas.tsx:323-324` assigns `selectedIdRef.current = initialSelectedId ?? null` every render; new effect at `:1093-1096` reconciles on change | Verified by inspection and E2E deep-link inspect (`data-audio-swell="true"`) | stable |
-| `HOVER_SWELL_GAIN = 2.0` fits without clipping | Replaced by explicit `1.0`; unit assertion at `src/audio/ambientSynth.test.ts:182`; halving linear gain removes `+6.02 dB`, moving the researched `+1.5 dBFS` peak to approximately `-4.5 dBFS` | Non-clipping (`< 0 dBFS`) by construction | stable |
+| `HOVER_SWELL_GAIN = 2.0` fits without clipping | Replaced by explicit `1.0`; unit assertion at `src/audio/ambientSynth.test.ts:184`; halving linear gain removes `+6.02 dB`, moving the researched `+1.5 dBFS` peak to approximately `-4.5 dBFS` | Non-clipping (`< 0 dBFS`) by construction | stable |
 | Sustained inspection can buzz at full peak | New plateau test advances fake timers to `1199ms` (stays `1.0`) then `1200ms` (settles to `0.35`); repeated `onNodeHover(true)` leaves the ramp count unchanged | Plateau + idempotency proven | stable |
-| Phone-speaker audibility and 30-second comfort on the user's iPhone | Not automatable in this environment; remains the manual check documented in `tests.md` | **Manual verification pending** (no empirical claim) | decays |
+| Phone-speaker audibility and sustained comfort on the user's iPhone | User listened on-device after implementation and confirmed the sound is good; matches the manual check documented in `tests.md` | **User-verified** on 2026-11-13 (`"the sound looks good on my end"`) | stable |
 
 ## Nomenclature & Code Symbol Audit
 
@@ -69,8 +69,7 @@ Delta capability: `ambient-audio` → `### Requirement: Node hover harmonic reso
 
 - **Deferred Item**: Automated assertion of the Grid-view swell on the canvas.
   - **Reason**: Grid view intentionally unmounts `<canvas>`, so `data-audio-swell` has nowhere to live. The App-level sync is covered by typecheck and code audit; adding a cross-view assertion would require a new persistent observability element outside this change's scope.
-- **Deferred Item**: Physical iPhone speaker / 30-second comfort check.
-  - **Reason**: Requires the user's hardware and hearing; documented as manual verification in `tests.md` rather than claimed as automated proof.
+- ~~**Deferred Item**: Physical iPhone speaker / 30-second comfort check.~~ **Resolved** on 2026-11-13: the user confirmed on-device sound quality is good, so the manual check is no longer outstanding.
 
 ## Empirical Execution Logs & Evidence
 
@@ -172,6 +171,15 @@ Test Files  2 failed (2)
      Tests  3 failed | 15 passed (18)
 ```
 
+### Manual on-device verification
+
+- **Date**: 2026-11-13
+- **Tester**: User (project owner) on their own device
+- **Method**: Played the app with Sound enabled and exercised the inspect/drag paths implemented by this change.
+- **Verbatim report**:
+  > the sound looks good on my end
+- **Result**: **PASS** — the user confirmed the audible result is good; no clipping or harsh sustained buzz was reported.
+
 ### Metrics & Data Invariants
 
 | Metric / Count | Before | After | Delta / Observation |
@@ -181,6 +189,7 @@ Test Files  2 failed (2)
 | Hover-gain test lookup | value matched `HOVER_SWELL_GAIN` | zero-valued gain after start | Avoids collision with master gain at `1.0` |
 | New unit tests | `0` | `12` | +9 `deriveSwellActive` truth-table cases, +3 envelope/idempotency/dispose cases |
 | New E2E scenarios | `0` | `2` | Desktop + mobile `data-audio-swell` inspect/drag coverage |
+| On-device sound check | Manual pending | User-confirmed good | Manual **PASS** on 2026-11-13 |
 | Persistent data / storage schema | — | — | No storage or catalog changes; no data-loss surface |
 
 ## Quick Re-Verification (60-Second Audit)
