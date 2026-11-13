@@ -18,7 +18,7 @@ The system SHALL organize top-right header controls on desktop (`>= 640px` with 
 ### Requirement: Sound volume popover and persisted gain
 On hover-capable desktop (`>= 640px` and `hover: hover`), the system SHALL render a vertical volume slider popover anchored beneath the `Sound` toggle when sound is enabled and the toggle is hovered, focused, or switched on, hiding `500ms` after the pointer leaves the toggle/popover or immediately when sound is disabled. On `< 640px` OR `(hover: none)` devices (including tablets and landscape phones), the 3-dot dropdown panel (`#portfolio-controls`) SHALL include a `44px`-tall Sound toggle (`data-testid="mobile-audio-toggle"`) and a horizontal touch-friendly (`touch-action: none`) volume slider (`data-testid="mobile-volume-slider"`). Both sliders SHALL persist a clamped `[0, 1]` value under `portfolio_sound_volume` and scale master gain by `volume * MASTER_GAIN`, with `0` leaving Sound enabled (`aria-pressed="true"`) at zero gain.
 
-#### Scenario: User adjusts sound volume on hover-capable desktop
+#### Scenario: User adjusts sound volume
 - **WHEN** sound is enabled on `>= 640px` with `hover: hover` and the user hovers/focuses `Sound` or turns it on
 - **THEN** the vertical volume popover appears, the slider reflects the persisted volume, and changing it updates audio gain immediately without disabling Sound at `0`.
 
@@ -26,6 +26,6 @@ On hover-capable desktop (`>= 640px` and `hover: hover`), the system SHALL rende
 - **WHEN** the user opens the 3-dot menu on `< 640px` or `(hover: none)`
 - **THEN** `mobile-audio-toggle` and the horizontal `mobile-volume-slider` are immediately interactive with `>= 44px` touch target height and persist volume under `portfolio_sound_volume`.
 
-#### Scenario: User leaves the desktop volume control
+#### Scenario: User leaves the volume control
 - **WHEN** the pointer leaves both the desktop `Sound` toggle and its popover
 - **THEN** the popover auto-hides after `500ms`; turning Sound off hides it immediately.
