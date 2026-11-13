@@ -28,11 +28,15 @@ On `(pointer: coarse)` devices, the graph `<canvas>` SHALL cap its backing-store
 ## MODIFIED Requirements
 
 ### Requirement: Sticky inspected focal context and draggable inspector
-The system SHALL retain the inspected project's focal connections and contiguous shared-tag labels after `ProjectDrawer` closes. The sticky focus SHALL clear when the `250ms` hover dwell activates on any node (including the inspected node), when a tap/click both begins and ends on empty canvas (`downNodeId === null`, `moved < 6`, and `!hitNode(pointerUp)`), on `Reset`, or when switching to Grid view. While the mobile sheet is open, `drawer-backdrop` intercepts taps above the sheet to close it, so empty-canvas focal clearing applies after the sheet is dismissed. The desktop `ProjectDrawer` SHALL treat its outer `8px` border band on all four edges as a draggable surface, showing the CSS `move` cursor while the pointer is over that band and supporting pointer-captured dragging clamped to the viewport, with a user-drag lock preventing anchor updates from snapping it back. The mobile `< 768px` bottom-sheet drawer SHALL remain non-draggable on its border and SHALL NOT show the `move` cursor.
+The system SHALL retain the inspected project's focal connections and contiguous shared-tag labels after `ProjectDrawer` closes. The sticky focus SHALL clear when the `250ms` hover dwell activates on any node (including the inspected node), when a tap/click both begins and ends on empty canvas (`downNodeId === null`, `moved < 6`, and `!hitNode(pointerUp)`), when a clean tap/click lands on the node that currently owns the sticky focus while `ProjectDrawer` is closed (`moved < 6`), on `Reset`, or when switching to Grid view. Tapping a different node while another node owns the sticky focus SHALL open the inspector for that new node immediately. While the mobile sheet is open, `drawer-backdrop` intercepts taps above the sheet to close it, so empty-canvas focal clearing applies after the sheet is dismissed. The desktop `ProjectDrawer` SHALL treat its outer `8px` border band on all four edges as a draggable surface, showing the CSS `move` cursor while the pointer is over that band and supporting pointer-captured dragging clamped to the viewport, with a user-drag lock preventing anchor updates from snapping it back. The mobile `< 768px` bottom-sheet drawer SHALL remain non-draggable on its border and SHALL NOT show the `move` cursor.
 
 #### Scenario: User closes the inspector
 - **WHEN** the user closes `ProjectDrawer`
-- **THEN** the inspected node's focal edges and tag labels remain highlighted until a hover dwell, empty-canvas tap, Reset, or Grid view clears the sticky focus.
+- **THEN** the inspected node's focal edges and tag labels remain highlighted until a hover dwell, empty-canvas tap, a tap on the sticky-focal node itself, Reset, or Grid view clears the sticky focus.
+
+#### Scenario: User taps the sticky-focal node while the inspector is closed
+- **WHEN** sticky focus is active, `ProjectDrawer` is closed, and the user cleanly taps/clicks the same node (`moved < 6`)
+- **THEN** the drawer stays closed and `stickyFocalId` clears so focal highlights and edge-tag labels disappear; tapping that node again opens the drawer, while tapping a different node opens that project immediately.
 
 #### Scenario: Touch user taps empty canvas to clear sticky focus
 - **WHEN** sticky focus is active after the sheet is closed and the user taps empty canvas background (`downNodeId === null`, `moved < 6`, no node hit on `pointerup`)

@@ -19,6 +19,7 @@
 | `graph-simulation` | `### Requirement: Sticky inspected focal context and draggable inspector` (modified) | `e2e/portfolio.spec.ts` → `pointercancel...clears sticky focal`, `Reset clears the sticky inspected focus`, `desktop inspector drags from its border...` | **PASS** |
 | `graph-simulation` | `#### Scenario: User closes the inspector` | `focal edge tag pills persist while the inspector is open` (desktop) and `pointercancel...` (mobile) | **PASS** |
 | `graph-simulation` | `#### Scenario: Touch user taps empty canvas to clear sticky focus` | `pointercancel ends a drag cleanly and empty-canvas tap clears sticky focal`; `data-focal-tag-pills` drops to `0` after an empty-corner tap | **PASS** |
+| `graph-simulation` | `#### Scenario: User taps the sticky-focal node while the inspector is closed` | `src/utils/stickyFocal.test.ts` (tap policy) + `tapping the sticky-focal node clears highlights before reopening the drawer` (desktop + mobile full cycle) | **PASS** |
 | `graph-simulation` | `#### Scenario: User drags the desktop inspector` | `desktop inspector drags from its border and stays inside the viewport`; cursor `move` and clamped geometry verified | **PASS** |
 | `portfolio-controls` | `### Requirement: Top-right header navigation sequence and theme toggle` (modified) | `header controls follow the canonical top-right sequence`; `loads on desktop and mobile...`; `mobile header is a single row at 393...` | **PASS** |
 | `portfolio-controls` | `#### Scenario: Desktop visitor views top-right header options` | Desktop project: visible order `About`, `GitHub ↗`, `Grid`, `Sound`, `Dark`, `...`; `Sound` exposes `aria-pressed` | **PASS** |
@@ -52,6 +53,7 @@
 | `isSheet` | `computeIsSheet()` + `isSheet` state | `src/components/ProjectDrawer.tsx` | Yes |
 | Sticky focal | `stickyFocalId` / `onClearFocal` | `src/App.tsx`, `src/components/GraphCanvas.tsx` | Yes |
 | Empty-canvas tap guard | `downNodeIdRef`, `moved < 6`, `hitNode(...)` | `src/components/GraphCanvas.tsx` | Yes |
+| Sticky-node tap policy | `shouldClearStickyFocalOnTap(...)` | `src/utils/stickyFocal.ts` | Yes |
 | Canceled drag | `dragEnd({ cancel: true })` | `src/physics/graphSimulation.ts` | Yes |
 | Sheet detents | `sheetDetent: 'peek' \| 'half' \| 'full'`, `SHEET_DETENT_VH` | `src/components/ProjectDrawer.tsx` | Yes |
 | Live sheet drag height | `liveSheetHeightPx`, `sheetDragRef` | `src/components/ProjectDrawer.tsx` | Yes |
@@ -69,6 +71,7 @@
 | Hybrid `< sm` / `(hover: none)` in-menu Sound, scrollable panel | `src/components/ControlsOverlay.tsx`, `src/styles.css` | Mobile `mobile 3-dot menu...` E2E; desktop popover E2E |
 | Mobile 3-detent bottom sheet, slim sticky header, safe-area padding | `src/components/ProjectDrawer.tsx` | Mobile drawer/detent/matrix E2E |
 | Empty-canvas sticky-focal clear | `src/App.tsx`, `src/components/GraphCanvas.tsx` | Mobile `pointercancel...clears sticky focal` E2E |
+| Sticky-node tap dismissal | `src/utils/stickyFocal.ts`, `src/components/GraphCanvas.tsx` | `vitest run src/utils/stickyFocal.test.ts`; desktop + mobile sticky-focal cycle E2E |
 
 ## Invalidated Hypotheses & Mid-Build Adjustments
 
@@ -126,14 +129,14 @@ $ npm run build
 
 $ npm run test:unit
 Test Files  17 passed (17)
-     Tests  183 passed (183)
+     Tests  187 passed (187)
 ```
 
 ### E2E (desktop + mobile)
 
 ```text
 $ npx playwright test
-102 passed (2.9m)
+104 passed (3.3m)
 36 skipped
 ```
 
@@ -145,6 +148,7 @@ Selected new mobile regressions (all passed):
 ✓ coarse pointers cap DPR at 2 and idle ambient at 15fps
 ✓ mobile 3-dot menu hosts Sound, volume, and a reachable Reset
 ✓ pointercancel ends a drag cleanly and empty-canvas tap clears sticky focal
+✓ tapping the sticky-focal node clears highlights before reopening the drawer (desktop + mobile)
 ✓ mobile sheet pans the selected node into the measured strip and snaps detents
 ✓ portrait, landscape, and tablet matrix stays reachable without overflow
 ```
@@ -189,7 +193,7 @@ Expected output:
 ```text
 tsc --noEmit: clean
 Test Files  17 passed (17)
-Tests       183 passed
+Tests       187 passed
 ~7 mobile tests passed
 "valid": true, "issues": []
 ```

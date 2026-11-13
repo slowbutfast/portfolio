@@ -15,6 +15,7 @@ import {
   type GraphSimulation,
 } from '../physics/graphSimulation';
 import type { PopoverObstacles } from '../utils/popoverPlacement';
+import { shouldClearStickyFocalOnTap } from '../utils/stickyFocal';
 import type { AmbientSynth } from '../audio/ambientSynth';
 
 interface GraphCanvasProps {
@@ -1240,6 +1241,24 @@ export function GraphCanvas({
     return null;
   };
 
+  /**
+   * A clean tap either opens the inspector or, when it lands on the node that
+   * already owns the sticky focal highlight, dismisses that highlight instead.
+   */
+  const activateNode = (node: GraphNode) => {
+    if (
+      shouldClearStickyFocalOnTap(
+        node.id,
+        selectedIdRef.current,
+        stickyFocalRef.current,
+      )
+    ) {
+      onClearFocalRef.current?.();
+      return;
+    }
+    onSelectRef.current(node.id, nodeScreenPoint(node), buildObstacleSnapshot());
+  };
+
   const emitAudioPointer = (clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
     const synth = synthRef.current;
@@ -1316,18 +1335,10 @@ export function GraphCanvas({
     if (sim.state === 'drag') {
       sim.dragEnd();
       if (!reduceMotionRef.current && moved < 6 && releasedNode) {
-        onSelectRef.current(
-          releasedNode.id,
-          nodeScreenPoint(releasedNode),
-          buildObstacleSnapshot(),
-        );
+        activateNode(releasedNode);
       }
     } else if (reduceMotionRef.current && moved < 6 && releasedNode) {
-      onSelectRef.current(
-        releasedNode.id,
-        nodeScreenPoint(releasedNode),
-        buildObstacleSnapshot(),
-      );
+      activateNode(releasedNode);
     }
     // A tap that starts and ends on empty canvas clears the sticky highlight.
     // Requiring `downNodeId === null` prevents a finger slipping off a node's

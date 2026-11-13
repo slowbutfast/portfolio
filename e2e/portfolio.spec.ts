@@ -693,6 +693,58 @@ test.describe('portfolio graph SPA', () => {
     expect(errors).toEqual([]);
   });
 
+  test('tapping the sticky-focal node clears highlights before reopening the drawer', async ({
+    page,
+  }, testInfo) => {
+    await page.goto('/');
+    await page.waitForTimeout(1500);
+    const canvas = page.getByTestId('graph-canvas');
+    const drawer = page.getByTestId('project-drawer');
+    const focalPills = async () =>
+      Number((await canvas.getAttribute('data-focal-tag-pills')) ?? 0);
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error('graph canvas has no bounding box');
+    const clickCenter = async () => {
+      const centerX = box.x + box.width / 2;
+      const centerY = box.y + box.height / 2;
+      if (isMobile(testInfo)) {
+        await page.touchscreen.tap(centerX, centerY);
+      } else {
+        await page.mouse.click(centerX, centerY);
+      }
+    };
+    const moveAway = async () => {
+      if (!isMobile(testInfo)) {
+        await page.mouse.move(box.x + 8, box.y + box.height - 8);
+      }
+    };
+
+    // click -> inspect
+    await focusNode(page);
+    await clickCenter();
+    await expect(drawer).toBeVisible();
+
+    // close -> sticky highlights remain
+    await page.getByTestId('drawer-close').click();
+    await blurActiveElement(page);
+    await page.waitForTimeout(900);
+    await expect.poll(focalPills).toBeGreaterThan(0);
+
+    // same node again -> highlights clear, drawer stays closed
+    await focusNode(page);
+    await clickCenter();
+    await expect(drawer).toHaveCount(0);
+    await moveAway();
+    await blurActiveElement(page);
+    await page.waitForTimeout(600);
+    await expect.poll(focalPills).toBe(0);
+
+    // same node again -> drawer opens normally
+    await focusNode(page);
+    await clickCenter();
+    await expect(drawer).toBeVisible();
+  });
+
   test('mobile sheet pans the selected node into the measured strip and snaps detents', async ({
     page,
   }, testInfo) => {

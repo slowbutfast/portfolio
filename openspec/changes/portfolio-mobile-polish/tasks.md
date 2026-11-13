@@ -11,6 +11,7 @@
 - [x] 2.2 Add `cancel?: boolean` option to `dragEnd` in `src/physics/graphSimulation.ts` (zeroing `vx/vy` without fling or `home` commit), and bind `onPointerCancel` on `<canvas>` in `src/components/GraphCanvas.tsx` (releasing pointer capture only if held, calling `sim.dragEnd({ cancel: true })`, zeroing drag audio velocity, and clearing `downPosRef`, `downNodeIdRef`, `lastDragPointRef`)
 - [x] 2.3 Update the camera-target `useEffect` (and `resize` handler) in `src/components/GraphCanvas.tsx` to pan using measured `headerBottom`, `sheetTop`, and `scale` (`goal.y = targetY - n.y * scale`) when `initialSelectedId` is active (with `< 120px` minimum-strip fallback to Peek detent, returning to `(0, 0)` on close even while `stickyFocalId` persists)
 - [x] 2.4 Cap canvas DPR at `2` (`getEffectiveDpr()`) and schedule `idleAmbientOnly` redraws on `(pointer: coarse)` via a `15 fps` (`66.7 ms`) `setTimeout` instead of spinning `requestAnimationFrame` at display refresh rate in `src/components/GraphCanvas.tsx`
+- [x] 2.5 Dismiss `stickyFocalId` on a clean tap/click of the already-focused node while the inspector is closed, reopen the drawer on the next tap, and open a different node immediately; cover the tap policy with a unit test and the full click → inspect → close → clear → reopen cycle with E2E tests on desktop and mobile
 
 ## 3. Single-Row Mobile Header & In-Menu Sound
 
