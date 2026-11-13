@@ -908,26 +908,26 @@ test.describe('portfolio graph SPA', () => {
     });
   }
 
-  test('desktop inspector drags by its handle and stays inside the viewport', async ({
+  test('desktop inspector drags from its border and stays inside the viewport', async ({
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'drawer dragging runs on desktop');
     await page.goto('/#/p/open-dungeon');
     const drawer = page.getByTestId('project-drawer');
     await expect(drawer).toBeVisible();
-    const handle = page.getByTestId('drawer-drag-handle');
-    await expect(handle).toBeVisible();
+    await page.waitForTimeout(600);
     const before = await drawer.boundingBox();
-    const handleBox = await handle.boundingBox();
-    if (!before || !handleBox) throw new Error('drawer drag geometry is unavailable');
+    if (!before) throw new Error('drawer drag geometry is unavailable');
 
-    await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
+    // The left border is the drag surface; hovering it shows the move cursor.
+    const startX = before.x + 3;
+    const startY = before.y + before.height / 2;
+    await page.mouse.move(startX, startY);
+    await expect
+      .poll(() => drawer.evaluate((element) => getComputedStyle(element).cursor))
+      .toBe('move');
     await page.mouse.down();
-    await page.mouse.move(
-      handleBox.x + handleBox.width / 2 + 140,
-      handleBox.y + handleBox.height / 2 + 90,
-      { steps: 8 },
-    );
+    await page.mouse.move(startX + 140, startY + 60, { steps: 8 });
     await page.mouse.up();
     await page.waitForTimeout(300);
 

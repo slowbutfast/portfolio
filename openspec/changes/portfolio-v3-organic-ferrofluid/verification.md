@@ -652,3 +652,54 @@ Totals: 2 passed, 0 failed (2 items)
 $ npx openspec validate --specs
 Totals: 7 passed, 0 failed (7 items)
 ```
+
+---
+
+# PATCH-07 Verification Addendum: Border-Draggable Desktop Inspector
+
+## Status: RESOLVED
+
+- **Date**: 2026-11-13
+- **Patch**: `PATCH-07` (`patch.md`)
+- **Changes**: `src/components/ProjectDrawer.tsx`, `e2e/portfolio.spec.ts`, graph-simulation spec, `patch.md`, `tasks.md`.
+
+| Request | Resolution | Verification |
+| :--- | :--- | :--- |
+| Make the whole inspector border draggable | Removed the `Move` icon button. `ProjectDrawer` now detects an outer `8px` band on all four desktop edges in `onPointerDown`; pointer capture carries the drag even outside the panel. | `e2e/portfolio.spec.ts::desktop inspector drags from its border and stays inside the viewport` | **PASS** |
+| Show the CSS `move` cursor over the edge | Panel-level `onPointerMove` sets inline `cursor: move` when the pointer is within the border band and clears it when leaving the border/panel. | Same E2E test polls `getComputedStyle(panel).cursor === 'move'` from the left border before dragging | **PASS** |
+| Preserve interior interactions and mobile behavior | Border detection only starts a drag within `DRAWER_EDGE_PX`; interior links/buttons receive normal events. `isSheet` keeps the mobile bottom sheet unchanged. | Full E2E suite and visual check | **PASS** |
+
+## Empirical Execution Logs (PATCH-07)
+
+```text
+$ npm run typecheck
+> tsc --noEmit
+(exit 0, no diagnostics)
+```
+
+```text
+$ npm run test:unit
+ Test Files  17 passed (17)
+      Tests  182 passed (182)
+```
+
+```text
+$ npm run build
+dist/assets/index-C0wxY4NZ.css    28.97 kB │ gzip:   6.28 kB
+dist/assets/index-CR7r_Ekn.js    335.18 kB │ gzip: 106.86 kB
+✓ built in 4.53s
+```
+
+```text
+$ npm run test:e2e
+  29 skipped
+  97 passed (2.5m)
+```
+
+```text
+$ npx openspec validate --changes
+Totals: 2 passed, 0 failed (2 items)
+
+$ npx openspec validate --specs
+Totals: 7 passed, 0 failed (7 items)
+```

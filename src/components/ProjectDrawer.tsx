@@ -6,7 +6,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import { ExternalLink, GitBranch, Move, X } from 'lucide-react';
+import { ExternalLink, GitBranch, X } from 'lucide-react';
 import type { Preview, ProjectData } from '../types/portfolio';
 import { projects } from '../data/projects';
 import { formatIndex } from '../utils/drafting';
@@ -38,6 +38,8 @@ const SCRAMBLE_TOTAL_MS = 350;
 /** Exponential tracking rate for the drawer's anchor lerp. */
 const DRAWER_TRACK_LAMBDA = 18;
 const DRAWER_SNAP_PX = 0.5;
+/** Desktop panel border thickness that starts a move drag. */
+const DRAWER_EDGE_PX = 8;
 
 function scrambleTitle(target: string, progress: number): string {
   const revealed = Math.floor(target.length * progress);
@@ -290,11 +292,42 @@ export function ProjectDrawer({
     };
   }, [onClose]);
 
-  const handleDragStart = (event: ReactPointerEvent<HTMLButtonElement>) => {
+  const isOnDragBorder = (
+    panel: HTMLDivElement,
+    clientX: number,
+    clientY: number,
+  ): boolean => {
+    const rect = panel.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    return (
+      x <= DRAWER_EDGE_PX ||
+      x >= rect.width - DRAWER_EDGE_PX ||
+      y <= DRAWER_EDGE_PX ||
+      y >= rect.height - DRAWER_EDGE_PX
+    );
+  };
+
+  const updateBorderCursor = (
+    panel: HTMLDivElement,
+    clientX: number,
+    clientY: number,
+  ) => {
+    const nextCursor = isOnDragBorder(panel, clientX, clientY) ? 'move' : '';
+    if (panel.style.cursor !== nextCursor) panel.style.cursor = nextCursor;
+  };
+
+  const handlePanelPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (isSheet || event.button !== 0) return;
     const panel = panelRef.current;
     const current = positionRef.current;
-    if (!panel || !current) return;
+    if (
+      !panel ||
+      !current ||
+      !isOnDragBorder(panel, event.clientX, event.clientY)
+    ) {
+      return;
+    }
     event.preventDefault();
     event.stopPropagation();
     hasUserDraggedRef.current = true;
@@ -305,13 +338,18 @@ export function ProjectDrawer({
       startLeft: current.left,
       startTop: current.top,
     };
-    event.currentTarget.setPointerCapture(event.pointerId);
+    panel.style.cursor = 'move';
+    panel.setPointerCapture(event.pointerId);
   };
 
-  const handleDragMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    const state = dragStateRef.current;
+  const handlePanelPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const panel = panelRef.current;
-    if (!state || !panel || state.pointerId !== event.pointerId) return;
+    if (!panel) return;
+    const state = dragStateRef.current;
+    if (!state || state.pointerId !== event.pointerId) {
+      updateBorderCursor(panel, event.clientX, event.clientY);
+      return;
+    }
     event.preventDefault();
     const margin = 16;
     const maxLeft = Math.max(margin, window.innerWidth - panel.offsetWidth - margin);
@@ -328,15 +366,24 @@ export function ProjectDrawer({
     positionRef.current = next;
     targetRef.current = next;
     setPosition(next);
+    panel.style.cursor = 'move';
   };
 
-  const handleDragEnd = (event: ReactPointerEvent<HTMLButtonElement>) => {
+  const handlePanelPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
     const state = dragStateRef.current;
-    if (!state || state.pointerId !== event.pointerId) return;
+    const panel = panelRef.current;
+    if (!state || !panel || state.pointerId !== event.pointerId) return;
     dragStateRef.current = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
+    if (panel.hasPointerCapture(event.pointerId)) {
+      panel.releasePointerCapture(event.pointerId);
     }
+    updateBorderCursor(panel, event.clientX, event.clientY);
+  };
+
+  const handlePanelPointerLeave = () => {
+    if (dragStateRef.current) return;
+    const panel = panelRef.current;
+    if (panel && panel.style.cursor !== '') panel.style.cursor = '';
   };
 
   const mediaPreviews = project.previews.filter(
@@ -371,6 +418,11 @@ export function ProjectDrawer({
               : { left: 0, top: 0, visibility: 'hidden' }
         }
         className={panelClass}
+        onPointerDown={handlePanelPointerDown}
+        onPointerMove={handlePanelPointerMove}
+        onPointerUp={handlePanelPointerUp}
+        onPointerCancel={handlePanelPointerUp}
+        onPointerLeave={handlePanelPointerLeave}
       >
         <header className="sticky top-0 z-10 border-b border-[var(--color-divider)] bg-[var(--color-surface)]/95 px-5 py-4 backdrop-blur-md">
           <div className="flex items-start justify-between gap-3">
@@ -431,34 +483,15 @@ export function ProjectDrawer({
                 )}
               </div>
             </div>
-            <div className="flex shrink-0 items-start gap-1">
-              {!isSheet && (
-                <button
-                  type="button"
-                  data-testid="drawer-drag-handle"
-                  aria-label="Drag project drawer"
-                  onPointerDown={handleDragStart}
-                  onPointerMove={handleDragMove}
-                  onPointerUp={handleDragEnd}
-                  onPointerCancel={handleDragEnd}
-                  className="group flex min-h-11 min-w-11 cursor-grab touch-none items-center justify-center rounded-full p-2 text-[var(--color-muted)] transition-colors hover:bg-[var(--color-surface-container)] hover:text-[var(--color-text)] active:cursor-grabbing"
-                >
-                  <Move
-                    className="h-4 w-4 opacity-60 transition-opacity group-hover:opacity-100"
-                    aria-hidden="true"
-                  />
-                </button>
-              )}
-              <button
-                type="button"
-                data-testid="drawer-close"
-                onClick={onClose}
-                aria-label="Close project drawer"
-                className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-[var(--color-outline)] p-2 text-[var(--color-muted)] transition-colors hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
-              >
-                <X className="h-5 w-5" aria-hidden="true" />
-              </button>
-            </div>
+            <button
+              type="button"
+              data-testid="drawer-close"
+              onClick={onClose}
+              aria-label="Close project drawer"
+              className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-[var(--color-outline)] p-2 text-[var(--color-muted)] transition-colors hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
+            >
+              <X className="h-5 w-5" aria-hidden="true" />
+            </button>
           </div>
         </header>
 

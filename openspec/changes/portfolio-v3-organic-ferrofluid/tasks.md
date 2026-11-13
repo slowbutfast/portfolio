@@ -76,3 +76,8 @@
 - [x] P06.3 Update `src/physics/graphSimulation.ts` (`L460-L470`, `L542-L561`) to store `dragTarget` in `dragMove` and advance the critically damped viscous follower in `afterTick(dtMs)`
 - [x] P06.4 Sync `openspec/specs/portfolio-controls/spec.md` and `openspec/specs/graph-simulation/spec.md` with singular `Reset`, volume popover, `stickyFocalId`, collision-aware popups, draggable drawer, and initial vs. live reduced-motion behavior
 - [x] P06.5 Run `npm run typecheck && npm run test:unit && npm run build && npm run test:e2e && npx openspec validate --changes && npx openspec validate --specs`, update `verification.md`, and mark `PATCH-06` `RESOLVED` in `patch.md`
+
+## Patch 07: Border-Draggable Desktop Inspector
+
+- [x] P07.1 Replace the icon drag handle with an 8px edge-hit border drag surface and `move` cursor on desktop
+- [x] P07.2 Update the E2E drag test and documentation, run the full verification suite, and mark `PATCH-07` `RESOLVED`

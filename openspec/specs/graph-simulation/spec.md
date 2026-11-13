@@ -224,15 +224,15 @@ The system SHALL place `NodeHoverCard` and the desktop `ProjectDrawer` by scorin
 - **THEN** the solver chooses the clamped candidate that covers the fewest nodes and connections, especially focal edges, without overflowing the viewport or header.
 
 ### Requirement: Sticky inspected focal context and draggable inspector
-The system SHALL retain the inspected project's focal connections and contiguous shared-tag labels after the desktop `ProjectDrawer` closes. The sticky focus SHALL clear when the `250ms` hover dwell activates on any node (including the inspected node), on `Reset`, or when switching to Grid view. The desktop `ProjectDrawer` SHALL expose a hover-revealed `Move` / `cursor-grab` header handle (`data-testid="drawer-drag-handle"`) that supports pointer-captured dragging clamped to the viewport, with a user-drag lock preventing anchor updates from snapping it back. The mobile `< 768px` bottom-sheet drawer SHALL remain non-draggable.
+The system SHALL retain the inspected project's focal connections and contiguous shared-tag labels after the desktop `ProjectDrawer` closes. The sticky focus SHALL clear when the `250ms` hover dwell activates on any node (including the inspected node), on `Reset`, or when switching to Grid view. The desktop `ProjectDrawer` SHALL treat its outer `8px` border band on all four edges as a draggable surface, showing the CSS `move` cursor while the pointer is over that band and supporting pointer-captured dragging clamped to the viewport, with a user-drag lock preventing anchor updates from snapping it back. The mobile `< 768px` bottom-sheet drawer SHALL remain non-draggable.
 
 #### Scenario: User closes the inspector
 - **WHEN** the user closes `ProjectDrawer`
 - **THEN** the inspected node's focal edges and tag labels remain highlighted until a hover dwell, Reset, or Grid view clears the sticky focus.
 
 #### Scenario: User drags the desktop inspector
-- **WHEN** the user drags the `Move` handle on a desktop `ProjectDrawer`
-- **THEN** the panel follows the pointer, stays inside viewport bounds and below the header, and does not snap back to its computed anchor position.
+- **WHEN** the user drags any edge of a desktop `ProjectDrawer`
+- **THEN** the panel follows the pointer, shows the `move` cursor over its border, stays inside viewport bounds and below the header, and does not snap back to its computed anchor position.
 
 ### Requirement: Idle simulation suspend and continuous rAF throttling
 The system SHALL throttle or suspend the continuous `requestAnimationFrame` canvas render loop when all node velocities $\|\vec{v}\| < 0.01\text{ px/tick}$, all bridge oscillator amplitudes $|\delta| < 0.1\text{ px}$, and camera transform lerps have converged, instantly resuming the loop upon any pointer event, window resize, theme change, filter selection, or hover update.

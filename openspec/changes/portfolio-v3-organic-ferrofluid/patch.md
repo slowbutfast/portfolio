@@ -110,14 +110,14 @@
   - `NodeHoverCard.tsx` uses a single outward ray (`position - canvasCenter`), and `ProjectDrawer.tsx` hardcodes `anchor.x + 32, anchor.y - 40`, ignoring live connection segments and neighboring nodes.
   - `GraphCanvas.tsx` `focalId` drops `selectedId` as soon as `ProjectDrawer` closes.
 - **Target Files**: `src/utils/popoverPlacement.ts`, `src/utils/popoverPlacement.test.ts`, `src/components/GraphCanvas.tsx`, `src/components/NodeHoverCard.tsx`, `src/components/ProjectDrawer.tsx` (including header drag handle), `src/App.tsx`, `e2e/portfolio.spec.ts`
-- **Expected Resolution**: `chooseBestPopoverPosition` scores 8 candidate quadrants against live screen-space node circles and Liang-Barsky segment-AABB intersections (weighting `isFocal` edges `3x`), placing both `NodeHoverCard` and desktop `ProjectDrawer` with minimal connection overlap; `stickyFocalId` preserves inspected focal edges & contiguous tag pills after closing `ProjectDrawer` until `250ms` hover dwell activates on any node (or `Reset` / `Grid` view); desktop `ProjectDrawer` gains a hover-revealed `Move`/grab handle with pointer-captured, viewport-clamped dragging and a `hasUserDraggedRef` lock so anchor updates cannot snap it back.
+- **Expected Resolution**: `chooseBestPopoverPosition` scores 8 candidate quadrants against live screen-space node circles and Liang-Barsky segment-AABB intersections (weighting `isFocal` edges `3x`), placing both `NodeHoverCard` and desktop `ProjectDrawer` with minimal connection overlap; `stickyFocalId` preserves inspected focal edges & contiguous tag pills after closing `ProjectDrawer` until `250ms` hover dwell activates on any node (or `Reset` / `Grid` view); desktop `ProjectDrawer` gains an edge-hit draggable border with the CSS `move` cursor, pointer-captured viewport-clamped dragging, and a `hasUserDraggedRef` lock so anchor updates cannot snap it back.
 - **Status**: RESOLVED (2026-11-13 19:03:00 UTC)
 - **Resolution**:
   - Added `src/utils/popoverPlacement.ts` with 8 candidate rectangles, viewport/72px header clamping, circle-rect node penalties (`5000` target / `1000` neighbor), Liang-Barsky segment-AABB intersection scoring (`3x` focal), and an outward-ray tie-breaker; unit tests cover hub, corner, focal-edge, neighbor-node, and clamping cases.
   - `GraphCanvas` emits live screen-space `{ nodes, segments }` snapshots through `onHoverNode`, `onSelect`, and `onResolveAnchor`; both `NodeHoverCard` and desktop `ProjectDrawer` place through `chooseBestPopoverPosition`.
   - Added `stickyFocalId`: `openProject` sets it, `closeDrawer` preserves it, `Reset` / `Grid` view clear it, and the unified `250ms` hover dwell clears it on any node (including the same inspected node). Sticky focal connections and contiguous tag pills remain visible after the drawer closes.
   - Kept the last obstacle snapshot during the 150ms hover-card transfer grace period so the card cannot re-place itself away from the pointer mid-transfer.
-  - Desktop `ProjectDrawer` now exposes a hover-revealed `Move` / `cursor-grab` / `cursor-grabbing` header handle (`data-testid="drawer-drag-handle"`) with pointer capture, viewport-clamped dragging, and a `hasUserDraggedRef` lock that prevents anchor updates from snapping the panel back. Mobile remains an unchanged bottom sheet.
+  - Desktop `ProjectDrawer` now treats its outer 8px border as the drag surface (superseded by PATCH-07), with pointer capture, viewport-clamped dragging, and a `hasUserDraggedRef` lock that prevents anchor updates from snapping the panel back. Mobile remains an unchanged bottom sheet.
   - Verification: typecheck clean, 181 unit tests, 96 e2e passed / 28 expected skips, build clean, OpenSpec changes/specs valid.
 
 ### [PATCH-06] Mid-Drag Reduced-Motion Guard, Frame-Clock Drag Follower, 30fps Idle Throttle & Spec Sync
@@ -141,3 +141,17 @@
   - The idle ambient loop now renders at ~30 fps (`>= 33ms`) when the sim is idle and only ambient drift is active; node maps, active positions, ambient offsets, and dimmed-edge keys are reused/cached instead of reallocated each frame. `data-sim-state` exposes the current state for regression testing.
   - Synced `openspec/specs/portfolio-controls/spec.md` (singular Reset, 500ms volume popover, persisted gain) and `openspec/specs/graph-simulation/spec.md` (initial vs live reduced-motion behavior, collision-aware popups, sticky inspected focus, draggable desktop drawer).
   - Verification: typecheck clean, 182 unit tests, 97 e2e passed / 29 expected skips, build clean, `openspec validate --changes` and `--specs` clean.
+
+### [PATCH-07] Border-Draggable Desktop Inspector
+- **Date**: 2026-11-13 19:50:00 UTC
+- **Feedback Source**: Manual UX Review on PR #12 follow-up
+- **Reported Issue**: The desktop `ProjectDrawer` used a separate `Move` icon button; the requested affordance is to make the whole inspector border draggable and show the CSS `move` cursor when the pointer is over any edge.
+- **Root Cause**: Drag handlers were bound to the `data-testid="drawer-drag-handle"` icon button, not the panel edges.
+- **Target Files**: `src/components/ProjectDrawer.tsx`, `e2e/portfolio.spec.ts`, `openspec/specs/graph-simulation/spec.md`, `patch.md`, `tasks.md`, `verification.md`.
+- **Expected Resolution**: Remove the icon handle; the outer `8px` band of all four desktop panel edges starts a pointer-captured drag and sets `cursor: move`, while interactive content remains clickable and mobile bottom-sheet behavior is unchanged.
+- **Status**: RESOLVED (2026-11-13 19:52:00 UTC)
+- **Resolution**:
+  - Removed the `Move` icon button and its `drawer-drag-handle` test id.
+  - Added panel-level pointer handlers that detect the outer `DRAWER_EDGE_PX = 8px` band on all four edges; hovering it sets inline `cursor: move`, `pointerdown` begins a viewport-clamped drag, and pointer capture carries the gesture outside the panel.
+  - Interior clicks/links are untouched; mobile still renders the unchanged fixed bottom sheet.
+  - E2E drag test now starts from the left border, asserts the computed `move` cursor, and verifies viewport-clamped movement.
