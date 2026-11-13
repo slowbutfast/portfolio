@@ -129,14 +129,14 @@ $ npm run build
 
 $ npm run test:unit
 Test Files  17 passed (17)
-     Tests  187 passed (187)
+     Tests  188 passed (188)
 ```
 
 ### E2E (desktop + mobile)
 
 ```text
 $ npx playwright test
-104 passed (3.3m)
+104 passed (3.4m)
 36 skipped
 ```
 
@@ -179,12 +179,41 @@ All 8 project ids remain: `open-dungeon`, `agentic-resume-builder`, `pict-climat
 }
 ```
 
+## PATCH-01 Verification (Post-Review Surgical Fix)
+
+**Source**: PR #13 code review (Agent 2 REQUEST CHANGES; Agent 1 follow-ups). Full ledger: `patch.md`.
+
+| Finding | Before PATCH-01 | After PATCH-01 | Proof |
+| :--- | :--- | :--- | :--- |
+| 120ms `geometryPoll` woke the simulation on every tick while the sheet was open | **110 renders/s** (15fps timer continuously canceled) | **11–19 renders/s** after camera settle | `npx playwright test --project=mobile -g "coarse pointers cap DPR"` |
+| Canceled first drag on a never-placed node | **228.5 px** from pre-drag resting point after 600 ticks | **< 15 px** | `npx vitest run src/physics/graphSimulation.test.ts` → `returns a never-placed node to its pre-drag position on cancel` |
+| Placed-node cancel tolerance | `< 60 px` | `< 15 px` | `cancels a drag with zero fling velocity and an unmoved home anchor` |
+| Open-sheet idle regression coverage | None | Second 1s sample after opening the mobile sheet, bounded to `11–19 fps` | `coarse pointers cap DPR at 2 and idle ambient at 15fps` |
+
+Implementation:
+- `GraphCanvas.tsx` `measure()` now computes `nextX`/`nextY` and only mutates the camera goal + calls `wakeRef.current()` when the target moved by more than `0.5 px`.
+- `graphSimulation.ts` cancel path seeds `homeAnchors` from the pre-drag `dragAnchor` when the node has no prior committed home.
+
+```text
+$ npx vitest run src/physics/graphSimulation.test.ts
+Test Files  1 passed (1)
+     Tests  33 passed (33)
+
+$ npx playwright test --project=mobile -g "coarse pointers cap DPR"
+1 passed
+
+$ npm run typecheck && npm run build && npm test
+Test Files  18 passed (18)
+     Tests  188 passed (188)
+104 passed, 36 skipped
+```
+
 ## Quick Re-Verification (60-Second Audit)
 
 ```bash
 npm run typecheck
 npm run test:unit
-npx playwright test --project=mobile -g "mobile drawer opens|mobile header is|coarse pointers cap|mobile 3-dot|pointercancel|mobile sheet pans|portrait, landscape"
+npx playwright test --project=mobile -g "coarse pointers cap DPR|mobile drawer opens|mobile header is|mobile 3-dot|pointercancel|tapping the sticky-focal|mobile sheet pans|portrait, landscape"
 npx openspec validate portfolio-mobile-polish --strict --json
 ```
 
@@ -193,7 +222,7 @@ Expected output:
 ```text
 tsc --noEmit: clean
 Test Files  17 passed (17)
-Tests       187 passed
+Tests       188 passed
 ~7 mobile tests passed
 "valid": true, "issues": []
 ```

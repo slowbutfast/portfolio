@@ -776,8 +776,31 @@ describe('d3 tick event path', () => {
       node.y - committedHome.y,
     );
     const fromDragged = Math.hypot(node.x - dragged.x, node.y - dragged.y);
-    expect(fromHome).toBeLessThan(60);
+    expect(fromHome).toBeLessThan(15);
     expect(fromHome).toBeLessThan(fromDragged);
+    sim.destroy();
+  });
+
+  it('returns a never-placed node to its pre-drag position on cancel', () => {
+    const sim = twoNodeSim();
+    const listener = tickListener(sim);
+    const node = sim.findNode('a')!;
+    drive(sim, listener, 1);
+    const resting = { x: node.x, y: node.y };
+
+    sim.dragStart(node);
+    sim.dragMove(resting.x + 280, resting.y + 120);
+    drive(sim, listener, 12);
+    expect(
+      Math.hypot((node.fx ?? 0) - resting.x, (node.fy ?? 0) - resting.y),
+    ).toBeGreaterThan(60);
+
+    sim.dragEnd({ cancel: true });
+    drive(sim, listener, 600);
+
+    // No prior normal release exists, so the cancel path must seed the home
+    // spring from the pre-drag anchor to bring the node back.
+    expect(Math.hypot(node.x - resting.x, node.y - resting.y)).toBeLessThan(15);
     sim.destroy();
   });
 

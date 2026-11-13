@@ -568,8 +568,12 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
 
     if (options?.cancel) {
       // OS gesture interruption: drop the hard pin without committing the
-      // dragged coordinate as the new home. The existing home spring pulls the
-      // node back to where it rested before the gesture.
+      // dragged coordinate as the new home. Seed the home spring from the
+      // pre-drag anchor for nodes that have never been placed, so a canceled
+      // first drag still returns to where it started.
+      if (!homeAnchors.has(node.id) && dragAnchor) {
+        homeAnchors.set(node.id, { x: dragAnchor.x, y: dragAnchor.y });
+      }
       node.fx = null;
       node.fy = null;
       node.vx = 0;

@@ -29,3 +29,11 @@
 
 - [x] 5.1 Run `npm run typecheck`, `npm run build`, `npm test` (`npm run test:unit && npm run test:e2e`), and `npx openspec validate portfolio-mobile-polish` to verify clean passes across desktop and mobile suites
 - [x] 5.2 Populate `verification.md` with Requirement Adherence Matrix, resolved assumptions (including Phase 1 landscape `BOUNDARY_MARGIN` finding), and verbatim execution logs
+
+## Patch 01: Gate geometryPoll wake(), restore never-placed cancel home, and tighten 15fps/cancel tests
+
+- [x] P01.1 Scaffold/run reproducing unit test for never-placed `dragEnd({ cancel: true })` in `src/physics/graphSimulation.test.ts` and open-sheet idle / tightened `15 fps` E2E test in `e2e/portfolio.spec.ts`
+- [x] P01.2 Gate `wakeRef.current()` in `GraphCanvas.tsx` `measure()` on `Math.hypot(nextX - goal.x, nextY - goal.y) > 0.5`
+- [x] P01.3 Seed `homeAnchors` from `dragAnchor` on `dragEnd({ cancel: true })` when `!homeAnchors.has(node.id)` in `src/physics/graphSimulation.ts`
+- [x] P01.4 Verify reproduction tests pass and run full regression suite (`npm run typecheck && npm run build && npm test`)
+- [x] P01.5 Update `verification.md` and mark `PATCH-01` resolved in `patch.md`

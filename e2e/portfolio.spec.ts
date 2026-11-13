@@ -562,8 +562,20 @@ test.describe('portfolio graph SPA', () => {
     await page.waitForTimeout(1000);
     const after = Number(await canvas.getAttribute('data-render-count'));
     const frames = after - before;
-    expect(frames).toBeGreaterThanOrEqual(8);
-    expect(frames).toBeLessThanOrEqual(25);
+    expect(frames).toBeGreaterThanOrEqual(11);
+    expect(frames).toBeLessThanOrEqual(19);
+
+    // Opening the sheet must not leave the 120ms geometry poll restarting the
+    // simulation every tick: after the camera settles it should stay at the
+    // same 15fps idle cadence.
+    await tapCenteredNode(page);
+    await page.waitForTimeout(4500);
+    const sheetBefore = Number(await canvas.getAttribute('data-render-count'));
+    await page.waitForTimeout(1000);
+    const sheetAfter = Number(await canvas.getAttribute('data-render-count'));
+    const sheetFrames = sheetAfter - sheetBefore;
+    expect(sheetFrames).toBeGreaterThanOrEqual(11);
+    expect(sheetFrames).toBeLessThanOrEqual(19);
   });
 
   test('mobile 3-dot menu hosts Sound, volume, and a reachable Reset', async ({

@@ -1004,9 +1004,13 @@ export function GraphCanvas({
       const targetY = headerBottom + (sheetTop - headerBottom) / 2;
       const rect = canvas.getBoundingClientRect();
       const scale = transformRef.current.scale;
-      goal.x = rect.width / 2 - node.x * scale;
-      goal.y = targetY - rect.top - node.y * scale;
-      wakeRef.current();
+      const nextX = rect.width / 2 - node.x * scale;
+      const nextY = targetY - rect.top - node.y * scale;
+      if (Math.hypot(nextX - goal.x, nextY - goal.y) > 0.5) {
+        goal.x = nextX;
+        goal.y = nextY;
+        wakeRef.current();
+      }
     };
 
     const scheduleMeasure = () => {
