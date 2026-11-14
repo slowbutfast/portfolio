@@ -1,16 +1,20 @@
 import AxeBuilder from '@axe-core/playwright';
 import { test, expect, type Page } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
-const PROJECT_IDS = [
-  'open-dungeon',
-  'agentic-resume-builder',
-  'pict-climate-risk-viz-chatbot',
-  'transcribe-plus',
-  'sandwave-sim',
-  'attention-max',
-  'kintsugi-fracture',
-  'ivy-film-festival-2026',
-];
+/**
+ * Catalog ids, read from `src/data/projects.ts` so completeness checks follow
+ * the catalog instead of a hard-coded count. The module itself cannot be
+ * imported here (it pulls in bundler-only image/video assets). The literal
+ * project count is pinned once, in `src/data/projects.test.ts`.
+ */
+const PROJECT_IDS: string[] = Array.from(
+  readFileSync(resolve(process.cwd(), 'src/data/projects.ts'), 'utf8').matchAll(
+    /^ {4}id: '([^']+)',$/gm,
+  ),
+  (match) => match[1],
+);
 
 const GITHUB_URL = 'https://github.com/slowbutfast';
 
@@ -101,6 +105,12 @@ async function blurActiveElement(page: Page) {
   });
 }
 
+/** Let the initial layout settle, then pan the camera onto a node. */
+async function centerNode(page: Page, id = 'open-dungeon') {
+  await page.waitForTimeout(1500);
+  await focusNode(page, id);
+}
+
 /** Focus a semantic-nav entry so the camera centers that node. */
 async function focusNode(page: Page, id = 'open-dungeon') {
   await page.getByTestId(`nav-${id}`).focus();
@@ -143,9 +153,7 @@ async function sheetHeightRatio(page: Page): Promise<number> {
  * center. The node is pinned by hover so the preview card stays visible.
  */
 async function hoverCenteredNode(page: Page, projectId = 'open-dungeon') {
-  await page.waitForTimeout(1500);
-  await page.getByTestId(`nav-${projectId}`).focus();
-  await page.waitForTimeout(1600);
+  await centerNode(page, projectId);
   const canvas = page.getByTestId('graph-canvas');
   const box = await canvas.boundingBox();
   if (!box) throw new Error('graph canvas has no bounding box');
@@ -189,7 +197,8 @@ test.describe('portfolio graph SPA', () => {
     expect(errors).toEqual([]);
   });
 
-  test('first visit defaults to the Light color scheme', async ({ page }) => {
+  test('first visit defaults to the Light color scheme', async ({ page }, testInfo) => {
+    test.skip(isMobile(testInfo), 'viewport-independent; runs on the desktop project only');
     const errors = trackErrors(page);
     await page.goto('/');
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
@@ -200,13 +209,15 @@ test.describe('portfolio graph SPA', () => {
     expect(errors).toEqual([]);
   });
 
-  test('theme-init applies a stored dark preference before the app mounts', async ({ page }) => {
+  test('theme-init applies a stored dark preference before the app mounts', async ({ page }, testInfo) => {
+    test.skip(isMobile(testInfo), 'viewport-independent; runs on the desktop project only');
     await useDarkTheme(page);
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   });
 
-  test('document metadata uses the canonical candidate identity', async ({ page }) => {
+  test('document metadata uses the canonical candidate identity', async ({ page }, testInfo) => {
+    test.skip(isMobile(testInfo), 'viewport-independent; runs on the desktop project only');
     await page.goto('/');
     await expect(page).toHaveTitle('Gregory Lazatin | Portfolio');
     const metadata = await page.evaluate(() => ({
@@ -409,24 +420,26 @@ test.describe('portfolio graph SPA', () => {
     );
   });
 
-  test('list view renders 8 cards and a card click opens the project drawer', async ({ page }) => {
+  test('list view renders a card per catalog project and a card click opens the project drawer', async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto('/');
     await page.getByTestId('view-toggle').click();
-    expect(PROJECT_IDS).toHaveLength(8);
+    expect(PROJECT_IDS.length, 'catalog ids were not parsed from projects.ts').toBeGreaterThan(0);
     for (const id of PROJECT_IDS) {
       await expect(page.getByTestId(`card-${id}`)).toBeVisible();
     }
+    await expect(page.locator('[data-testid^="card-"]')).toHaveCount(PROJECT_IDS.length);
     await page.getByTestId('card-open-dungeon').click();
     await expect(page.getByTestId('project-drawer')).toBeVisible();
     await expect(page.getByTestId('project-drawer')).toHaveAttribute('aria-modal', 'true');
     expect(errors).toEqual([]);
   });
 
-  test('graph view exposes all 8 project nodes through the semantic nav', async ({ page }) => {
+  test('graph view exposes every catalog project through the semantic nav', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByTestId('graph-canvas')).toBeVisible();
-    await expect(page.locator('nav[aria-label="Projects"] button')).toHaveCount(8);
+    expect(PROJECT_IDS.length, 'catalog ids were not parsed from projects.ts').toBeGreaterThan(0);
+    await expect(page.locator('nav[aria-label="Projects"] button')).toHaveCount(PROJECT_IDS.length);
     for (const id of PROJECT_IDS) {
       await expect(page.getByTestId(`nav-${id}`)).toHaveCount(1);
     }
@@ -948,7 +961,8 @@ test.describe('portfolio graph SPA', () => {
     await expect(page.getByTestId('nav-transcribe-plus')).toHaveAttribute('data-dimmed', 'true');
   });
 
-  test('deep link #/p/open-dungeon opens the drawer on load and closing clears the hash', async ({ page }) => {
+  test('deep link #/p/open-dungeon opens the drawer on load and closing clears the hash', async ({ page }, testInfo) => {
+    test.skip(isMobile(testInfo), 'viewport-independent; runs on the desktop project only');
     const errors = trackErrors(page);
     await page.goto('/#/p/open-dungeon');
     await expect(page.getByTestId('project-drawer')).toBeVisible();
@@ -960,7 +974,8 @@ test.describe('portfolio graph SPA', () => {
     expect(errors).toEqual([]);
   });
 
-  test('unknown deep link slug is ignored without crashing', async ({ page }) => {
+  test('unknown deep link slug is ignored without crashing', async ({ page }, testInfo) => {
+    test.skip(isMobile(testInfo), 'viewport-independent; runs on the desktop project only');
     const errors = trackErrors(page);
     await page.goto('/#/p/non-existent-tool');
     await expect(page.getByTestId('graph-canvas')).toBeVisible();
@@ -968,14 +983,16 @@ test.describe('portfolio graph SPA', () => {
     expect(errors).toEqual([]);
   });
 
-  test('Escape closes the project drawer', async ({ page }) => {
+  test('Escape closes the project drawer', async ({ page }, testInfo) => {
+    test.skip(isMobile(testInfo), 'viewport-independent; runs on the desktop project only');
     await page.goto('/#/p/transcribe-plus');
     await expect(page.getByTestId('project-drawer')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('project-drawer')).toHaveCount(0);
   });
 
-  test('theme switch persists across reloads', async ({ page }) => {
+  test('theme switch persists across reloads', async ({ page }, testInfo) => {
+    test.skip(isMobile(testInfo), 'viewport-independent; runs on the desktop project only');
     await page.goto('/');
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
     await page.getByTestId('theme-toggle').click();
@@ -988,7 +1005,8 @@ test.describe('portfolio graph SPA', () => {
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   });
 
-  test('opening a project records it in the visited set', async ({ page }) => {
+  test('opening a project records it in the visited set', async ({ page }, testInfo) => {
+    test.skip(isMobile(testInfo), 'viewport-independent; runs on the desktop project only');
     await page.goto('/');
     await page.getByTestId('view-toggle').click();
     await page.getByTestId('card-open-dungeon').click();
@@ -999,7 +1017,8 @@ test.describe('portfolio graph SPA', () => {
     expect(visited).toContain('open-dungeon');
   });
 
-  test('About button opens the modal and Escape/close dismiss it', async ({ page }) => {
+  test('About button opens the modal and Escape/close dismiss it', async ({ page }, testInfo) => {
+    test.skip(isMobile(testInfo), 'viewport-independent; runs on the desktop project only');
     const errors = trackErrors(page);
     await page.goto('/');
     await page.getByTestId('nav-about').click();
@@ -1055,7 +1074,8 @@ test.describe('portfolio graph SPA', () => {
     await expect(frame).toHaveAttribute('sandbox', /allow-scripts/);
   });
 
-  test('#/about deep link opens the modal and backdrop dismisses it', async ({ page }) => {
+  test('#/about deep link opens the modal and backdrop dismisses it', async ({ page }, testInfo) => {
+    test.skip(isMobile(testInfo), 'viewport-independent; runs on the desktop project only');
     const errors = trackErrors(page);
     await page.goto('/#/about');
     const modal = page.getByTestId('about-modal');
@@ -1067,12 +1087,9 @@ test.describe('portfolio graph SPA', () => {
   });
 
   test('GitHub navigation and profile links point to slowbutfast', async ({ page }, testInfo) => {
+    test.skip(isMobile(testInfo), 'mobile hides nav-github; asserted in the mobile header spec');
     await page.goto('/');
-    if (isMobile(testInfo)) {
-      await expect(page.getByTestId('nav-github')).toBeHidden();
-    } else {
-      await expect(page.getByTestId('nav-github')).toHaveAttribute('href', GITHUB_URL);
-    }
+    await expect(page.getByTestId('nav-github')).toHaveAttribute('href', GITHUB_URL);
     await page.getByTestId('nav-about').click();
     await expect(page.getByTestId('about-github')).toHaveAttribute('href', GITHUB_URL);
     await expect(page.getByTestId('about-github')).toBeVisible();
@@ -1198,9 +1215,7 @@ test.describe('portfolio graph SPA', () => {
   }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'pointer cursor test runs on desktop');
     await page.goto('/');
-    await page.waitForTimeout(1500);
-    await page.getByTestId('nav-open-dungeon').focus();
-    await page.waitForTimeout(1600);
+    await centerNode(page);
     const canvas = page.getByTestId('graph-canvas');
     const box = await canvas.boundingBox();
     if (!box) throw new Error('graph canvas has no bounding box');
@@ -1243,9 +1258,7 @@ test.describe('portfolio graph SPA', () => {
   test('hover dwell suppresses fast sweeps and opens after 250ms', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'hover previews are desktop-only');
     await page.goto('/');
-    await page.waitForTimeout(1500);
-    await page.getByTestId('nav-open-dungeon').focus();
-    await page.waitForTimeout(1600);
+    await centerNode(page);
 
     const canvas = page.getByTestId('graph-canvas');
     const box = await canvas.boundingBox();
@@ -1269,9 +1282,7 @@ test.describe('portfolio graph SPA', () => {
   test('focal edge tag pills persist while the inspector is open', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'hover previews are desktop-only');
     await page.goto('/');
-    await page.waitForTimeout(1500);
-    await page.getByTestId('nav-open-dungeon').focus();
-    await page.waitForTimeout(1600);
+    await centerNode(page);
     const canvas = page.getByTestId('graph-canvas');
     const box = await canvas.boundingBox();
     if (!box) throw new Error('graph canvas has no bounding box');
@@ -1307,8 +1318,7 @@ test.describe('portfolio graph SPA', () => {
     // Re-center the node, dwell on it for 250ms, then leave and blur the
     // semantic nav. The sticky highlight must already be cleared; otherwise
     // the focal tag pills would remain after both hover and focus are gone.
-    await page.getByTestId('nav-open-dungeon').focus();
-    await page.waitForTimeout(1600);
+    await focusNode(page);
     await page.mouse.move(centerX, centerY);
     await expect(page.getByTestId('node-hover-card')).toBeVisible();
     await page.mouse.move(box.x + 12, box.y + box.height - 12);
@@ -1340,9 +1350,7 @@ test.describe('portfolio graph SPA', () => {
   }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'pointer drag test runs on desktop');
     await page.goto('/');
-    await page.waitForTimeout(1500);
-    await page.getByTestId('nav-open-dungeon').focus();
-    await page.waitForTimeout(1600);
+    await centerNode(page);
     const canvas = page.getByTestId('graph-canvas');
     const box = await canvas.boundingBox();
     if (!box) throw new Error('graph canvas has no bounding box');
@@ -1475,7 +1483,8 @@ test.describe('portfolio graph SPA', () => {
     expect(besideNode).toBe(true);
   });
 
-  test('accessibility: graph view has zero WCAG A/AA violations (dark)', async ({ page }) => {
+  test('accessibility: graph view has zero WCAG A/AA violations (dark)', async ({ page }, testInfo) => {
+    test.skip(isMobile(testInfo), 'DOM-driven scan; the open-drawer scans keep mobile coverage');
     await useDarkTheme(page);
     await page.goto('/');
     await expect(page.getByTestId('graph-canvas')).toBeVisible();
@@ -1486,7 +1495,8 @@ test.describe('portfolio graph SPA', () => {
     ).toEqual([]);
   });
 
-  test('accessibility: list view has zero WCAG A/AA violations (dark)', async ({ page }) => {
+  test('accessibility: list view has zero WCAG A/AA violations (dark)', async ({ page }, testInfo) => {
+    test.skip(isMobile(testInfo), 'DOM-driven scan; the open-drawer scans keep mobile coverage');
     await useDarkTheme(page);
     await page.goto('/');
     await page.getByTestId('view-toggle').click();
@@ -1521,7 +1531,8 @@ test.describe('portfolio graph SPA', () => {
     ).toEqual([]);
   });
 
-  test('accessibility: About modal has zero WCAG A/AA violations (dark)', async ({ page }) => {
+  test('accessibility: About modal has zero WCAG A/AA violations (dark)', async ({ page }, testInfo) => {
+    test.skip(isMobile(testInfo), 'DOM-driven scan; the open-drawer scans keep mobile coverage');
     await useDarkTheme(page);
     await page.goto('/#/about');
     await expect(page.getByTestId('about-modal')).toBeVisible();
@@ -1532,7 +1543,8 @@ test.describe('portfolio graph SPA', () => {
     ).toEqual([]);
   });
 
-  test('accessibility: About modal has zero WCAG A/AA violations (light)', async ({ page }) => {
+  test('accessibility: About modal has zero WCAG A/AA violations (light)', async ({ page }, testInfo) => {
+    test.skip(isMobile(testInfo), 'DOM-driven scan; the open-drawer scans keep mobile coverage');
     await useLightTheme(page);
     await page.goto('/#/about');
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
@@ -1568,7 +1580,8 @@ test.describe('portfolio graph SPA', () => {
     ).toEqual([]);
   });
 
-  test('accessibility: graph view has zero WCAG A/AA violations (light)', async ({ page }) => {
+  test('accessibility: graph view has zero WCAG A/AA violations (light)', async ({ page }, testInfo) => {
+    test.skip(isMobile(testInfo), 'DOM-driven scan; the open-drawer scans keep mobile coverage');
     await useLightTheme(page);
     await page.goto('/');
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
@@ -1579,7 +1592,8 @@ test.describe('portfolio graph SPA', () => {
     ).toEqual([]);
   });
 
-  test('accessibility: list view has zero WCAG A/AA violations (light)', async ({ page }) => {
+  test('accessibility: list view has zero WCAG A/AA violations (light)', async ({ page }, testInfo) => {
+    test.skip(isMobile(testInfo), 'DOM-driven scan; the open-drawer scans keep mobile coverage');
     await useLightTheme(page);
     await page.goto('/');
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');

@@ -25,16 +25,14 @@ describe('project catalog contract', () => {
     }
   });
 
-  it('declares a non-empty classification on all 8 projects', () => {
-    expect(projects).toHaveLength(8);
+  it('declares a non-empty classification on every project', () => {
     for (const p of projects) {
       expect(typeof p.classification, `${p.id} classification type`).toBe('string');
       expect(p.classification.trim().length, `${p.id} classification empty`).toBeGreaterThan(0);
     }
   });
 
-  it('declares a mandatory non-empty shortTitle on all 8 projects', () => {
-    expect(projects).toHaveLength(8);
+  it('declares a mandatory non-empty shortTitle on every project', () => {
     for (const p of projects) {
       expect(typeof p.shortTitle, `${p.id} shortTitle type`).toBe('string');
       expect(p.shortTitle.trim().length, `${p.id} shortTitle empty`).toBeGreaterThan(0);

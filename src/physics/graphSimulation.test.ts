@@ -319,7 +319,10 @@ describe('drag-time bridge snapping and recovery', () => {
       initialPositions: scaleSeeds(PLANAR_NODE_SEEDS, width, height),
     });
 
+    expect(sim.links).toHaveLength(13);
     expect(sim.linkStates).toHaveLength(13);
+    // Proximity pairs are visual only; they must never become force links.
+    expect(sim.sim.force('proximity')).toBeUndefined();
     const node = sim.findNode('attention-max')!;
     sim.dragStart(node);
     sim.dragMove(node.x + 900, node.y + 400);
@@ -536,16 +539,6 @@ describe('visual ambient drift', () => {
       }
       expect(countSeedCrossings(displaced), `t=${time}ms`).toBe(0);
     }
-  });
-});
-
-describe('proximity pairs never create force links', () => {
-  it('keeps exactly the 13 permanent links in the simulation', () => {
-    const sim = fullSim();
-    expect(sim.links).toHaveLength(13);
-    expect(sim.linkStates).toHaveLength(13);
-    expect(sim.sim.force('proximity')).toBeUndefined();
-    sim.destroy();
   });
 });
 
