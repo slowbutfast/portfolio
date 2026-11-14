@@ -16,6 +16,7 @@ import { AboutModal } from './components/AboutModal';
 import { NodeHoverCard } from './components/NodeHoverCard';
 import { getAmbientSynth } from './audio/ambientSynth';
 import type { PopoverObstacles } from './utils/popoverPlacement';
+import { loadArtDiscoveryState } from './utils/artDiscovery';
 
 type ViewMode = 'graph' | 'list';
 type CanvasAnchor = { x: number; y: number };
@@ -207,6 +208,7 @@ export default function App() {
   const openProject = useCallback(
     (id: string, anchor?: CanvasAnchor, obstacles?: PopoverObstacles) => {
       if (!getProjectById(id)) return;
+      if (id === 'art-wip' && !loadArtDiscoveryState().unlocked) return;
       setIsAboutOpen(false);
       dismissHover();
       setHasInspectedAnyNode(true);
@@ -295,8 +297,9 @@ export default function App() {
     setActiveTags(new Set());
     setSearch('');
     setLayoutResetVersion((version) => version + 1);
-    setVisitedIds(new Set());
-    setInspectedIds(new Set());
+    const keepArt = loadArtDiscoveryState().unlocked;
+    setVisitedIds(keepArt ? new Set(['art-wip']) : new Set());
+    setInspectedIds(keepArt ? new Set(['art-wip']) : new Set());
     setStickyFocalId(null);
     setHoverObstacles(undefined);
     setDrawerObstacles(undefined);

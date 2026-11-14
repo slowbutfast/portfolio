@@ -57,3 +57,8 @@
 - [x] 9.1 Centralize `HIDDEN_TAGS` / `getVisibleTags` in `src/data/projects.ts`, assign `tags: ['art']` to `art-wip`, and filter hidden tags out of `deriveEdges`, `NodeHoverCard`, `ProjectDrawer`, and `ListView`.
 - [x] 9.2 Add `connectLink(sourceId, targetId)` and dynamic link cleanup on `resetLayout()` in `src/physics/graphSimulation.ts`; latch `1 -> 2 -> 3 -> 4` progressive `art-wip` links through the unified `LinearGradient` bridge loop in `GraphCanvas.tsx`; reset `inspectedIds` in `App.tsx` `resetAll()`.
 - [x] 9.3 Update unit & E2E tests (`projects.test.ts`, `graphSimulation.test.ts`, `e2e/portfolio.spec.ts`) and OpenSpec docs (`patch.md`, `specs/`, `verification.md`).
+
+## 10. `PATCH-05` — Drag-to-Unlock `art` Node, `450ms` Color Fade-In & Persistent Discovery
+- [x] 10.1 Add `src/utils/artDiscovery.ts` for `portfolio_art_state` persistence and `blendHexWithRgb` color fade interpolation.
+- [x] 10.2 Gate `art-wip` label, color, hover card, and inspector on first proximity connection in `GraphCanvas.tsx` and `App.tsx`, allow proximity latching while unrevealed, fade in rainbow color over `450ms`, and preserve unlocked state + connections across `Reset layout` and page reloads.
+- [x] 10.3 Add `src/utils/artDiscovery.test.ts`, update `e2e/portfolio.spec.ts`, and update OpenSpec docs (`patch.md`, `specs/`, `verification.md`).

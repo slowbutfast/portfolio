@@ -7,6 +7,7 @@
 | `PATCH-02` | 2026-11-14 | User Review Follow-up on PR #16 | `src/types/portfolio.ts`, `src/data/projects.ts`, `src/physics/graphSimulation.ts`, `src/components/GraphCanvas.tsx`, `src/data/projects.test.ts`, `src/physics/graphSimulation.test.ts`, `e2e/portfolio.spec.ts` | APPLIED |
 | `PATCH-03` | 2026-11-14 | User Review Follow-up on PR #16 | `src/types/portfolio.ts`, `src/data/projects.ts`, `src/data/graphSeeds.ts`, `src/utils/graphTopology.ts`, `src/components/GraphCanvas.tsx`, `src/utils/graphPlanarity.test.ts`, `src/data/projects.test.ts`, `src/physics/graphSimulation.test.ts`, `e2e/portfolio.spec.ts` | APPLIED |
 | `PATCH-04` | 2026-11-14 | User Review Follow-up on PR #16 | `src/data/projects.ts`, `src/utils/graphTopology.ts`, `src/components/NodeHoverCard.tsx`, `src/components/ProjectDrawer.tsx`, `src/components/ListView.tsx`, `src/App.tsx`, `src/physics/graphSimulation.ts`, `src/components/GraphCanvas.tsx`, `src/data/projects.test.ts`, `src/physics/graphSimulation.test.ts`, `e2e/portfolio.spec.ts` | APPLIED |
+| `PATCH-05` | 2026-11-14 | User Review Follow-up on PR #16 | `src/utils/artDiscovery.ts`, `src/utils/artDiscovery.test.ts`, `src/components/GraphCanvas.tsx`, `src/App.tsx`, `e2e/portfolio.spec.ts` | APPLIED |
 
 ---
 
@@ -47,6 +48,22 @@
 
 ---
 
+### [PATCH-05] Drag-to-Unlock `art` Node, `450ms` Rainbow Fade-In & Persistent Discovery
+- **Date**: 2026-11-14 08:33:00 UTC
+- **Feedback Source**: User Review Follow-up (PR #16)
+- **Reported Issue**:
+  1. Keep `art-wip` locked (no title pill, no color change, no hover card, no inspector drawer even on hover/click) until it is dragged to make at least one connection with an `'art'`-tagged node.
+  2. Allow `art-wip` to create proximity connections while still unrevealed and in motion.
+  3. On its first connection, quickly fade in the rainbow color (`450ms`) and unlock normal title, hover, and inspector behavior.
+  4. Persist the unlocked state and discovered connections in `localStorage` (`portfolio_art_state`) so neither `"Reset layout"` nor page reloads reset it.
+- **Root Cause**: `PATCH-04` gated proximity latching on prior click (`revealedRef`) and cleared `art-wip` reveal/connections on reset/reload.
+- **Target Files**: `src/utils/artDiscovery.ts`, `src/utils/artDiscovery.test.ts`, `src/components/GraphCanvas.tsx`, `src/App.tsx`, `e2e/portfolio.spec.ts`.
+- **Verification Command**: `npm run typecheck && npm run build && npm run test:unit && CI=1 npx playwright test --config=./playwright.config.ts && npx openspec validate "art-wip-rainbow-node" --strict`
+- **Status**: APPLIED
+
+
+---
+
 ### [PATCH-04] Hidden `'art'` Tag, Progressive `forceLink` Latching (`1 -> 2 -> 3 -> 4`), Rainbow Gradient Bridges & Resettable Reveal
 - **Date**: 2026-11-14 08:13:00 UTC
 - **Feedback Source**: User Review Follow-up (PR #16)
@@ -57,6 +74,22 @@
   4. Reset `inspectedIds` (`revealedIds`) inside `resetAll()` so the `art` node reveal resets on both page reloads and canvas resets (`Reset layout`).
 - **Root Cause**: `PATCH-03`'s separate zero-force `artProximityIds` render path omitted `d3-force` springs and `LinearGradient` fills, and `resetAll()` did not clear `inspectedIds`.
 - **Target Files**: `src/data/projects.ts`, `src/utils/graphTopology.ts`, `src/components/NodeHoverCard.tsx`, `src/components/ProjectDrawer.tsx`, `src/components/ListView.tsx`, `src/App.tsx`, `src/physics/graphSimulation.ts`, `src/components/GraphCanvas.tsx`, `src/data/projects.test.ts`, `src/physics/graphSimulation.test.ts`, `e2e/portfolio.spec.ts`.
+- **Verification Command**: `npm run typecheck && npm run build && npm run test:unit && CI=1 npx playwright test --config=./playwright.config.ts && npx openspec validate "art-wip-rainbow-node" --strict`
+- **Status**: APPLIED
+
+
+---
+
+### [PATCH-05] Drag-to-Unlock `art` Node, `450ms` Rainbow Fade-In & Persistent Discovery
+- **Date**: 2026-11-14 08:33:00 UTC
+- **Feedback Source**: User Review Follow-up (PR #16)
+- **Reported Issue**:
+  1. Keep `art-wip` locked (no title pill, no color change, no hover card, no inspector drawer even on hover/click) until it is dragged to make at least one connection with an `'art'`-tagged node.
+  2. Allow `art-wip` to create proximity connections while still unrevealed and in motion.
+  3. On its first connection, quickly fade in the rainbow color (`450ms`) and unlock normal title, hover, and inspector behavior.
+  4. Persist the unlocked state and discovered connections in `localStorage` (`portfolio_art_state`) so neither `"Reset layout"` nor page reloads reset it.
+- **Root Cause**: `PATCH-04` gated proximity latching on prior click (`revealedRef`) and cleared `art-wip` reveal/connections on reset/reload.
+- **Target Files**: `src/utils/artDiscovery.ts`, `src/utils/artDiscovery.test.ts`, `src/components/GraphCanvas.tsx`, `src/App.tsx`, `e2e/portfolio.spec.ts`.
 - **Verification Command**: `npm run typecheck && npm run build && npm run test:unit && CI=1 npx playwright test --config=./playwright.config.ts && npx openspec validate "art-wip-rainbow-node" --strict`
 - **Status**: APPLIED
 
@@ -78,6 +111,22 @@
 
 ---
 
+### [PATCH-05] Drag-to-Unlock `art` Node, `450ms` Rainbow Fade-In & Persistent Discovery
+- **Date**: 2026-11-14 08:33:00 UTC
+- **Feedback Source**: User Review Follow-up (PR #16)
+- **Reported Issue**:
+  1. Keep `art-wip` locked (no title pill, no color change, no hover card, no inspector drawer even on hover/click) until it is dragged to make at least one connection with an `'art'`-tagged node.
+  2. Allow `art-wip` to create proximity connections while still unrevealed and in motion.
+  3. On its first connection, quickly fade in the rainbow color (`450ms`) and unlock normal title, hover, and inspector behavior.
+  4. Persist the unlocked state and discovered connections in `localStorage` (`portfolio_art_state`) so neither `"Reset layout"` nor page reloads reset it.
+- **Root Cause**: `PATCH-04` gated proximity latching on prior click (`revealedRef`) and cleared `art-wip` reveal/connections on reset/reload.
+- **Target Files**: `src/utils/artDiscovery.ts`, `src/utils/artDiscovery.test.ts`, `src/components/GraphCanvas.tsx`, `src/App.tsx`, `e2e/portfolio.spec.ts`.
+- **Verification Command**: `npm run typecheck && npm run build && npm run test:unit && CI=1 npx playwright test --config=./playwright.config.ts && npx openspec validate "art-wip-rainbow-node" --strict`
+- **Status**: APPLIED
+
+
+---
+
 ### [PATCH-04] Hidden `'art'` Tag, Progressive `forceLink` Latching (`1 -> 2 -> 3 -> 4`), Rainbow Gradient Bridges & Resettable Reveal
 - **Date**: 2026-11-14 08:13:00 UTC
 - **Feedback Source**: User Review Follow-up (PR #16)
@@ -88,5 +137,21 @@
   4. Reset `inspectedIds` (`revealedIds`) inside `resetAll()` so the `art` node reveal resets on both page reloads and canvas resets (`Reset layout`).
 - **Root Cause**: `PATCH-03`'s separate zero-force `artProximityIds` render path omitted `d3-force` springs and `LinearGradient` fills, and `resetAll()` did not clear `inspectedIds`.
 - **Target Files**: `src/data/projects.ts`, `src/utils/graphTopology.ts`, `src/components/NodeHoverCard.tsx`, `src/components/ProjectDrawer.tsx`, `src/components/ListView.tsx`, `src/App.tsx`, `src/physics/graphSimulation.ts`, `src/components/GraphCanvas.tsx`, `src/data/projects.test.ts`, `src/physics/graphSimulation.test.ts`, `e2e/portfolio.spec.ts`.
+- **Verification Command**: `npm run typecheck && npm run build && npm run test:unit && CI=1 npx playwright test --config=./playwright.config.ts && npx openspec validate "art-wip-rainbow-node" --strict`
+- **Status**: APPLIED
+
+
+---
+
+### [PATCH-05] Drag-to-Unlock `art` Node, `450ms` Rainbow Fade-In & Persistent Discovery
+- **Date**: 2026-11-14 08:33:00 UTC
+- **Feedback Source**: User Review Follow-up (PR #16)
+- **Reported Issue**:
+  1. Keep `art-wip` locked (no title pill, no color change, no hover card, no inspector drawer even on hover/click) until it is dragged to make at least one connection with an `'art'`-tagged node.
+  2. Allow `art-wip` to create proximity connections while still unrevealed and in motion.
+  3. On its first connection, quickly fade in the rainbow color (`450ms`) and unlock normal title, hover, and inspector behavior.
+  4. Persist the unlocked state and discovered connections in `localStorage` (`portfolio_art_state`) so neither `"Reset layout"` nor page reloads reset it.
+- **Root Cause**: `PATCH-04` gated proximity latching on prior click (`revealedRef`) and cleared `art-wip` reveal/connections on reset/reload.
+- **Target Files**: `src/utils/artDiscovery.ts`, `src/utils/artDiscovery.test.ts`, `src/components/GraphCanvas.tsx`, `src/App.tsx`, `e2e/portfolio.spec.ts`.
 - **Verification Command**: `npm run typecheck && npm run build && npm run test:unit && CI=1 npx playwright test --config=./playwright.config.ts && npx openspec validate "art-wip-rainbow-node" --strict`
 - **Status**: APPLIED

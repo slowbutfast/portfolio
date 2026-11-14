@@ -19,6 +19,12 @@ import type { PopoverObstacles } from '../utils/popoverPlacement';
 import { shouldClearStickyFocalOnTap } from '../utils/stickyFocal';
 import { deriveSwellActive, deriveSwellRetrigger } from '../utils/audioSwell';
 import { computeRainbowRgb, isRainbowNodeActive } from '../utils/rainbowPulse';
+import {
+  ART_COLOR_FADE_MS,
+  blendHexWithRgb,
+  loadArtDiscoveryState,
+  saveArtDiscoveryState,
+} from '../utils/artDiscovery';
 import type { AmbientSynth } from '../audio/ambientSynth';
 
 interface GraphCanvasProps {
@@ -321,8 +327,13 @@ export function GraphCanvas({
   const emptyRevealedRef = useRef<Set<string>>(new Set());
   const revealedRef = useRef(revealedIds ?? emptyRevealedRef.current);
   revealedRef.current = revealedIds ?? emptyRevealedRef.current;
-  const artConnectedIdsRef = useRef<Set<string>>(new Set());
-  const artMaxConnectionsRef = useRef<number>(1);
+  const artDiscoveryInitRef = useRef(loadArtDiscoveryState());
+  const artUnlockedRef = useRef<boolean>(artDiscoveryInitRef.current.unlocked);
+  const artConnectedIdsRef = useRef<Set<string>>(
+    new Set(artDiscoveryInitRef.current.connectedIds),
+  );
+  const artMaxConnectionsRef = useRef<number>(artDiscoveryInitRef.current.maxConnections);
+  const artFadeStartMsRef = useRef<number | null>(null);
   const onHoverNodeRef = useRef(onHoverNode);
   onHoverNodeRef.current = onHoverNode;
   const onCanvasDragStartRef = useRef(onCanvasDragStart);
@@ -418,6 +429,9 @@ export function GraphCanvas({
       initialPositions: scaledSeeds,
     });
     simRef.current = sim;
+    for (const id of artConnectedIdsRef.current) {
+      sim.connectLink('art-wip', id);
+    }
 
     // Node ids and permanent-edge keys never change for this mount; hoist them
     // out of the 60fps render loop.
@@ -542,6 +556,12 @@ export function GraphCanvas({
         const isHovered = !isFocused && sim.hovered?.id === n.id;
         const isActive = isFocused || isHovered;
         const isVisited = visited.has(n.id) || n.visited === true;
+        if (n.id === 'art-wip') {
+          if (artUnlockedRef.current) {
+            rainbowActiveIds.add(n.id);
+          }
+          continue;
+        }
         if (
           isRainbowNodeActive(
             getProjectById(n.id)?.rainbowOnInteract,
@@ -567,12 +587,31 @@ export function GraphCanvas({
       if (canvas.dataset.rainbowNodes !== rainbowNodesValue) {
         canvas.dataset.rainbowNodes = rainbowNodesValue;
       }
-      const revealedLabelsValue = [...revealedRef.current].sort().join(',');
+      const revealedSet = new Set(revealedRef.current);
+      if (artUnlockedRef.current) revealedSet.add('art-wip');
+      else revealedSet.delete('art-wip');
+      const revealedLabelsValue = [...revealedSet].sort().join(',');
       if (canvas.dataset.revealedLabels !== revealedLabelsValue) {
         canvas.dataset.revealedLabels = revealedLabelsValue;
       }
+      const artUnlockedValue = String(artUnlockedRef.current);
+      if (canvas.dataset.artUnlocked !== artUnlockedValue) {
+        canvas.dataset.artUnlocked = artUnlockedValue;
+      }
 
       const nodeColor = (id: string): string => {
+        if (id === 'art-wip') {
+          if (!artUnlockedRef.current) return tokens.nodeUnvisited;
+          if (rainbowVibrant && artFadeStartMsRef.current !== null && !reduceMotionRef.current) {
+            const t = Math.min(1, (nowMs - artFadeStartMsRef.current) / ART_COLOR_FADE_MS);
+            if (t >= 1) {
+              artFadeStartMsRef.current = null;
+              return rainbowVibrant;
+            }
+            return blendHexWithRgb(tokens.nodeUnvisited, rainbowVibrant, t);
+          }
+          if (rainbowVibrant) return rainbowVibrant;
+        }
         if (rainbowVibrant && rainbowActiveIds.has(id)) return rainbowVibrant;
         if (focused === id) return tokens.accent;
         if (!focused && sim.hovered?.id === id) return tokens.accent;
@@ -580,23 +619,32 @@ export function GraphCanvas({
         return tokens.nodeUnvisited;
       };
 
-      // Latch progressive `d3-force` links when revealed `art-wip` enters
-      // proximity of `'art'`-tagged projects, growing its cap 1 -> 2 -> 3 -> 4.
-      if (revealedRef.current.has('art-wip')) {
-        const artPos = active.get('art-wip');
-        if (artPos) {
-          for (const otherId of sortedNodeIds) {
-            if (otherId === 'art-wip') continue;
-            if (artConnectedIdsRef.current.has(otherId)) continue;
-            if (artConnectedIdsRef.current.size >= artMaxConnectionsRef.current) break;
-            if (!getProjectById(otherId)?.tags.includes('art')) continue;
-            const otherPos = active.get(otherId);
-            if (!otherPos) continue;
-            const distance = Math.hypot(artPos[0] - otherPos[0], artPos[1] - otherPos[1]);
-            if (distance < ART_PROXIMITY_MAX_DIST && sim.connectLink('art-wip', otherId)) {
-              artConnectedIdsRef.current.add(otherId);
-              artMaxConnectionsRef.current = Math.min(4, artMaxConnectionsRef.current + 1);
+      // Latch progressive `d3-force` links whenever `art-wip` enters
+      // proximity of `'art'`-tagged projects (even while still unrevealed/in motion),
+      // unlocking its label, color fade-in, hover, and inspector on first connection.
+      const artPos = active.get('art-wip');
+      if (artPos) {
+        for (const otherId of sortedNodeIds) {
+          if (otherId === 'art-wip') continue;
+          if (artConnectedIdsRef.current.has(otherId)) continue;
+          if (artConnectedIdsRef.current.size >= artMaxConnectionsRef.current) break;
+          if (!getProjectById(otherId)?.tags.includes('art')) continue;
+          const otherPos = active.get(otherId);
+          if (!otherPos) continue;
+          const distance = Math.hypot(artPos[0] - otherPos[0], artPos[1] - otherPos[1]);
+          if (distance < ART_PROXIMITY_MAX_DIST && sim.connectLink('art-wip', otherId)) {
+            const wasUnlocked = artUnlockedRef.current;
+            artConnectedIdsRef.current.add(otherId);
+            artMaxConnectionsRef.current = Math.min(4, artMaxConnectionsRef.current + 1);
+            artUnlockedRef.current = true;
+            if (!wasUnlocked && !reduceMotionRef.current) {
+              artFadeStartMsRef.current = nowMs;
             }
+            saveArtDiscoveryState({
+              unlocked: true,
+              connectedIds: [...artConnectedIdsRef.current].sort(),
+              maxConnections: artMaxConnectionsRef.current,
+            });
           }
         }
       }
@@ -783,8 +831,10 @@ export function GraphCanvas({
         }
 
         const shouldHideLabel =
-          getProjectById(n.id)?.revealLabelOnInspect === true &&
-          !revealedRef.current.has(n.id);
+          n.id === 'art-wip'
+            ? !artUnlockedRef.current
+            : getProjectById(n.id)?.revealLabelOnInspect === true &&
+              !revealedRef.current.has(n.id);
         if (shouldHideLabel) continue;
 
         ctx.font = LABEL_FONT;
@@ -1238,9 +1288,10 @@ export function GraphCanvas({
 
   useEffect(() => {
     if (layoutResetVersion <= 0) return;
-    artConnectedIdsRef.current.clear();
-    artMaxConnectionsRef.current = 1;
     simRef.current?.resetLayout();
+    for (const id of artConnectedIdsRef.current) {
+      simRef.current?.connectLink('art-wip', id);
+    }
     renderRef.current();
     wakeRef.current();
   }, [layoutResetVersion]);
@@ -1338,16 +1389,18 @@ export function GraphCanvas({
   buildObstacleSnapshotRef.current = buildObstacleSnapshot;
 
   const emitHover = (node: GraphNode | null) => {
-    const nextId = node?.id ?? null;
+    const effectiveNode =
+      node?.id === 'art-wip' && !artUnlockedRef.current ? null : node;
+    const nextId = effectiveNode?.id ?? null;
     if (nextId === hoveredProjectIdRef.current) return;
     hoveredProjectIdRef.current = nextId;
     syncSynthSwell();
-    if (!node) {
+    if (!effectiveNode) {
       onHoverNodeRef.current?.(null, null);
       return;
     }
-    const project = getProjectById(node.id) ?? null;
-    const anchor = nodeScreenPoint(node);
+    const project = getProjectById(effectiveNode.id) ?? null;
+    const anchor = nodeScreenPoint(effectiveNode);
     if (project && anchor) {
       onHoverNodeRef.current?.(project, anchor, buildObstacleSnapshot());
     } else {
@@ -1422,6 +1475,7 @@ export function GraphCanvas({
    * already owns the sticky focal highlight, dismisses that highlight instead.
    */
   const activateNode = (node: GraphNode) => {
+    if (node.id === 'art-wip' && !artUnlockedRef.current) return;
     if (
       shouldClearStickyFocalOnTap(
         node.id,

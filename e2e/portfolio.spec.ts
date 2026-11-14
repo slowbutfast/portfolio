@@ -1740,19 +1740,62 @@ test.describe('portfolio graph SPA', () => {
     expect(errors).toEqual([]);
   });
 
-  test('art-wip rainbow state, hidden label reveal, progressive art links, and reset lifecycle', async ({
+  test('art-wip stays locked until dragged to connect, then unlocks color/hover/inspect persistently', async ({
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'hover card is desktop-only');
     await page.goto('/');
     const canvas = page.getByTestId('graph-canvas');
+    await expect(canvas).toHaveAttribute('data-art-unlocked', 'false');
     await expect(canvas).toHaveAttribute('data-rainbow-nodes', '');
     await expect(canvas).toHaveAttribute('data-revealed-labels', '');
     await expect(canvas).toHaveAttribute('data-art-proximity-links', '');
     await expect(canvas).toHaveAttribute('data-art-max-connections', '1');
 
-    // Inspecting art-wip activates rainbow pulsing, reveals art label, omits 09/Overview,
-    // and keeps the latent 'art' tag hidden from the inspector panel.
+    // Before connection: hovering or clicking art-wip shows no color, no label, no hover card, no drawer.
+    await page.waitForTimeout(800);
+    const boxInitial = await canvas.boundingBox();
+    if (!boxInitial) throw new Error('graph canvas has no bounding box');
+    const initialArtPos = await canvas.getAttribute('data-art-node-pos');
+    if (!initialArtPos) throw new Error('missing data-art-node-pos');
+    const [initArtLocalX, initArtLocalY] = initialArtPos.split(',').map(Number);
+    const initArtX = boxInitial.x + initArtLocalX;
+    const initArtY = boxInitial.y + initArtLocalY;
+
+    await page.mouse.move(initArtX, initArtY);
+    await page.waitForTimeout(350);
+    await expect(page.getByTestId('node-hover-card')).toHaveCount(0);
+    await expect(canvas).toHaveAttribute('data-rainbow-nodes', '');
+
+    await page.mouse.click(initArtX, initArtY);
+    await expect(page.getByTestId('project-drawer')).toHaveCount(0);
+    await expect(canvas).toHaveAttribute('data-revealed-labels', '');
+    await expect(canvas).toHaveAttribute('data-rainbow-nodes', '');
+
+    await page.getByTestId('nav-art-wip').evaluate((el: HTMLButtonElement) => el.click());
+    await expect(page.getByTestId('project-drawer')).toHaveCount(0);
+
+    // Drag unrevealed art-wip toward center (open-dungeon): it latches automatically while in motion,
+    // fading in rainbow color and unlocking label, hover card, and inspector.
+    const artPosBeforeDrag = await canvas.getAttribute('data-art-node-pos');
+    if (!artPosBeforeDrag) throw new Error('missing data-art-node-pos');
+    const [artLocalX, artLocalY] = artPosBeforeDrag.split(',').map(Number);
+    const artX = boxInitial.x + artLocalX;
+    const artY = boxInitial.y + artLocalY;
+    const centerX = boxInitial.x + boxInitial.width / 2;
+    const centerY = boxInitial.y + boxInitial.height / 2;
+    await page.mouse.move(artX, artY);
+    await page.mouse.down();
+    await page.mouse.move(centerX, centerY, { steps: 16 });
+    await page.mouse.up();
+
+    await expect(canvas).toHaveAttribute('data-art-unlocked', 'true');
+    await expect(canvas).toHaveAttribute('data-art-proximity-links', /open-dungeon/);
+    await expect(canvas).toHaveAttribute('data-art-max-connections', /^[234]$/);
+    await expect(canvas).toHaveAttribute('data-rainbow-nodes', 'art-wip');
+    await expect(canvas).toHaveAttribute('data-revealed-labels', 'art-wip');
+
+    // Now inspecting art-wip opens ProjectDrawer normally (with hidden 'art' tag, no Overview/09).
     await page.getByTestId('nav-art-wip').evaluate((el: HTMLButtonElement) => el.click());
     await expect(page.getByTestId('project-drawer')).toBeVisible();
     await expect(page.getByTestId('drawer-visit')).toHaveAttribute('href', '/art/');
@@ -1763,72 +1806,23 @@ test.describe('portfolio graph SPA', () => {
     await expect(
       page.getByTestId('project-drawer').locator('.fluid-pill', { hasText: /^art$/i }),
     ).toHaveCount(0);
-    await expect(canvas).toHaveAttribute('data-rainbow-nodes', 'art-wip');
-    await expect(canvas).toHaveAttribute('data-revealed-labels', 'art-wip');
-    await expect(canvas).toHaveAttribute('data-art-proximity-links', '');
-
-    // Close drawer and drag revealed art-wip toward center (open-dungeon) to latch its
-    // first progressive real link and bump the max-connections cap from 1 -> 2.
     await page.getByTestId('drawer-close').click();
-    await expect(page.getByTestId('project-drawer')).toHaveCount(0);
-    await page.waitForTimeout(800);
-    const boxForDrag = await canvas.boundingBox();
-    if (!boxForDrag) throw new Error('graph canvas has no bounding box');
-    const artPosAttr = await canvas.getAttribute('data-art-node-pos');
-    if (!artPosAttr) throw new Error('missing data-art-node-pos');
-    const [artLocalX, artLocalY] = artPosAttr.split(',').map(Number);
-    const artX = boxForDrag.x + artLocalX;
-    const artY = boxForDrag.y + artLocalY;
-    const centerX = boxForDrag.x + boxForDrag.width / 2;
-    const centerY = boxForDrag.y + boxForDrag.height / 2;
-    await page.mouse.move(artX, artY);
-    await page.mouse.down();
-    await page.mouse.move(centerX, centerY, { steps: 16 });
-    await page.mouse.up();
+
+    // Reset layout does NOT reset the unlocked art node state or its discovered connections.
+    await page.getByTestId('controls-dropdown-trigger').click();
+    await page.getByTestId('reset-layout').click();
+    await expect(canvas).toHaveAttribute('data-art-unlocked', 'true');
+    await expect(canvas).toHaveAttribute('data-rainbow-nodes', 'art-wip');
+    await expect(canvas).toHaveAttribute('data-revealed-labels', /\bart-wip\b/);
     await expect(canvas).toHaveAttribute('data-art-proximity-links', /open-dungeon/);
     await expect(canvas).toHaveAttribute('data-art-max-connections', /^[234]$/);
 
-    // Reload: rainbow state persists via visitedIds, but art-wip label & dynamic links reset.
+    // Full page reload ALSO preserves the unlocked art node state and connections.
     await page.reload();
+    await expect(canvas).toHaveAttribute('data-art-unlocked', 'true');
     await expect(canvas).toHaveAttribute('data-rainbow-nodes', 'art-wip');
-    await expect(canvas).toHaveAttribute('data-revealed-labels', '');
-    await expect(canvas).toHaveAttribute('data-art-proximity-links', '');
-    await expect(canvas).toHaveAttribute('data-art-max-connections', '1');
-
-    // Re-inspect art-wip so label is revealed, then click Reset layout.
-    await page.getByTestId('nav-art-wip').evaluate((el: HTMLButtonElement) => el.click());
-    await expect(canvas).toHaveAttribute('data-revealed-labels', 'art-wip');
-    await page.getByTestId('drawer-close').click();
-    await page.getByTestId('controls-dropdown-trigger').click();
-    await page.getByTestId('reset-layout').click();
-
-    // Reset layout clears rainbow pulsing, re-hides the art-wip reveal, and resets proximity links.
-    await expect(canvas).toHaveAttribute('data-rainbow-nodes', '');
-    await expect(canvas).toHaveAttribute('data-revealed-labels', '');
-    await expect(canvas).toHaveAttribute('data-art-proximity-links', '');
-    await expect(canvas).toHaveAttribute('data-art-max-connections', '1');
-    await page.waitForTimeout(1500);
-    await page.getByTestId('nav-open-dungeon').focus();
-    await page.waitForTimeout(600);
-    const box = await canvas.boundingBox();
-    if (!box) throw new Error('graph canvas has no bounding box');
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await expect(page.getByTestId('node-hover-card')).toBeVisible();
-    await expect(page.getByTestId('node-hover-card')).not.toContainText(/\bart\b/);
-    await expect(page.getByTestId('node-hover-card')).not.toContainText('Click to inspect');
-
-    // Full page reload restores "Click to inspect ↗" and keeps art-wip hidden.
-    await page.reload();
-    await expect(canvas).toHaveAttribute('data-revealed-labels', '');
-    await page.waitForTimeout(1500);
-    await page.getByTestId('nav-open-dungeon').focus();
-    await page.waitForTimeout(600);
-    const boxAfterReload = await canvas.boundingBox();
-    if (!boxAfterReload) throw new Error('graph canvas has no bounding box');
-    await page.mouse.move(
-      boxAfterReload.x + boxAfterReload.width / 2,
-      boxAfterReload.y + boxAfterReload.height / 2,
-    );
-    await expect(page.getByTestId('node-hover-card')).toContainText('Click to inspect');
+    await expect(canvas).toHaveAttribute('data-revealed-labels', /\bart-wip\b/);
+    await expect(canvas).toHaveAttribute('data-art-proximity-links', /open-dungeon/);
+    await expect(canvas).toHaveAttribute('data-art-max-connections', /^[234]$/);
   });
 });
