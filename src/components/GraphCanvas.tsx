@@ -97,6 +97,8 @@ const EDGE_TAG_VERTICAL_PADDING = 4;
 const HOVER_DWELL_MS = 200;
 /** Proximity-only webbing appears for non-edge pairs inside this distance. */
 const PROXIMITY_MAX_DIST = 96;
+/** Revealed `art-wip` node connects to `art`-tagged projects inside this distance. */
+const ART_PROXIMITY_MAX_DIST = 180;
 
 function edgeKey(source: string, target: string): string {
   return [source, target].sort().join('\u0000');
@@ -579,6 +581,7 @@ export function GraphCanvas({
       // Zero-force proximity-only webbing for non-edge pairs. This pass paints
       // beneath permanent bridges and nodes, in deterministic sorted-pair order,
       // and skips every permanent edge so a detached bridge never duplicates.
+      const artProximityIds = new Set<string>();
       for (let i = 0; i < sortedNodeIds.length; i += 1) {
         for (let j = i + 1; j < sortedNodeIds.length; j += 1) {
           const sourceId = sortedNodeIds[i];
@@ -591,6 +594,32 @@ export function GraphCanvas({
           const ra = nodesById.get(sourceId)?.radius ?? 22;
           const rb = nodesById.get(targetId)?.radius ?? 22;
           const contactDistance = ra + rb;
+
+          if (sourceId === 'art-wip' || targetId === 'art-wip') {
+            const otherId = sourceId === 'art-wip' ? targetId : sourceId;
+            if (
+              !revealedRef.current.has('art-wip') ||
+              !getProjectById(otherId)?.tags.includes('art') ||
+              distance >= ART_PROXIMITY_MAX_DIST
+            ) {
+              continue;
+            }
+            const taper = smoothstep01((ART_PROXIMITY_MAX_DIST - distance) / 40);
+            if (taper <= 0) continue;
+            artProximityIds.add(otherId);
+            drawFluidBridge(
+              ctx,
+              { x: a[0], y: a[1] },
+              { x: b[0], y: b[1] },
+              ra,
+              rb,
+              tokens.connection,
+              0.85 * taper,
+              { restDistance: distance, sharedTagCount: 1, sag: 0 },
+            );
+            continue;
+          }
+
           if (distance <= contactDistance || distance >= PROXIMITY_MAX_DIST) continue;
           const fadeIn = smoothstep01((distance - contactDistance) / 12);
           const taper = 1 - distance / PROXIMITY_MAX_DIST;
@@ -606,6 +635,10 @@ export function GraphCanvas({
             { restDistance: distance, sharedTagCount: 1, sag: 0 },
           );
         }
+      }
+      const artProximityValue = [...artProximityIds].sort().join(',');
+      if (canvas.dataset.artProximityLinks !== artProximityValue) {
+        canvas.dataset.artProximityLinks = artProximityValue;
       }
 
       // Pure binary connections. No grayscale, no alpha fade on live edges;

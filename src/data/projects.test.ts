@@ -72,7 +72,7 @@ describe('project catalog contract', () => {
     const ivy = projects.find((p) => p.id === 'ivy-film-festival-2026');
     expect(kintsugi?.shortTitle).toBe('Kintsugi 3D');
     expect(kintsugi?.classification).toBe('PROCEDURAL MESH GENERATION // WEBGL');
-    expect(kintsugi?.tags).toEqual(['Graphics']);
+    expect(kintsugi?.tags).toEqual(['Graphics', 'art']);
     expect(kintsugi?.repo).toBe('https://github.com/slowbutfast/kintsugi-fracture');
     expect(kintsugi?.liveUrl).toBe('https://kintsugi-fracture.vercel.app/');
 
@@ -109,7 +109,7 @@ describe('project catalog contract', () => {
     expect(art?.title).toBe('art');
     expect(art?.shortTitle).toBe('art');
     expect(art?.summary).toBe('WIP');
-    expect(art?.tags).toEqual(['Design', 'Graphics']);
+    expect(art?.tags).toEqual([]);
     expect(art?.liveUrl).toBe('/art/');
     expect(art?.rainbowOnInteract).toBe(true);
     expect(art?.omitIndex).toBe(true);
@@ -118,9 +118,9 @@ describe('project catalog contract', () => {
     expect(art?.previews).toEqual([]);
   });
 
-  it('keeps sandwave-sim at exactly the two acoustic tags', () => {
+  it('keeps sandwave-sim at the acoustic tags plus implicit art tag', () => {
     const sandwave = projects.find((p) => p.id === 'sandwave-sim');
-    expect(sandwave?.tags).toEqual(['Vanilla JS', 'Audio']);
+    expect(sandwave?.tags).toEqual(['Vanilla JS', 'Audio', 'art']);
   });
 
 
@@ -163,19 +163,15 @@ describe('project catalog contract', () => {
     }
   });
 
-  it('derives exactly the pinned 17 edges from the real catalog', () => {
+  it('derives exactly the pinned 13 permanent edges from the real catalog', () => {
     const edges = deriveEdges(projects);
-    expect(edges).toHaveLength(17);
+    expect(edges).toHaveLength(13);
     const keys = edges.map((e) => [e.source, e.target].sort().join('<->')).sort();
     expect(keys).toEqual(
       [
-        'agentic-resume-builder<->art-wip',
         'agentic-resume-builder<->attention-max',
         'agentic-resume-builder<->ivy-film-festival-2026',
         'agentic-resume-builder<->open-dungeon',
-        'art-wip<->attention-max',
-        'art-wip<->ivy-film-festival-2026',
-        'art-wip<->kintsugi-fracture',
         'attention-max<->ivy-film-festival-2026',
         'attention-max<->kintsugi-fracture',
         'attention-max<->open-dungeon',

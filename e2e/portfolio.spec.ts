@@ -1238,7 +1238,7 @@ test.describe('portfolio graph SPA', () => {
     // A mixed active/dimmed pair must dim, unlike the old `&&` behavior.
     expect(dimmedEdges.has(edgeKey('open-dungeon', 'transcribe-plus'))).toBe(true);
     expect(dimmedEdges.has(edgeKey('attention-max', 'kintsugi-fracture'))).toBe(true);
-    expect(dimmedEdges.size).toBe(16);
+    expect(dimmedEdges.size).toBe(12);
   });
 
   test('hover dwell suppresses fast sweeps and opens after 200ms', async ({ page }, testInfo) => {
@@ -1759,7 +1759,7 @@ test.describe('portfolio graph SPA', () => {
     await expect(page.getByTestId('project-drawer')).not.toContainText('09');
     await expect(canvas).toHaveAttribute('data-rainbow-nodes', 'art-wip');
     await expect(canvas).toHaveAttribute('data-revealed-labels', 'art-wip');
-    await expect(canvas).toHaveAttribute('data-rainbow-tag-pills', /^(?:[1-9]\d*)$/);
+    await expect(canvas).toHaveAttribute('data-art-proximity-links', '');
 
     // Close drawer and reload: rainbow state persists via visitedIds, but ART label re-hides.
     await page.getByTestId('drawer-close').click();

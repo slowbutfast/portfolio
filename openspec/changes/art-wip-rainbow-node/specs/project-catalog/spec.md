@@ -5,30 +5,30 @@ The system SHALL maintain a typed dataset in `src/data/projects.ts` using `satis
 
 | Project ID | Mandatory Short Title | Paradigm Tags | Previews | Asset Source |
 | :--- | :--- | :--- | :--- | :--- |
-| `open-dungeon` | `OpenDungeon` | `Express`, `Vanilla JS`, `LLM`, `Agent Tooling` | `terminal`, `screenshot`, `linkout` | Real unit tests, real 1280×720 canvas screenshot, live linkout |
+| `open-dungeon` | `OpenDungeon` | `Express`, `Vanilla JS`, `LLM`, `Agent Tooling`, `art` | `terminal`, `screenshot`, `linkout` | Real unit tests, real 1280×720 canvas screenshot, live linkout |
 | `agentic-resume-builder` | `Resume Builder` | `Agent Tooling`, `LaTeX`, `Design` | `terminal` | Real CLI outputs (`--help`, `--schema`, `--list`, `--lint`) |
 | `pict-climate-risk-viz-chatbot` | `Climate Risk` | `Express`, `LLM`, `Geospatial` | `screenshot`, `linkout` | Real 1920×1080 bivariate risk map, repository link |
-| `transcribe-plus` | `Transcribe+` | `Express`, `Vanilla JS`, `Audio` | `video`, `terminal`, `linkout` | Bundled `src/assets/clip.mp4` imported via Vite, real `npm test` output |
-| `sandwave-sim` | `Sandwave` | `Vanilla JS`, `Audio` | `screenshot`, `terminal`, `linkout` | Real 1280×720 Chladni plate canvas screenshot, real `npm test` output, live linkout |
+| `transcribe-plus` | `Transcribe+` | `Express`, `Vanilla JS`, `Audio`, `art` | `video`, `terminal`, `linkout` | Bundled `src/assets/clip.mp4` imported via Vite, real `npm test` output |
+| `sandwave-sim` | `Sandwave` | `Vanilla JS`, `Audio`, `art` | `screenshot`, `terminal`, `linkout` | Real 1280×720 Chladni plate canvas screenshot, real `npm test` output, live linkout |
 | `attention-max` | `AttentionMax` | `Vanilla JS`, `WebExtension`, `Design`, `Graphics` | `screenshot`, `terminal`, `linkout` | Real 700×1040 extension popup UI screenshot, real `npm test` output, repository link |
-| `kintsugi-fracture` | `Kintsugi 3D` | `Graphics` | `screenshot`, `linkout` | Real 3D model processor screenshot, repository and Vercel live links |
+| `kintsugi-fracture` | `Kintsugi 3D` | `Graphics`, `art` | `screenshot`, `linkout` | Real 3D model processor screenshot, repository and Vercel live links |
 | `ivy-film-festival-2026` | `Ivy Film\nFestival` | `Design` | `screenshot`, `linkout` | Real festival landing page screenshot, live linkout (no repo) |
-| `art-wip` | `art` | `Design`, `Graphics` | `[]` (`liveUrl: '/art/'`) | Static `/art/` WIP endpoint, `rainbowOnInteract: true`, `omitIndex: true`, `hideOverview: true`, `revealLabelOnInspect: true` (no repo) |
+| `art-wip` | `art` | `[]` | `[]` (`liveUrl: '/art/'`) | Static `/art/` WIP endpoint, `rainbowOnInteract: true`, `omitIndex: true`, `hideOverview: true`, `revealLabelOnInspect: true` (no repo) |
 
 #### Scenario: Loading the project catalog
 - **WHEN** the portfolio initializes
 - **THEN** the system loads all 9 projects, verifying that every project defines a non-empty `shortTitle: string` and cleanly handles missing `repo` attributes.
 
 ### Requirement: Controlled tag vocabulary and tag-derived edge generation
-The system SHALL derive undirected graph edges between projects if and only if they share one or more controlled paradigm tags from a strict union (`LLM`, `Express`, `Vanilla JS`, `Audio`, `Agent Tooling`, `LaTeX`, `Geospatial`, `WebExtension`, `Graphics`, `Design`), with a weak link spring strength (0.015) that does not overpower planar seed homing so all nodes float freely without pulling the graph into a central cluster.
+The system SHALL derive undirected graph edges between projects if and only if they share one or more visible controlled paradigm tags from a strict union (`LLM`, `Express`, `Vanilla JS`, `Audio`, `Agent Tooling`, `LaTeX`, `Geospatial`, `WebExtension`, `Graphics`, `Design`, `art`), excluding `'art'` from pairwise `deriveEdges` and edge-tag pills so `art-wip` (`tags: []`) starts disconnected and only connects via proximity to `'art'`-tagged projects after being clicked.
 
 #### Scenario: Projects share controlled paradigm tags
 - **WHEN** project A and project B share at least one controlled paradigm tag
 - **THEN** an undirected link is generated connecting project A and project B labeled with their shared tags.
 
-#### Scenario: Expected exact 17-edge topology across the 9 projects
+#### Scenario: Expected exact 13-edge permanent topology across the 9 projects
 - **WHEN** the edge derivation utility processes the 9 catalog entries
-- **THEN** exactly 17 unique undirected edges are produced (the original 13 edges plus the 4 edges connecting `art-wip` to `agentic-resume-builder`, `attention-max`, `ivy-film-festival-2026`, and `kintsugi-fracture`).
+- **THEN** exactly 13 permanent undirected edges are produced (with `art-wip` starting disconnected in the top-left and connecting dynamically to `'art'`-tagged projects by proximity after click).
 
 #### Scenario: Projects share no controlled paradigm tags
 - **WHEN** two projects share zero common paradigm tags

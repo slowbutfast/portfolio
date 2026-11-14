@@ -63,7 +63,7 @@ The system SHALL initialize graph simulation nodes from the authoritative normal
 | `attention-max` | `(0.52, 0.80)` | Bottom vertex of the $K_4$ triangle; central hub |
 | `kintsugi-fracture` | `(0.84, 0.72)` | Lower-right perimeter node connected to AttentionMax and Art (WIP) |
 | `ivy-film-festival-2026` | `(0.15, 0.75)` | Lower-left perimeter node connected to Resume Builder, AttentionMax, and Art (WIP) |
-| `art-wip` | `(0.05, 0.97)` | Bottom-left outer-face node connected to Resume Builder, Ivy, AttentionMax, and Kintsugi 3D |
+| `art-wip` | `(0.16, 0.22)` | Top-left isolated node with 0 permanent edges; connects to `'art'`-tagged nodes by proximity after click |
 
 The system SHALL guarantee that:
 1. **Initial Mount Layout**: The affine safe-rectangle mapping preserves 0 straight-segment crossings for canvas dimensions larger than twice `BOUNDARY_MARGIN`. For smaller canvases, the implementation SHALL use a documented compact-layout policy; the margin invariant is not physically satisfiable there.

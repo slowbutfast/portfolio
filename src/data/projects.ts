@@ -33,7 +33,7 @@ export const projects = [
     summary:
       'Generative text-adventure engine with a 20-tool MCP server and an OAuth-gated multiplayer canvas.',
     classification: 'GENERATIVE ADVENTURE // MCP RUNTIME',
-    tags: ['Express', 'Vanilla JS', 'LLM', 'Agent Tooling'],
+    tags: ['Express', 'Vanilla JS', 'LLM', 'Agent Tooling', 'art'],
     repo: 'https://github.com/slowbutfast/open-dungeon',
     liveUrl: 'https://open-dungeon-three.vercel.app/',
     previews: [
@@ -84,7 +84,7 @@ export const projects = [
     summary:
       'Local transcription workspace with a Vite + Express 5 monorepo and an offline product demo video.',
     classification: 'LOCAL AUDIO TRANSCRIPTION // MONOREPO',
-    tags: ['Express', 'Vanilla JS', 'Audio'],
+    tags: ['Express', 'Vanilla JS', 'Audio', 'art'],
     repo: 'https://github.com/slowbutfast/transcribe-plus',
     liveUrl: 'https://transcribe-plus-frontend.vercel.app/',
     previews: [
@@ -101,7 +101,7 @@ export const projects = [
     summary:
       'Vanilla JS Chladni plate acoustic simulator rendering nodal-line sand patterns with Web Audio.',
     classification: 'ACOUSTIC PHYSICS SIMULATION // CHLADNI PLATES',
-    tags: ['Vanilla JS', 'Audio'],
+    tags: ['Vanilla JS', 'Audio', 'art'],
     repo: 'https://github.com/slowbutfast/sandwave-sim',
     liveUrl: 'https://sandwave-sim.vercel.app/',
     previews: [
@@ -134,7 +134,7 @@ export const projects = [
     summary:
       'WebGL fracture study that reassembles procedurally shattered geometry along gilded kintsugi seams in real time.',
     classification: 'PROCEDURAL MESH GENERATION // WEBGL',
-    tags: ['Graphics'],
+    tags: ['Graphics', 'art'],
     repo: 'https://github.com/slowbutfast/kintsugi-fracture',
     liveUrl: 'https://kintsugi-fracture.vercel.app/',
     previews: [
@@ -168,7 +168,7 @@ export const projects = [
     shortTitle: 'art',
     summary: 'WIP',
     classification: 'ART & VISUAL EXPERIMENTS // WIP',
-    tags: ['Design', 'Graphics'],
+    tags: [],
     liveUrl: '/art/',
     rainbowOnInteract: true,
     omitIndex: true,

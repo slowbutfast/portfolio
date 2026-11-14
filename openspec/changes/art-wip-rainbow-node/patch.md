@@ -5,6 +5,7 @@
 | :--- | :--- | :--- | :--- | :--- |
 | `PATCH-01` | 2026-11-14 | User Review Feedback on PR #16 | `src/types/portfolio.ts`, `src/data/projects.ts`, `src/utils/rainbowPulse.ts`, `src/physics/graphSimulation.ts`, `src/components/GraphCanvas.tsx`, `src/App.tsx`, `src/components/ProjectDrawer.tsx`, `src/components/ListView.tsx`, `src/data/projects.test.ts`, `src/physics/graphSimulation.test.ts`, `e2e/portfolio.spec.ts` | APPLIED |
 | `PATCH-02` | 2026-11-14 | User Review Follow-up on PR #16 | `src/types/portfolio.ts`, `src/data/projects.ts`, `src/physics/graphSimulation.ts`, `src/components/GraphCanvas.tsx`, `src/data/projects.test.ts`, `src/physics/graphSimulation.test.ts`, `e2e/portfolio.spec.ts` | APPLIED |
+| `PATCH-03` | 2026-11-14 | User Review Follow-up on PR #16 | `src/types/portfolio.ts`, `src/data/projects.ts`, `src/data/graphSeeds.ts`, `src/utils/graphTopology.ts`, `src/components/GraphCanvas.tsx`, `src/utils/graphPlanarity.test.ts`, `src/data/projects.test.ts`, `src/physics/graphSimulation.test.ts`, `e2e/portfolio.spec.ts` | APPLIED |
 
 ---
 
@@ -39,5 +40,20 @@
   2. Change `art-wip` `title` and `shortTitle` from `ART` to lowercase `art`.
 - **Root Cause**: Follow-up aesthetic & physics balance preference after `PATCH-01`.
 - **Target Files**: `src/types/portfolio.ts`, `src/data/projects.ts`, `src/physics/graphSimulation.ts`, `src/components/GraphCanvas.tsx`, `src/data/projects.test.ts`, `src/physics/graphSimulation.test.ts`, `e2e/portfolio.spec.ts`.
+- **Verification Command**: `npm run typecheck && npm run build && npm run test:unit && CI=1 npx playwright test --config=./playwright.config.ts && npx openspec validate "art-wip-rainbow-node" --strict`
+- **Status**: APPLIED
+
+
+---
+
+### [PATCH-03] Top-Left Isolated `art` Node & Post-Click Proximity Connections
+- **Date**: 2026-11-14 07:50:00 UTC
+- **Feedback Source**: User Review Follow-up (PR #16)
+- **Reported Issue**:
+  1. Give `art-wip` zero explicit tags (`tags: []`) and place it in the top-left empty space (`{ x: 0.16, y: 0.22 }`) with zero permanent edges on initial load (preserving the 13-edge planar graph with 0 crossings).
+  2. Add the invisible `'art'` tag to `open-dungeon`, `transcribe-plus`, `sandwave-sim`, and `kintsugi-fracture` (excluded from pairwise `deriveEdges` and edge-tag pills).
+  3. Once `art-wip` is clicked (`revealedRef.current.has('art-wip')`), dragging it within `180px` of any of those 4 `'art'`-tagged projects draws a proximity fluid bridge (`data-art-proximity-links`) with no tag pill on the connection.
+- **Root Cause**: Avoid $K_5$ non-planarity while giving `art-wip` a playful mystery discovery mechanic.
+- **Target Files**: `src/types/portfolio.ts`, `src/data/projects.ts`, `src/data/graphSeeds.ts`, `src/utils/graphTopology.ts`, `src/components/GraphCanvas.tsx`, `src/utils/graphPlanarity.test.ts`, `src/data/projects.test.ts`, `src/physics/graphSimulation.test.ts`, `e2e/portfolio.spec.ts`.
 - **Verification Command**: `npm run typecheck && npm run build && npm run test:unit && CI=1 npx playwright test --config=./playwright.config.ts && npx openspec validate "art-wip-rainbow-node" --strict`
 - **Status**: APPLIED

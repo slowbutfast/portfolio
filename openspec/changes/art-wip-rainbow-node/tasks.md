@@ -45,3 +45,10 @@
 - [x] 7.1 Remove `gravityWeight`, `gravityPullForce`, `linkStrengthFor`, and `sim.on('end')` / `.alphaDecay(0.03)` overrides in `src/types/portfolio.ts`, `src/physics/graphSimulation.ts`, and `src/components/GraphCanvas.tsx` to restore decentralized equal-mass node physics.
 - [x] 7.2 Update `art-wip` `title` and `shortTitle` to `'art'` in `src/data/projects.ts` and update `specs/graph-simulation/spec.md`, `specs/project-catalog/spec.md`, and `patch.md`.
 - [x] 7.3 Update `projects.test.ts`, `graphSimulation.test.ts`, and `e2e/portfolio.spec.ts`, re-run all checks, and update `verification.md`.
+
+
+## 8. PR #16 Review Patch (`PATCH-03`)
+
+- [x] 8.1 Add `'art'` to `ParadigmTag`, set `art-wip` `tags: []`, add `'art'` to `open-dungeon`, `transcribe-plus`, `sandwave-sim`, `kintsugi-fracture`, and exclude `'art'` from `deriveEdges`.
+- [x] 8.2 Place `art-wip` in the top-left empty space (`{ x: 0.16, y: 0.22 }`) and draw proximity bridges (`ART_PROXIMITY_MAX_DIST = 180`, `data-art-proximity-links`) to `'art'`-tagged nodes only after `art-wip` is clicked (`revealedRef`).
+- [x] 8.3 Update unit & E2E tests and OpenSpec docs (`patch.md`, `specs/`, `verification.md`).

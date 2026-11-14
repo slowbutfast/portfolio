@@ -8,7 +8,8 @@ export type ParadigmTag =
   | 'Geospatial'
   | 'WebExtension'
   | 'Graphics'
-  | 'Design';
+  | 'Design'
+  | 'art';
 
 export type TerminalStatus = 'ok' | 'warn' | 'error';
 

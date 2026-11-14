@@ -57,27 +57,31 @@ function countCrossings(positions: Positions, edges: GraphEdge[] = EDGES): numbe
 }
 
 describe('9-project planar catalog', () => {
-  it('has exactly 9 projects and 17 tag-derived edges', () => {
+  it('has exactly 9 projects and 13 permanent tag-derived edges', () => {
     expect(projects).toHaveLength(9);
-    expect(EDGES).toHaveLength(17);
+    expect(EDGES).toHaveLength(13);
     expect(projects).toHaveLength(PROJECT_IDS.length);
     expect(new Set(PROJECT_IDS).size).toBe(PROJECT_IDS.length);
   });
 
-  it('gives every project at least one graph connection', () => {
+  it('gives every project except art-wip at least one permanent connection', () => {
     const degree = new Map<string, number>(PROJECT_IDS.map((id) => [id, 0]));
     for (const edge of EDGES) {
       degree.set(edge.source, (degree.get(edge.source) ?? 0) + 1);
       degree.set(edge.target, (degree.get(edge.target) ?? 0) + 1);
     }
     for (const id of PROJECT_IDS) {
-      expect(degree.get(id), `${id} degree`).toBeGreaterThanOrEqual(1);
+      if (id === 'art-wip') {
+        expect(degree.get(id), `${id} degree`).toBe(0);
+      } else {
+        expect(degree.get(id), `${id} degree`).toBeGreaterThanOrEqual(1);
+      }
     }
   });
 
-  it('keeps sandwave-sim on only the acoustic tags and disconnected from kintsugi', () => {
+  it('keeps sandwave-sim on the acoustic tags plus implicit art tag and disconnected from kintsugi', () => {
     const sandwave = projects.find((project) => project.id === 'sandwave-sim');
-    expect(sandwave?.tags).toEqual(['Vanilla JS', 'Audio']);
+    expect(sandwave?.tags).toEqual(['Vanilla JS', 'Audio', 'art']);
     const connectedToKintsugi = EDGES.some(
       (edge) =>
         (edge.source === 'sandwave-sim' && edge.target === 'kintsugi-fracture') ||

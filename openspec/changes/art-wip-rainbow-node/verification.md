@@ -37,3 +37,11 @@
 - `npm run build`: exit 0 (`dist/index.html` + assets built)
 - `npm run test:unit`: `Test Files 20 passed (20)`, `Tests 213 passed (213)` (equal-mass physics restored, `art-wip` `title` & `shortTitle` verified as `'art'`)
 - `CI=1 npx playwright test --config=./playwright.config.ts`: `111 passed`, `37 skipped` (platform-gated desktop/mobile/preview skips), `0 failed` (verifies `art` title in drawer + equal-mass physics behavior)
+
+
+## `PATCH-03` Verification Logs
+
+- `npm run typecheck`: exit 0
+- `npm run build`: exit 0 (`dist/index.html` + assets built)
+- `npm run test:unit`: `Test Files 20 passed (20)`, `Tests 213 passed (213)` (13 permanent edges, 0 crossings across 1440×900, 393×852, 1920×1080, 320×900, 300 ticks, and `resetLayout`)
+- `CI=1 npx playwright test --config=./playwright.config.ts`: `111 passed`, `37 skipped` (platform-gated desktop/mobile/preview skips), `0 failed`

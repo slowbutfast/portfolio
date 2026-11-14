@@ -19,7 +19,7 @@ export function deriveEdges(projects: Tagged[]): GraphEdge[] {
     for (let j = i + 1; j < projects.length; j += 1) {
       const a = projects[i];
       const b = projects[j];
-      const shared = a.tags.filter((t) => b.tags.includes(t)).sort();
+      const shared = a.tags.filter((t) => t !== 'art' && b.tags.includes(t)).sort();
       if (shared.length > 0) {
         edges.push({ source: a.id, target: b.id, tags: shared });
       }

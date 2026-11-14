@@ -25,7 +25,7 @@ export const PLANAR_NODE_SEEDS: Record<string, PlanarSeed> = {
   'attention-max': { x: 0.52, y: 0.8 },
   'kintsugi-fracture': { x: 0.84, y: 0.72 },
   'ivy-film-festival-2026': { x: 0.15, y: 0.75 },
-  'art-wip': { x: 0.05, y: 0.97 },
+  'art-wip': { x: 0.16, y: 0.22 },
 };
 
 /**
