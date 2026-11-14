@@ -9,9 +9,9 @@ colors:
   on-surface-variant: "#525257"
   outline: "#71717a"
   outline-variant: "#c7c7cc"
-  primary: "#003399"
+  primary: "#2563eb"
   on-primary: "#ffffff"
-  primary-container: "#003399"
+  primary-container: "#2563eb"
   on-primary-container: "#ffffff"
   secondary: "#3d7fff"
   on-secondary: "#0a0a0c"
@@ -140,14 +140,14 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 
 ### 1. Swiss Typography, Binary Contrast
 - Helvetica / Helvetica Neue carries brand, headings, body, and canvas node label pills. Helvetica Light (`font-weight: 300`) carries metadata, tags, and secondary labels.
-- Menlo, Monaco, Consolas, Liberation Mono, and Courier New form the monospace stack, scoped strictly to the terminal simulator, CLI specimens, and coordinate HUDs.
+- Menlo, Monaco, Consolas, Liberation Mono, and Courier New form the monospace stack, scoped strictly to the terminal simulator and CLI specimens.
 - Two calibrated modes: warm museum paper (`#f6f6f4`) with black primitives by default, and a deep black void (`#0a0a0c`) with white primitives on demand.
 - Connections are pure binary: `#000000` in light mode and `#ffffff` in dark mode. No gray connection strokes.
 
 ### 2. Ferrofluid Constructivism
 - Nodes are pure, flat circular primitives (`r = 22px`) with no shadows, bevels, crosshairs, or contour lines.
 - Connected nodes fuse through bilateral cubic Bézier boundaries. The upper boundary leaves each circle along its exact perimeter tangent (C1 continuity), and the lower boundary is the mathematical reflection of the upper curve across the center-to-center axis. The waist cinches under distance tension.
-- Clicked/visited nodes adopt hyperlink cobalt: `#003399` on light, `#3d7fff` on dark.
+- Clicked/visited and active/highlighted nodes adopt cobalt blue: `#2563eb` on light, `#3d7fff` on dark.
 - Bridges are omitted entirely when circles touch or overlap (`d <= R_A + R_B`), never inverted through the centerline.
 
 ### 3. Radical Reduction (Ma)
@@ -163,7 +163,7 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 
 ### 5. Human Identity & Discoverability
 - The top-left wordmark is the author's name (`Gregory Lazatin`), rendered as naked typography with no pill, panel, or background container.
-- Top-right navigation is equally bare and ordered: `About`, `GitHub ↗`, `Graph` / `Grid`, `Sound`, `Dark` / `Light`, and a 3-dot overflow menu (`...`). When Sound is enabled, the three-dot glyph itself renders in `--color-accent` on both desktop and mobile; no separate indicator dot or badge is used.
+- Top-right navigation is equally bare. On hover-capable desktop (`>= 640px` and `hover: hover`), it is ordered: `About`, `GitHub ↗`, `Graph` / `Grid`, `Sound`, `Dark` / `Light`, and a 3-dot overflow menu (`...`), with a vertical volume slider popover anchored under `Sound`. On mobile (`< 640px`), `GitHub ↗` is omitted from the top bar (accessible in `AboutModal`) and the bar stays on a single row at `>= 360px` (`About`, `Graph` / `Grid`, `Dark` / `Light`, `...`), wrapping cleanly only at `320px`. On `< 640px` or `(hover: none)` devices, `Sound` and a horizontal `44px` volume slider live inside the 3-dot menu (`#portfolio-controls`). Whenever Sound is enabled, the three-dot glyph itself renders in `--color-accent` (`#2563eb` light, `#3d7fff` dark) on both desktop and mobile; no separate indicator dot or badge is used.
 - Hovering any node on a fine-pointer device reveals an interactive media card with its video or screenshot, title, tags, summary, and direct `Code ↗` / `Visit ↗` actions. A 150ms pointer-transfer grace period keeps the card alive when the cursor moves from node to card.
 - The About modal carries the canonical Brown University bio and top-mounted Email, LinkedIn, GitHub, and Resume links; the resume preview is a click-to-load sandboxed Google Drive iframe.
 
@@ -180,8 +180,8 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 | `on-surface-variant` | `#8e8e93` | `#525257` | Muted metadata (6.4:1 on `#eae9e5`) |
 | `outline` | `#71717a` | `#71717a` | Interactive boundaries (3.96:1 on `#eae9e5`) |
 | `outline-variant` | `#27272a` | `#c7c7cc` | Decorative dividers |
-| `primary` | `#003399` | `#003399` | International Klein Blue brand accent |
-| `secondary` | `#3d7fff` | `#3d7fff` | Non-text focus rings and selection boundaries |
+| `primary` | `#3d7fff` | `#2563eb` | Interactive accent & visited/highlighted nodes (`--color-brand` remains `#003399`) |
+| `secondary` | `#3d7fff` | `#2563eb` | Non-text focus rings and selection boundaries |
 | `tertiary` | `#eab308` | `#a16207` | Terminal warning / non-zero exit |
 
 > **Contrast rule:** `#3d7fff` is reserved for non-text UI indicators (focus rings, selection boundaries, active rings) that meet WCAG 2.1 SC 1.4.11 at >= 3:1. It is not approved for normal text on white or paper surfaces.
@@ -199,14 +199,14 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 | `Body` | Helvetica | `15px` | `400` | Summaries and descriptions |
 | `Secondary / Tag` | Helvetica Light | `11px` | `300` | Metadata, tags, uppercase plate labels |
 | `Canvas Label` | Helvetica | `12px` | `500` | 2D canvas project node pills |
-| `Data Mono` | Menlo | `12px` | `400–500` | Terminal output, CLI specimens, coordinate HUD |
+| `Data Mono` | Menlo | `12px` | `400–500` | Terminal output and CLI specimens |
 
 ---
 
 ## Component Anatomy
 
 ### Floating Top Bar
-- Naked typography floating directly over the canvas: `Gregory Lazatin` at top-left; `About`, `GitHub ↗`, `Graph` / `Grid`, `Sound`, `Dark` / `Light`, and a 3-dot overflow menu (`...`) at top-right, in that exact order. The 3-dot glyph is the sound-active affordance: it takes `--color-accent` while Sound is enabled and returns to the muted text color when Sound is off.
+- Naked typography floating directly over the canvas: `Gregory Lazatin` at top-left; on hover-capable desktop (`>= 640px` and `hover: hover`), `About`, `GitHub ↗`, `Graph` / `Grid`, `Sound`, `Dark` / `Light`, and a 3-dot overflow menu (`...`) at top-right, in that exact order. On mobile (`< 640px`), `GitHub ↗` is omitted from the bar and `Sound` + a horizontal `44px` volume slider move inside the 3-dot menu (`#portfolio-controls`) so the bar stays single-row at `>= 360px`. The 3-dot glyph is the sound-active affordance: it takes `--color-accent` (`#2563eb` light, `#3d7fff` dark) while Sound is enabled and returns to `--color-muted` when Sound is off.
 - No background fill, no border, and no pill wrapper around the top bar or its text links. A progressive gradient scrim from `var(--color-bg)` to transparent preserves legibility when Grid cards scroll beneath the bar.
 - Clicking the wordmark returns to graph view and resets the HUD. `Dark` / `Light` toggles the theme directly in the bar; the 3-dot menu opens a `rounded-2xl` popover containing the `Filters` heading, search, stackable tag pills, and a singular `Reset` action that clears filters, layout, and visited-node colors.
 
@@ -229,7 +229,7 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 
 ### Floating Inspector Tooltip
 - Positioned beside the clicked node with `(+32px, -40px)` offset, clamped to the viewport with a 16px margin on desktop.
-- On mobile (`< 768px`) the inspector docks to the bottom edge as a `rounded-t-2xl` bottom sheet with `max-h-[85dvh]`.
+- On mobile (`< 768px`) the inspector docks to the bottom edge as a draggable `rounded-t-2xl` 3-detent bottom sheet (`peek: 28dvh`, `half: 56dvh`, `full: 86dvh`, `16dvh` dismiss threshold, `120px` minimum visible graph strip).
 - Sticky header carries the project title, summary, and permanent `Code ↗` and, when available, `Visit ↗` actions.
 - Content tabs live in a distinct segmented track (`bg-[var(--color-surface-container)] rounded-full p-1`) containing only `Media` and/or `Terminal`, with >= 44px touch targets. The legacy `Link` tab is retired.
 - Non-repository linkouts render contextually in the Overview section. Plate, build SHA, and classification captions are omitted.
@@ -247,6 +247,8 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 - **Planar Resting State:** Initial, reduced-motion, and settled layouts derive from `PLANAR_NODE_SEEDS`; active dragging may temporarily displace nodes and homing returns them to the planar basin.
 - **Ferrofluid Tension:** Bridge width and waist respond continuously to distance; no interpolation loops or keyframes are needed.
 - **Hover Dwell:** `250ms` pointer dwell gates both simulation hover and the media card, cancelled synchronously on press, drag, leave, focus change, coasting, or reduced motion.
+- **Procedural Audio & Swell:** Web Audio synthesizer couples hover, node inspection, and node drag into a shared bandpass swell (`1.0` onset decaying over `1.2s` to a `0.35` plateau, retriggered on selection onset) mirrored via `data-audio-swell`.
+- **Coarse-Pointer Cadence:** Coarse-pointer/mobile devices cap canvas DPR at `2` and throttle idle ambient drift to `15fps`.
 - **Stepped Title Decode:** 12fps, <=350ms, once per drawer open, bypassed under `prefers-reduced-motion`.
 - **Theme Transition:** 180ms background/color ease; reduced-motion users receive instant changes. `theme-init.js` prevents first-paint theme flashes.
 
@@ -256,7 +258,7 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 
 | Viewport | Pattern | Rules |
 | :--- | :--- | :--- |
-| Mobile `< 768px` | Wrapped naked top bar, bottom-sheet inspector, stacked filter popover | Touch targets >= 44px, safe-area insets, `max-h-[85dvh]`; hover card disabled on coarse pointers |
+| Mobile `< 768px` | Single-row naked top bar (`>= 360px`), draggable 3-detent bottom-sheet inspector (`28`/`56`/`86dvh`), in-menu Sound & filter popover | Touch targets >= 44px, safe-area insets; hover card disabled on coarse pointers |
 | Desktop `>= 768px` | Naked top bar, HUD tooltip beside node, interactive hover card | Compact light metadata, node-hover crosshair, clamped inspector |
 
 ---
@@ -264,14 +266,14 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 ## Do's and Don'ts
 
 - **DO** keep connections pure binary (`#000000` light, `#ffffff` dark).
-- **DO** use International Klein Blue `#003399` as the light-theme brand accent, with `#3d7fff` for dark-mode non-text focus indicators.
+- **DO** use `#2563eb` as the light-theme interactive/visited accent (`--color-accent`), with `#3d7fff` for dark mode (`--color-brand` remains `#003399`).
 - **DO** keep the top bar as naked typography — no background panel, border, or pill wrapper.
 - **DO** fill canvas title knockout pills with the theme background only; never stroke them.
 - **DO** reveal an interactive hover media card on fine-pointer devices with a 150ms transfer grace period.
 - **DO** initialize and restore the graph from the authoritative planar seeds.
 - **DO** use Helvetica Light (`font-weight: 300`) for secondary metadata and tags.
 - **DO** use `rounded-full` for controls/chips and `rounded-2xl` for floating cards.
-- **DON'T** use Menlo outside terminals, CLI specimens, and coordinate HUDs.
+- **DON'T** use Menlo outside terminals and CLI specimens.
 - **DON'T** use `#3d7fff` for normal text on light surfaces.
 - **DON'T** render the terminal for any project other than `agentic-resume-builder`.
 - **DON'T** introduce un-themed hardcoded colors in the interface; bind visuals to CSS custom properties.

@@ -78,9 +78,9 @@ const DEFAULT_TOKENS: FluidTokens = {
   text: '#0a0a0c',
   muted: '#525257',
   outline: '#71717a',
-  accent: '#003399',
+  accent: '#2563eb',
   nodeUnvisited: '#0a0a0c',
-  nodeVisited: '#003399',
+  nodeVisited: '#2563eb',
   connection: '#000000',
 };
 
