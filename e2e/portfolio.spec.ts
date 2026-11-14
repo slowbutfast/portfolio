@@ -10,6 +10,7 @@ const PROJECT_IDS = [
   'attention-max',
   'kintsugi-fracture',
   'ivy-film-festival-2026',
+  'art-wip',
 ];
 
 const GITHUB_URL = 'https://github.com/slowbutfast';
@@ -409,11 +410,11 @@ test.describe('portfolio graph SPA', () => {
     );
   });
 
-  test('list view renders 8 cards and a card click opens the project drawer', async ({ page }) => {
+  test('list view renders 9 cards and a card click opens the project drawer', async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto('/');
     await page.getByTestId('view-toggle').click();
-    expect(PROJECT_IDS).toHaveLength(8);
+    expect(PROJECT_IDS).toHaveLength(9);
     for (const id of PROJECT_IDS) {
       await expect(page.getByTestId(`card-${id}`)).toBeVisible();
     }
@@ -423,10 +424,10 @@ test.describe('portfolio graph SPA', () => {
     expect(errors).toEqual([]);
   });
 
-  test('graph view exposes all 8 project nodes through the semantic nav', async ({ page }) => {
+  test('graph view exposes all 9 project nodes through the semantic nav', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByTestId('graph-canvas')).toBeVisible();
-    await expect(page.locator('nav[aria-label="Projects"] button')).toHaveCount(8);
+    await expect(page.locator('nav[aria-label="Projects"] button')).toHaveCount(9);
     for (const id of PROJECT_IDS) {
       await expect(page.getByTestId(`nav-${id}`)).toHaveCount(1);
     }
@@ -1237,10 +1238,10 @@ test.describe('portfolio graph SPA', () => {
     // A mixed active/dimmed pair must dim, unlike the old `&&` behavior.
     expect(dimmedEdges.has(edgeKey('open-dungeon', 'transcribe-plus'))).toBe(true);
     expect(dimmedEdges.has(edgeKey('attention-max', 'kintsugi-fracture'))).toBe(true);
-    expect(dimmedEdges.size).toBe(12);
+    expect(dimmedEdges.size).toBe(16);
   });
 
-  test('hover dwell suppresses fast sweeps and opens after 250ms', async ({ page }, testInfo) => {
+  test('hover dwell suppresses fast sweeps and opens after 150ms', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'hover previews are desktop-only');
     await page.goto('/');
     await page.waitForTimeout(1500);
@@ -1253,15 +1254,15 @@ test.describe('portfolio graph SPA', () => {
     const centerX = box.x + box.width / 2;
     const centerY = box.y + box.height / 2;
 
-    // Cross the centered node and leave well inside the 250ms dwell window.
+    // Cross the centered node and leave well inside the 150ms dwell window.
     await page.mouse.move(centerX, centerY);
     await page.mouse.move(box.x + 12, box.y + box.height - 12);
-    await page.waitForTimeout(120);
+    await page.waitForTimeout(100);
     await expect(page.getByTestId('node-hover-card')).toHaveCount(0);
 
-    // Returning and dwelling opens the card only after the timer fires.
+    // Returning and dwelling opens the card only after the 150ms timer fires.
     await page.mouse.move(centerX, centerY);
-    await page.waitForTimeout(180);
+    await page.waitForTimeout(70);
     await expect(page.getByTestId('node-hover-card')).toHaveCount(0);
     await expect(page.getByTestId('node-hover-card')).toBeVisible();
   });
@@ -1729,5 +1730,66 @@ test.describe('portfolio graph SPA', () => {
     } finally {
       await client.send('Emulation.setCPUThrottlingRate', { rate: 1 });
     }
+  });
+
+  test('/art/ endpoint serves raw WIP HTML title and body', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/art/');
+    await expect(page).toHaveTitle('WIP');
+    await expect(page.locator('body')).toHaveText('WIP');
+    expect(errors).toEqual([]);
+  });
+
+  test('art-wip rainbow state persists until Reset layout and hides Click to inspect after node click', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'hover card is desktop-only');
+    await page.goto('/');
+    const canvas = page.getByTestId('graph-canvas');
+    await expect(canvas).toHaveAttribute('data-rainbow-nodes', '');
+
+    // Inspecting art-wip activates rainbow pulsing and reveals WIP media + /art/ Visit link.
+    await page.getByTestId('nav-art-wip').evaluate((el: HTMLButtonElement) => el.click());
+    await expect(page.getByTestId('project-drawer')).toBeVisible();
+    await expect(page.getByTestId('drawer-visit')).toHaveAttribute('href', '/art/');
+    await expect(page.getByTestId('project-drawer')).toContainText('WIP');
+    await expect(canvas).toHaveAttribute('data-rainbow-nodes', 'art-wip');
+    await expect(canvas).toHaveAttribute('data-rainbow-tag-pills', /^(?:[1-9]\d*)$/);
+
+    // Close drawer and reload: rainbow state persists via visitedIds.
+    await page.getByTestId('drawer-close').click();
+    await expect(page.getByTestId('project-drawer')).toHaveCount(0);
+    await page.reload();
+    await expect(canvas).toHaveAttribute('data-rainbow-nodes', 'art-wip');
+
+    // Click any node to hide "Click to inspect ↗" for the session, then Reset layout.
+    await page.getByTestId('nav-open-dungeon').evaluate((el: HTMLButtonElement) => el.click());
+    await page.getByTestId('drawer-close').click();
+    await page.getByTestId('controls-dropdown-trigger').click();
+    await page.getByTestId('reset-layout').click();
+
+    // Reset layout clears rainbow node pulsing, but "Click to inspect ↗" stays hidden.
+    await expect(canvas).toHaveAttribute('data-rainbow-nodes', '');
+    await page.waitForTimeout(1500);
+    await page.getByTestId('nav-open-dungeon').focus();
+    await page.waitForTimeout(600);
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error('graph canvas has no bounding box');
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await expect(page.getByTestId('node-hover-card')).toBeVisible();
+    await expect(page.getByTestId('node-hover-card')).not.toContainText('Click to inspect');
+
+    // Full page reload restores "Click to inspect ↗".
+    await page.reload();
+    await page.waitForTimeout(1500);
+    await page.getByTestId('nav-open-dungeon').focus();
+    await page.waitForTimeout(600);
+    const boxAfterReload = await canvas.boundingBox();
+    if (!boxAfterReload) throw new Error('graph canvas has no bounding box');
+    await page.mouse.move(
+      boxAfterReload.x + boxAfterReload.width / 2,
+      boxAfterReload.y + boxAfterReload.height / 2,
+    );
+    await expect(page.getByTestId('node-hover-card')).toContainText('Click to inspect');
   });
 });

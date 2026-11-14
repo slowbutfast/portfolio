@@ -50,6 +50,7 @@ export default function App() {
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [theme, setTheme] = useState<ThemeMode>(readStoredTheme);
   const [visitedIds, setVisitedIds] = useState<Set<string>>(readStoredVisited);
+  const [hasInspectedAnyNode, setHasInspectedAnyNode] = useState(false);
   const [drawerAnchor, setDrawerAnchor] = useState<CanvasAnchor | null>(null);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [hoverState, setHoverState] = useState<HoverState>(null);
@@ -207,6 +208,7 @@ export default function App() {
       if (!getProjectById(id)) return;
       setIsAboutOpen(false);
       dismissHover();
+      setHasInspectedAnyNode(true);
       if (
         document.activeElement instanceof HTMLElement &&
         document.activeElement !== document.body
@@ -416,6 +418,7 @@ export default function App() {
           position={hoverState.position}
           canvasCenter={canvasCenter}
           obstacles={hoverObstacles}
+          showInspectHint={!hasInspectedAnyNode}
           onPointerEnter={clearHoverDismissal}
           onPointerLeave={scheduleHoverDismiss}
         />

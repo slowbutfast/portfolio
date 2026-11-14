@@ -29,6 +29,9 @@ function CardPreview({ project }: { project: ProjectData }) {
     (preview): preview is Extract<Preview, { kind: 'screenshot' }> =>
       preview.kind === 'screenshot',
   );
+  const wipPreview = project.previews.find(
+    (preview): preview is Extract<Preview, { kind: 'wip' }> => preview.kind === 'wip',
+  );
 
   if (video) {
     return (
@@ -56,6 +59,16 @@ function CardPreview({ project }: { project: ProjectData }) {
           loading="lazy"
           className="h-full w-full object-cover"
         />
+      </div>
+    );
+  }
+
+  if (wipPreview) {
+    return (
+      <div className="flex aspect-video w-full items-center justify-center rounded-xl border border-[var(--color-outline)] bg-[var(--color-bg)]">
+        <span className="font-mono text-sm uppercase tracking-[0.22em] text-[var(--color-muted)]">
+          {wipPreview.label}
+        </span>
       </div>
     );
   }

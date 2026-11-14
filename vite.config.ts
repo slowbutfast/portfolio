@@ -14,7 +14,21 @@ const commitHash = resolveCommitHash(process.env, () =>
 );
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    {
+      name: 'wip-art-dir-index',
+      configureServer(server) {
+        server.middlewares.use((req, _res, next) => {
+          if (req.url === '/art' || req.url === '/art/') {
+            req.url = '/art/index.html';
+          }
+          next();
+        });
+      },
+    },
+  ],
   define: {
     __COMMIT_HASH__: JSON.stringify(commitHash),
   },

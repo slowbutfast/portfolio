@@ -1,0 +1,31 @@
+## 1. Test Scaffolding (TDD)
+
+- [x] 1.1 Write unit tests in `src/utils/rainbowPulse.test.ts` covering `isRainbowNodeActive` truth table, `computeRainbowRgb` HSL-to-RGB cycling over time, dark/light theme lightness, and `prefers-reduced-motion: reduce` determinism.
+- [x] 1.2 Update `src/data/projects.test.ts` and `src/utils/graphPlanarity.test.ts` for the 9-project (`art-wip`), 17-edge planar catalog, and `wip` preview support.
+- [x] 1.3 Update `e2e/portfolio.spec.ts` (9-project count, `150ms` hover dwell timing, `/art/` endpoint `WIP` check, `art-wip` rainbow state activation/persistence/`Reset layout` clearing, and `"Click to inspect ↗"` dismissal across `Reset layout` + restoration on reload).
+- [x] 1.4 Add regression tests for the 320×900 boundary-clamped crossing and shared safe-canvas affine mapping, plus sampled contrast checks for the node outline and muted tag-pill text in both themes.
+
+## 2. Static `/art/` Endpoint & Catalog Data
+
+- [x] 2.1 Create `public/art/index.html` with `<title>WIP</title>`, body text `WIP`, and zero inline scripts/styles.
+- [x] 2.2 Extend `Preview` (`{ kind: 'wip'; label: string }`) and `ProjectData` (`rainbowOnInteract?: boolean`) in `src/types/portfolio.ts`.
+- [x] 2.3 Add `art-wip` (`Art (WIP)`, `tags: ['Design', 'Graphics']`, `liveUrl: '/art/'`, `rainbowOnInteract: true`, `wip` + `linkout` previews) to `src/data/projects.ts`.
+- [x] 2.4 Add `'art-wip': { x: 0.05, y: 0.97 }` to `PLANAR_NODE_SEEDS` in `src/data/graphSeeds.ts`.
+- [x] 2.5 Apply the same safe-canvas affine seed transform to initial positions, simulation homing, resize, and link rest-distance calculations in `graphSeeds.ts`, `graphSimulation.ts`, and `GraphCanvas.tsx`.
+
+## 3. Rainbow RGB Pulse Engine & Canvas Integration
+
+- [x] 3.1 Implement `isRainbowNodeActive` and `computeRainbowRgb(nowMs, reducedMotion, theme, variant)` in `src/utils/rainbowPulse.ts`; the `'muted'` variant must adjust lightness to maintain 4.5:1 contrast against both actual pill surfaces.
+- [x] 3.2 Integrate the helper into `GraphCanvas.tsx`: animate the Art node/bridge endpoint fill, keep the node label at theme foreground, apply synchronized contrast-safe muted rainbow text to focal connected tag pills, add a stable contrasting node outline, and expose `canvas.dataset.rainbowNodes` plus `canvas.dataset.rainbowTagPills` for observability.
+- [x] 3.3 Lower `HOVER_DWELL_MS` from `250` to `150` in `src/components/GraphCanvas.tsx`.
+
+## 4. WIP Previews & Session Inspect Hint Dismissal
+
+- [x] 4.1 Add `{ kind: 'wip' }` rendering in `src/components/MediaView.tsx`, `src/components/ProjectDrawer.tsx` (`Media` tab + `mediaPreviews`), `src/components/NodeHoverCard.tsx`, and `src/components/ListView.tsx`.
+- [x] 4.2 Guard `Code ↗` in `src/components/NodeHoverCard.tsx` with `{project.repo && ...}` and add `showInspectHint?: boolean` prop to conditionally hide `"Click to inspect ↗"`.
+- [x] 4.3 Add session-only `hasInspectedAnyNode` state in `src/App.tsx` (set to `true` in `openProject`, preserved across `resetAll()`, reset on reload) and pass `showInspectHint={!hasInspectedAnyNode}` to `<NodeHoverCard />`.
+
+## 5. Verification & Empirical Audit
+
+- [x] 5.1 Run `npm run typecheck`, `npm run build`, `npm test`, and `npx playwright test`, verifying clean passes and `dist/art/index.html` emission.
+- [x] 5.2 Populate `verification.md` with the Requirement Adherence Matrix, resolved assumptions, and verbatim execution logs, and run `npx openspec validate "art-wip-rainbow-node" --strict`.

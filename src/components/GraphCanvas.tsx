@@ -18,6 +18,7 @@ import {
 import type { PopoverObstacles } from '../utils/popoverPlacement';
 import { shouldClearStickyFocalOnTap } from '../utils/stickyFocal';
 import { deriveSwellActive, deriveSwellRetrigger } from '../utils/audioSwell';
+import { computeRainbowRgb, isRainbowNodeActive } from '../utils/rainbowPulse';
 import type { AmbientSynth } from '../audio/ambientSynth';
 
 interface GraphCanvasProps {
@@ -92,7 +93,7 @@ const EDGE_TAG_LINE_SPACING = 1.15;
 const EDGE_TAG_VERTICAL_PADDING = 4;
 
 /** Unified hover gate shared by simulation pinning and the DOM preview card. */
-const HOVER_DWELL_MS = 250;
+const HOVER_DWELL_MS = 150;
 /** Proximity-only webbing appears for non-edge pairs inside this distance. */
 const PROXIMITY_MAX_DIST = 96;
 
@@ -245,6 +246,7 @@ function drawEdgeTagPills(
   y: number,
   tags: string[],
   tokens: FluidTokens,
+  textColor: string = tokens.accent,
 ): number {
   if (tags.length === 0) return 0;
   const visible = tags.slice(0, 3);
@@ -265,7 +267,7 @@ function drawEdgeTagPills(
   ctx.fillStyle = tokens.surfaceContainer;
   ctx.fill();
 
-  ctx.fillStyle = tokens.accent;
+  ctx.fillStyle = textColor;
   for (let index = 0; index < visible.length; index += 1) {
     ctx.fillText(
       visible[index],
@@ -524,7 +526,41 @@ export function GraphCanvas({
         delete canvas.dataset.selectedScreenY;
       }
 
+      const nowMs = performance.now();
+      const rainbowActiveIds = new Set<string>();
+      for (const n of sim.nodes) {
+        const isFocused = focused === n.id;
+        const isHovered = !isFocused && sim.hovered?.id === n.id;
+        const isActive = isFocused || isHovered;
+        const isVisited = visited.has(n.id) || n.visited === true;
+        if (
+          isRainbowNodeActive(
+            getProjectById(n.id)?.rainbowOnInteract,
+            isActive,
+            isVisited,
+          )
+        ) {
+          rainbowActiveIds.add(n.id);
+        }
+      }
+      const activeTheme =
+        document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+      const rainbowVibrant =
+        rainbowActiveIds.size > 0
+          ? computeRainbowRgb(nowMs, reduceMotionRef.current, activeTheme, 'vibrant')
+          : null;
+      const rainbowMuted =
+        rainbowActiveIds.size > 0
+          ? computeRainbowRgb(nowMs, reduceMotionRef.current, activeTheme, 'muted')
+          : null;
+
+      const rainbowNodesValue = [...rainbowActiveIds].sort().join(',');
+      if (canvas.dataset.rainbowNodes !== rainbowNodesValue) {
+        canvas.dataset.rainbowNodes = rainbowNodesValue;
+      }
+
       const nodeColor = (id: string): string => {
+        if (rainbowVibrant && rainbowActiveIds.has(id)) return rainbowVibrant;
         if (focused === id) return tokens.accent;
         if (!focused && sim.hovered?.id === id) return tokens.accent;
         if (visited.has(id) || nodesById.get(id)?.visited === true) return tokens.nodeVisited;
@@ -621,6 +657,7 @@ export function GraphCanvas({
 
       // Focal-only shared-tag labels ride above the bridges and beneath nodes.
       let focalTagCount = 0;
+      let rainbowTagPillCount = 0;
       if (focalId !== null) {
         for (const edge of edges) {
           if (edge.source !== focalId && edge.target !== focalId) continue;
@@ -631,18 +668,28 @@ export function GraphCanvas({
           const a = active.get(edge.source);
           const b = active.get(edge.target);
           if (!a || !b) continue;
-          focalTagCount += drawEdgeTagPills(
+          const usesRainbowTag =
+            rainbowMuted !== null &&
+            (rainbowActiveIds.has(edge.source) || rainbowActiveIds.has(edge.target));
+          const drawnCount = drawEdgeTagPills(
             ctx,
             (a[0] + b[0]) / 2,
             (a[1] + b[1]) / 2,
             edge.tags,
             tokens,
+            usesRainbowTag ? rainbowMuted : tokens.accent,
           );
+          focalTagCount += drawnCount;
+          if (usesRainbowTag) rainbowTagPillCount += drawnCount;
         }
       }
       const focalTagValue = String(focalTagCount);
       if (canvas.dataset.focalTagPills !== focalTagValue) {
         canvas.dataset.focalTagPills = focalTagValue;
+      }
+      const rainbowTagValue = String(rainbowTagPillCount);
+      if (canvas.dataset.rainbowTagPills !== rainbowTagValue) {
+        canvas.dataset.rainbowTagPills = rainbowTagValue;
       }
 
       // Pure circular primitives, with a background-matched pill behind each
@@ -655,17 +702,18 @@ export function GraphCanvas({
         const isFocused = focused === n.id;
         const isHovered = !isFocused && sim.hovered?.id === n.id;
         const isActive = isFocused || isHovered;
-        const isVisited = visited.has(n.id) || n.visited === true;
+        const isRainbow = rainbowActiveIds.has(n.id);
 
         ctx.globalAlpha = isDim ? 0.2 : 1;
         ctx.beginPath();
         ctx.arc(x, y, n.radius, 0, Math.PI * 2);
-        ctx.fillStyle = isActive
-          ? tokens.accent
-          : isVisited
-            ? tokens.nodeVisited
-            : tokens.nodeUnvisited;
+        ctx.fillStyle = nodeColor(n.id);
         ctx.fill();
+        if (isRainbow) {
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = tokens.text;
+          ctx.stroke();
+        }
 
         ctx.font = LABEL_FONT;
         const labelWidth = ctx.measureText(n.label).width;
@@ -679,7 +727,7 @@ export function GraphCanvas({
         ctx.fillStyle = tokens.bg;
         ctx.fill();
 
-        ctx.fillStyle = isActive ? tokens.accent : tokens.text;
+        ctx.fillStyle = isActive && !isRainbow ? tokens.accent : tokens.text;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(n.label, x, pillY + pillHeight / 2);

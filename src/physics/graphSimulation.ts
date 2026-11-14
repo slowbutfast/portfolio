@@ -14,7 +14,7 @@ import {
   stepBridgeOscillator,
   type BridgeOscillatorState,
 } from '../utils/bridgeOscillator';
-import { PLANAR_NODE_SEEDS } from '../data/graphSeeds';
+import { PLANAR_NODE_SEEDS, scaleSeedPoint } from '../data/graphSeeds';
 
 export type SimState = 'idle' | 'hover' | 'drag' | 'coasting';
 
@@ -209,7 +209,7 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
     for (const node of opts.nodes) {
       const seed = opts.seeds?.[node.id];
       if (seed) {
-        targets.set(node.id, [seed.x * w, seed.y * h]);
+        targets.set(node.id, scaleSeedPoint(seed, w, h, BOUNDARY_MARGIN));
         continue;
       }
       const explicit = opts.initialPositions?.[node.id];
@@ -260,13 +260,16 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
   const recomputeRestDistances = (w: number, h: number) => {
     restDistances.clear();
     for (const link of opts.links) {
-      // Seed distances are normalized to a 1x1 box. Scale each axis by the
-      // container size (the seed map uses an affine embedding).
+      // Seed distances use the same safe-canvas affine transform as homing
+      // targets so rest lengths match the boundary-safe planar layout.
       const a = seeds[link.source];
       const b = seeds[link.target];
-      const scaled = a && b
-        ? Math.hypot((a.x - b.x) * w, (a.y - b.y) * h)
-        : LINK_DISTANCE;
+      let scaled = LINK_DISTANCE;
+      if (a && b) {
+        const [ax, ay] = scaleSeedPoint(a, w, h, BOUNDARY_MARGIN);
+        const [bx, by] = scaleSeedPoint(b, w, h, BOUNDARY_MARGIN);
+        scaled = Math.hypot(ax - bx, ay - by);
+      }
       restDistances.set(linkKey(link.source, link.target), Math.max(1, scaled));
     }
   };

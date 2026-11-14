@@ -162,6 +162,20 @@ export const projects = [
       },
     ],
   },
+  {
+    id: 'art-wip',
+    title: 'Art (WIP)',
+    shortTitle: 'Art (WIP)',
+    summary: 'WIP — Art & visual experiments page currently under construction.',
+    classification: 'ART & VISUAL EXPERIMENTS // WIP',
+    tags: ['Design', 'Graphics'],
+    liveUrl: '/art/',
+    rainbowOnInteract: true,
+    previews: [
+      { kind: 'wip', label: 'WIP' },
+      { kind: 'linkout', url: '/art/', label: 'Visit WIP page' },
+    ],
+  },
 ] satisfies ProjectData[];
 
 export function getProjectById(id: string): ProjectData | undefined {

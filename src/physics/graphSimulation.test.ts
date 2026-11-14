@@ -117,8 +117,8 @@ describe('graphSimulation seed homing', () => {
 
     const node = sim.findNode('open-dungeon')!;
     expect(node.label).toBe('OpenDungeon');
-    expect(node.x).toBeCloseTo(400, 6);
-    expect(node.y).toBeCloseTo(240, 6);
+    expect(node.x).toBeCloseTo(48 + 0.4 * (1000 - 96), 6);
+    expect(node.y).toBeCloseTo(48 + 0.48 * (500 - 96), 6);
 
     sim.destroy();
   });
@@ -281,7 +281,7 @@ describe('drag-time bridge snapping and recovery', () => {
     });
 
     const link = sim.findLink('a', 'b')!;
-    expect(link.restDistance).toBeCloseTo(100, 6);
+    expect(link.restDistance).toBeCloseTo(90.4, 6);
 
     const node = sim.findNode('a')!;
     sim.dragStart(node);
@@ -319,7 +319,7 @@ describe('drag-time bridge snapping and recovery', () => {
       initialPositions: scaleSeeds(PLANAR_NODE_SEEDS, width, height),
     });
 
-    expect(sim.linkStates).toHaveLength(13);
+    expect(sim.linkStates).toHaveLength(17);
     const node = sim.findNode('attention-max')!;
     sim.dragStart(node);
     sim.dragMove(node.x + 900, node.y + 400);
@@ -329,7 +329,7 @@ describe('drag-time bridge snapping and recovery', () => {
     sim.resetLayout();
 
     for (let i = 0; i < 600; i += 1) sim.tick();
-    expect(sim.linkStates).toHaveLength(13);
+    expect(sim.linkStates).toHaveLength(17);
     expect(sim.linkStates.every((link) => !link.isDetached)).toBe(true);
     sim.destroy();
   });
@@ -446,12 +446,12 @@ describe('decoupled drag and persistent user pinning', () => {
     expect(node.fx).toBeNull();
     expect(node.fy).toBeNull();
     expect(link.isDetached).toBe(false);
-    expect(node.x).toBeCloseTo(0.4 * 1000, 6);
-    expect(node.y).toBeCloseTo(0.5 * 1000, 6);
+    expect(node.x).toBeCloseTo(48 + 0.4 * (1000 - 96), 6);
+    expect(node.y).toBeCloseTo(48 + 0.5 * (1000 - 96), 6);
 
     for (let i = 0; i < 60; i += 1) sim.tick();
-    expect(Math.abs(node.x - 0.4 * 1000)).toBeLessThan(30);
-    expect(Math.abs(node.y - 0.5 * 1000)).toBeLessThan(30);
+    expect(Math.abs(node.x - (48 + 0.4 * (1000 - 96)))).toBeLessThan(30);
+    expect(Math.abs(node.y - (48 + 0.5 * (1000 - 96)))).toBeLessThan(30);
     sim.destroy();
   });
 });
@@ -540,10 +540,10 @@ describe('visual ambient drift', () => {
 });
 
 describe('proximity pairs never create force links', () => {
-  it('keeps exactly the 13 permanent links in the simulation', () => {
+  it('keeps exactly the 17 permanent links in the simulation', () => {
     const sim = fullSim();
-    expect(sim.links).toHaveLength(13);
-    expect(sim.linkStates).toHaveLength(13);
+    expect(sim.links).toHaveLength(17);
+    expect(sim.linkStates).toHaveLength(17);
     expect(sim.sim.force('proximity')).toBeUndefined();
     sim.destroy();
   });

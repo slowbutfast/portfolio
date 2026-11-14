@@ -32,6 +32,7 @@ export type Preview =
   | { kind: 'terminal'; label: string }
   | { kind: 'video'; src: string; poster?: string; caption: string }
   | { kind: 'screenshot'; src: string; caption: string }
+  | { kind: 'wip'; label: string }
   | { kind: 'linkout'; url: string; label: string };
 
 export interface ProjectData {
@@ -46,6 +47,8 @@ export interface ProjectData {
   /** Public source repository. Omitted for client/design work without one. */
   repo?: string;
   liveUrl?: string;
+  /** Opt-in rainbow RGB pulse on hover or while visited (until canvas reset). */
+  rainbowOnInteract?: boolean;
   previews: Preview[];
   terminalDemo?: TerminalDemo;
 }

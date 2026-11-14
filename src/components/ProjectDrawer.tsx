@@ -132,7 +132,11 @@ export function ProjectDrawer({
     if (project.id === 'agentic-resume-builder' && project.terminalDemo) {
       list.push({ kind: 'terminal', label: 'Terminal' });
     }
-    if (project.previews.some((p) => p.kind === 'video' || p.kind === 'screenshot')) {
+    if (
+      project.previews.some(
+        (p) => p.kind === 'video' || p.kind === 'screenshot' || p.kind === 'wip',
+      )
+    ) {
       list.push({ kind: 'media', label: 'Media' });
     }
     // The legacy Link tab is retired: Code and Visit live in the sticky header
@@ -522,8 +526,8 @@ export function ProjectDrawer({
   };
 
   const mediaPreviews = project.previews.filter(
-    (p): p is Extract<Preview, { kind: 'video' | 'screenshot' }> =>
-      p.kind === 'video' || p.kind === 'screenshot',
+    (p): p is Extract<Preview, { kind: 'video' | 'screenshot' | 'wip' }> =>
+      p.kind === 'video' || p.kind === 'screenshot' || p.kind === 'wip',
   );
   const linkPreviews = project.previews.filter((p) => p.kind === 'linkout');
 
