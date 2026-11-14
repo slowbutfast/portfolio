@@ -18,6 +18,13 @@ import {
 import type { PopoverObstacles } from '../utils/popoverPlacement';
 import { shouldClearStickyFocalOnTap } from '../utils/stickyFocal';
 import { deriveSwellActive, deriveSwellRetrigger } from '../utils/audioSwell';
+import { computeRainbowRgb, isRainbowNodeActive } from '../utils/rainbowPulse';
+import {
+  ART_COLOR_FADE_MS,
+  blendHexWithRgb,
+  loadArtDiscoveryState,
+  saveArtDiscoveryState,
+} from '../utils/artDiscovery';
 import type { AmbientSynth } from '../audio/ambientSynth';
 
 interface GraphCanvasProps {
@@ -26,6 +33,7 @@ interface GraphCanvasProps {
   dimmedIds: Set<string>;
   focusedId: string | null;
   visitedIds: Set<string>;
+  revealedIds?: Set<string>;
   initialSelectedId?: string | null;
   synth?: AmbientSynth | null;
   onHoverNode?: (
@@ -46,6 +54,10 @@ interface GraphCanvasProps {
   ) => void;
   /** Bumped by the 3-dot menu's "Reset layout" action. */
   layoutResetVersion?: number;
+  /** Bumped on consecutive double-reset to clear art-wip discovery state. */
+  artResetVersion?: number;
+  /** Called on any canvas pointerdown so consecutive-reset tracking clears. */
+  onCanvasInteract?: () => void;
   /** Measured canvas-container center for peripheral hover-card anchoring. */
   onCanvasCenterChange?: (center: { x: number; y: number }) => void;
   /** Highlighted node retained after the inspector closes. */
@@ -92,9 +104,11 @@ const EDGE_TAG_LINE_SPACING = 1.15;
 const EDGE_TAG_VERTICAL_PADDING = 4;
 
 /** Unified hover gate shared by simulation pinning and the DOM preview card. */
-const HOVER_DWELL_MS = 250;
+const HOVER_DWELL_MS = 200;
 /** Proximity-only webbing appears for non-edge pairs inside this distance. */
 const PROXIMITY_MAX_DIST = 96;
+/** Revealed `art-wip` node connects to `art`-tagged projects inside this distance. */
+const ART_PROXIMITY_MAX_DIST = 180;
 
 function edgeKey(source: string, target: string): string {
   return [source, target].sort().join('\u0000');
@@ -245,6 +259,7 @@ function drawEdgeTagPills(
   y: number,
   tags: string[],
   tokens: FluidTokens,
+  textColor: string = tokens.accent,
 ): number {
   if (tags.length === 0) return 0;
   const visible = tags.slice(0, 3);
@@ -265,7 +280,7 @@ function drawEdgeTagPills(
   ctx.fillStyle = tokens.surfaceContainer;
   ctx.fill();
 
-  ctx.fillStyle = tokens.accent;
+  ctx.fillStyle = textColor;
   for (let index = 0; index < visible.length; index += 1) {
     ctx.fillText(
       visible[index],
@@ -282,6 +297,7 @@ export function GraphCanvas({
   dimmedIds,
   focusedId,
   visitedIds,
+  revealedIds,
   initialSelectedId,
   synth,
   onHoverNode,
@@ -289,6 +305,8 @@ export function GraphCanvas({
   onResolveAnchor,
   onSelect,
   layoutResetVersion = 0,
+  artResetVersion = 0,
+  onCanvasInteract,
   onCanvasCenterChange,
   stickyFocalId = null,
   onClearFocal,
@@ -312,6 +330,19 @@ export function GraphCanvas({
   focusedRef.current = focusedId;
   const visitedRef = useRef(visitedIds);
   visitedRef.current = visitedIds;
+  const emptyRevealedRef = useRef<Set<string>>(new Set());
+  const revealedRef = useRef(revealedIds ?? emptyRevealedRef.current);
+  revealedRef.current = revealedIds ?? emptyRevealedRef.current;
+  const artDiscoveryInitRef = useRef(loadArtDiscoveryState());
+  const artUnlockedRef = useRef<boolean>(artDiscoveryInitRef.current.unlocked);
+  const artConnectedIdsRef = useRef<Set<string>>(
+    new Set(artDiscoveryInitRef.current.connectedIds),
+  );
+  const artMaxConnectionsRef = useRef<number>(artDiscoveryInitRef.current.maxConnections);
+  const artFadeStartMsRef = useRef<number | null>(null);
+  const artUserDraggedRef = useRef<boolean>(false);
+  const onCanvasInteractRef = useRef(onCanvasInteract);
+  onCanvasInteractRef.current = onCanvasInteract;
   const onHoverNodeRef = useRef(onHoverNode);
   onHoverNodeRef.current = onHoverNode;
   const onCanvasDragStartRef = useRef(onCanvasDragStart);
@@ -341,7 +372,7 @@ export function GraphCanvas({
   const draggingNodeRef = useRef(false);
   const canHoverRef = useRef(false);
   const renderRef = useRef<() => void>(() => {});
-  const wakeRef = useRef<() => void>(() => {});
+  const wakeRef = useRef<(reheatSim?: boolean) => void>(() => {});
   const synthRef = useRef<AmbientSynth | null>(null);
   synthRef.current = synth ?? null;
   const lastDragPointRef = useRef<{ x: number; y: number; t: number } | null>(null);
@@ -407,6 +438,9 @@ export function GraphCanvas({
       initialPositions: scaledSeeds,
     });
     simRef.current = sim;
+    for (const id of artConnectedIdsRef.current) {
+      sim.connectLink('art-wip', id);
+    }
 
     // Node ids and permanent-edge keys never change for this mount; hoist them
     // out of the 60fps render loop.
@@ -524,21 +558,124 @@ export function GraphCanvas({
         delete canvas.dataset.selectedScreenY;
       }
 
+      const nowMs = performance.now();
+      const rainbowActiveIds = new Set<string>();
+      for (const n of sim.nodes) {
+        const isFocused = focused === n.id;
+        const isHovered = !isFocused && sim.hovered?.id === n.id;
+        const isActive = isFocused || isHovered;
+        const isVisited = visited.has(n.id) || n.visited === true;
+        if (n.id === 'art-wip') {
+          if (artUnlockedRef.current) {
+            rainbowActiveIds.add(n.id);
+          }
+          continue;
+        }
+        if (
+          isRainbowNodeActive(
+            getProjectById(n.id)?.rainbowOnInteract,
+            isActive,
+            isVisited,
+          )
+        ) {
+          rainbowActiveIds.add(n.id);
+        }
+      }
+      const activeTheme =
+        document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+      const rainbowVibrant =
+        rainbowActiveIds.size > 0
+          ? computeRainbowRgb(nowMs, reduceMotionRef.current, activeTheme, 'vibrant')
+          : null;
+      const rainbowMuted =
+        rainbowActiveIds.size > 0
+          ? computeRainbowRgb(nowMs, reduceMotionRef.current, activeTheme, 'muted')
+          : null;
+
+      const rainbowNodesValue = [...rainbowActiveIds].sort().join(',');
+      if (canvas.dataset.rainbowNodes !== rainbowNodesValue) {
+        canvas.dataset.rainbowNodes = rainbowNodesValue;
+      }
+      const revealedSet = new Set(revealedRef.current);
+      if (artUnlockedRef.current) revealedSet.add('art-wip');
+      else revealedSet.delete('art-wip');
+      const revealedLabelsValue = [...revealedSet].sort().join(',');
+      if (canvas.dataset.revealedLabels !== revealedLabelsValue) {
+        canvas.dataset.revealedLabels = revealedLabelsValue;
+      }
+      const artUnlockedValue = String(artUnlockedRef.current);
+      if (canvas.dataset.artUnlocked !== artUnlockedValue) {
+        canvas.dataset.artUnlocked = artUnlockedValue;
+      }
+
       const nodeColor = (id: string): string => {
+        if (id === 'art-wip') {
+          if (!artUnlockedRef.current) return tokens.nodeUnvisited;
+          if (rainbowVibrant && artFadeStartMsRef.current !== null && !reduceMotionRef.current) {
+            const t = Math.min(1, (nowMs - artFadeStartMsRef.current) / ART_COLOR_FADE_MS);
+            if (t >= 1) {
+              artFadeStartMsRef.current = null;
+              return rainbowVibrant;
+            }
+            return blendHexWithRgb(tokens.nodeUnvisited, rainbowVibrant, t);
+          }
+          if (rainbowVibrant) return rainbowVibrant;
+        }
+        if (rainbowVibrant && rainbowActiveIds.has(id)) return rainbowVibrant;
         if (focused === id) return tokens.accent;
         if (!focused && sim.hovered?.id === id) return tokens.accent;
         if (visited.has(id) || nodesById.get(id)?.visited === true) return tokens.nodeVisited;
         return tokens.nodeUnvisited;
       };
 
+      // Latch progressive `d3-force` links only after an explicit user drag on
+      // `art-wip`, using a viewport-scaled proximity radius so mobile/small
+      // screens never auto-connect on load.
+      const artPos = artUserDraggedRef.current ? active.get('art-wip') : undefined;
+      if (artPos) {
+        const artProximityDist = Math.min(
+          ART_PROXIMITY_MAX_DIST,
+          Math.max(96, Math.min(width, height) * 0.28),
+        );
+        for (const otherId of sortedNodeIds) {
+          if (otherId === 'art-wip') continue;
+          if (artConnectedIdsRef.current.has(otherId)) continue;
+          if (artConnectedIdsRef.current.size >= artMaxConnectionsRef.current) break;
+          if (!getProjectById(otherId)?.tags.includes('art')) continue;
+          const otherPos = active.get(otherId);
+          if (!otherPos) continue;
+          const distance = Math.hypot(artPos[0] - otherPos[0], artPos[1] - otherPos[1]);
+          if (distance < artProximityDist && sim.connectLink('art-wip', otherId)) {
+            const wasUnlocked = artUnlockedRef.current;
+            artConnectedIdsRef.current.add(otherId);
+            artMaxConnectionsRef.current = Math.min(4, artMaxConnectionsRef.current + 1);
+            artUnlockedRef.current = true;
+            if (!wasUnlocked && !reduceMotionRef.current) {
+              artFadeStartMsRef.current = nowMs;
+            }
+            saveArtDiscoveryState({
+              unlocked: true,
+              connectedIds: [...artConnectedIdsRef.current].sort(),
+              maxConnections: artMaxConnectionsRef.current,
+            });
+          }
+        }
+      }
+
       // Zero-force proximity-only webbing for non-edge pairs. This pass paints
       // beneath permanent bridges and nodes, in deterministic sorted-pair order,
-      // and skips every permanent edge so a detached bridge never duplicates.
+      // and skips every active edge so a detached bridge never duplicates.
       for (let i = 0; i < sortedNodeIds.length; i += 1) {
         for (let j = i + 1; j < sortedNodeIds.length; j += 1) {
           const sourceId = sortedNodeIds[i];
           const targetId = sortedNodeIds[j];
           if (permanentEdgeKeys.has(edgeKey(sourceId, targetId))) continue;
+          if (
+            (sourceId === 'art-wip' && artConnectedIdsRef.current.has(targetId)) ||
+            (targetId === 'art-wip' && artConnectedIdsRef.current.has(sourceId))
+          ) {
+            continue;
+          }
           const a = active.get(sourceId);
           const b = active.get(targetId);
           if (!a || !b) continue;
@@ -546,6 +683,7 @@ export function GraphCanvas({
           const ra = nodesById.get(sourceId)?.radius ?? 22;
           const rb = nodesById.get(targetId)?.radius ?? 22;
           const contactDistance = ra + rb;
+
           if (distance <= contactDistance || distance >= PROXIMITY_MAX_DIST) continue;
           const fadeIn = smoothstep01((distance - contactDistance) / 12);
           const taper = 1 - distance / PROXIMITY_MAX_DIST;
@@ -562,11 +700,37 @@ export function GraphCanvas({
           );
         }
       }
+      const artPosForAttr = active.get('art-wip');
+      const artPosValue = artPosForAttr
+        ? `${Math.round(artPosForAttr[0])},${Math.round(artPosForAttr[1])}`
+        : '';
+      if (canvas.dataset.artNodePos !== artPosValue) {
+        canvas.dataset.artNodePos = artPosValue;
+      }
+      const artProximityValue = [...artConnectedIdsRef.current].sort().join(',');
+      if (canvas.dataset.artProximityLinks !== artProximityValue) {
+        canvas.dataset.artProximityLinks = artProximityValue;
+      }
+      const artMaxValue = String(artMaxConnectionsRef.current);
+      if (canvas.dataset.artMaxConnections !== artMaxValue) {
+        canvas.dataset.artMaxConnections = artMaxValue;
+      }
 
       // Pure binary connections. No grayscale, no alpha fade on live edges;
       // only filtered-out pairs recede to 0.12. Bridge fills blend the endpoint
       // node colors along the center-to-center axis through `connection`.
-      for (const edge of edges) {
+      const renderEdges: GraphEdge[] =
+        artConnectedIdsRef.current.size === 0
+          ? edges
+          : [
+              ...edges,
+              ...[...artConnectedIdsRef.current].sort().map((otherId) => ({
+                source: 'art-wip',
+                target: otherId,
+                tags: [],
+              })),
+            ];
+      for (const edge of renderEdges) {
         const a = active.get(edge.source);
         const b = active.get(edge.target);
         if (!a || !b) continue;
@@ -621,6 +785,7 @@ export function GraphCanvas({
 
       // Focal-only shared-tag labels ride above the bridges and beneath nodes.
       let focalTagCount = 0;
+      let rainbowTagPillCount = 0;
       if (focalId !== null) {
         for (const edge of edges) {
           if (edge.source !== focalId && edge.target !== focalId) continue;
@@ -631,18 +796,28 @@ export function GraphCanvas({
           const a = active.get(edge.source);
           const b = active.get(edge.target);
           if (!a || !b) continue;
-          focalTagCount += drawEdgeTagPills(
+          const usesRainbowTag =
+            rainbowMuted !== null &&
+            (rainbowActiveIds.has(edge.source) || rainbowActiveIds.has(edge.target));
+          const drawnCount = drawEdgeTagPills(
             ctx,
             (a[0] + b[0]) / 2,
             (a[1] + b[1]) / 2,
             edge.tags,
             tokens,
+            usesRainbowTag ? rainbowMuted : tokens.accent,
           );
+          focalTagCount += drawnCount;
+          if (usesRainbowTag) rainbowTagPillCount += drawnCount;
         }
       }
       const focalTagValue = String(focalTagCount);
       if (canvas.dataset.focalTagPills !== focalTagValue) {
         canvas.dataset.focalTagPills = focalTagValue;
+      }
+      const rainbowTagValue = String(rainbowTagPillCount);
+      if (canvas.dataset.rainbowTagPills !== rainbowTagValue) {
+        canvas.dataset.rainbowTagPills = rainbowTagValue;
       }
 
       // Pure circular primitives, with a background-matched pill behind each
@@ -655,34 +830,47 @@ export function GraphCanvas({
         const isFocused = focused === n.id;
         const isHovered = !isFocused && sim.hovered?.id === n.id;
         const isActive = isFocused || isHovered;
-        const isVisited = visited.has(n.id) || n.visited === true;
+        const isRainbow = rainbowActiveIds.has(n.id);
 
         ctx.globalAlpha = isDim ? 0.2 : 1;
         ctx.beginPath();
         ctx.arc(x, y, n.radius, 0, Math.PI * 2);
-        ctx.fillStyle = isActive
-          ? tokens.accent
-          : isVisited
-            ? tokens.nodeVisited
-            : tokens.nodeUnvisited;
+        ctx.fillStyle = nodeColor(n.id);
         ctx.fill();
+        if (isRainbow) {
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = '#ffffff';
+          ctx.stroke();
+        }
+
+        const shouldHideLabel =
+          n.id === 'art-wip'
+            ? !artUnlockedRef.current
+            : getProjectById(n.id)?.revealLabelOnInspect === true &&
+              !revealedRef.current.has(n.id);
+        if (shouldHideLabel) continue;
 
         ctx.font = LABEL_FONT;
-        const labelWidth = ctx.measureText(n.label).width;
+        const lines = n.label.split('\n');
+        const labelWidth = Math.max(...lines.map((line) => ctx.measureText(line).width));
         const pillWidth = labelWidth + 16;
-        const pillHeight = 20;
+        const lineHeight = LABEL_FONT_SIZE * 1.0;
+        const pillHeight = lines.length === 1 ? 20 : Math.ceil(lines.length * lineHeight + 8);
         const pillX = x - pillWidth / 2;
         const pillY = y + n.radius + 8;
 
         ctx.beginPath();
-        ctx.roundRect(pillX, pillY, pillWidth, pillHeight, pillHeight / 2);
+        ctx.roundRect(pillX, pillY, pillWidth, pillHeight, Math.min(10, pillHeight / 2));
         ctx.fillStyle = tokens.bg;
         ctx.fill();
 
-        ctx.fillStyle = isActive ? tokens.accent : tokens.text;
+        ctx.fillStyle = isActive && !isRainbow ? tokens.accent : tokens.text;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(n.label, x, pillY + pillHeight / 2);
+        const firstLineY = pillY + pillHeight / 2 - ((lines.length - 1) * lineHeight) / 2;
+        for (let lineIdx = 0; lineIdx < lines.length; lineIdx += 1) {
+          ctx.fillText(lines[lineIdx], x, firstLineY + lineIdx * lineHeight);
+        }
       }
 
       ctx.restore();
@@ -766,7 +954,7 @@ export function GraphCanvas({
 
     let idleSuspended = false;
 
-    const wake = () => {
+    const wake = (reheatSim = true) => {
       if (disposed) return;
       if (idleTimer !== 0) {
         window.clearTimeout(idleTimer);
@@ -774,9 +962,11 @@ export function GraphCanvas({
       }
       if (idleSuspended) {
         idleSuspended = false;
-        // A small alpha re-heats homing and oscillator integration just enough
-        // to respond without a visible jump.
-        sim.sim.alpha(Math.max(sim.sim.alpha(), 0.05)).restart();
+        if (reheatSim) {
+          // A small alpha re-heats homing and oscillator integration just enough
+          // to respond without a visible jump.
+          sim.sim.alpha(Math.max(sim.sim.alpha(), 0.05)).restart();
+        }
       }
       if (raf === 0) raf = requestAnimationFrame(loop);
     };
@@ -788,6 +978,13 @@ export function GraphCanvas({
       const now = performance.now();
       const t = transformRef.current;
       const goal = targetRef.current;
+      if (focusedRef.current) {
+        const focusedNode = sim.findNode(focusedRef.current);
+        if (focusedNode) {
+          goal.x = width / 2 - focusedNode.x;
+          goal.y = height / 2 - focusedNode.y;
+        }
+      }
       const dx = goal.x - t.x;
       const dy = goal.y - t.y;
       const cameraMoving = Math.abs(dx) > 0.05 || Math.abs(dy) > 0.05;
@@ -993,7 +1190,7 @@ export function GraphCanvas({
     const reset = () => {
       goal.x = 0;
       goal.y = 0;
-      wakeRef.current();
+      wakeRef.current(false);
     };
 
     if (!initialSelectedId) {
@@ -1040,7 +1237,7 @@ export function GraphCanvas({
       if (Math.hypot(nextX - goal.x, nextY - goal.y) > 0.5) {
         goal.x = nextX;
         goal.y = nextY;
-        wakeRef.current();
+        wakeRef.current(false);
       }
     };
 
@@ -1104,10 +1301,26 @@ export function GraphCanvas({
 
   useEffect(() => {
     if (layoutResetVersion <= 0) return;
+    artUserDraggedRef.current = false;
     simRef.current?.resetLayout();
+    for (const id of artConnectedIdsRef.current) {
+      simRef.current?.connectLink('art-wip', id);
+    }
     renderRef.current();
     wakeRef.current();
   }, [layoutResetVersion]);
+
+  useEffect(() => {
+    if (artResetVersion <= 0) return;
+    artUnlockedRef.current = false;
+    artConnectedIdsRef.current.clear();
+    artMaxConnectionsRef.current = 1;
+    artUserDraggedRef.current = false;
+    artFadeStartMsRef.current = null;
+    simRef.current?.resetLayout();
+    renderRef.current();
+    wakeRef.current();
+  }, [artResetVersion]);
 
   // Inspector close/open and sticky-highlight changes must repaint a graph that
   // may already be idle-suspended.
@@ -1202,16 +1415,18 @@ export function GraphCanvas({
   buildObstacleSnapshotRef.current = buildObstacleSnapshot;
 
   const emitHover = (node: GraphNode | null) => {
-    const nextId = node?.id ?? null;
+    const effectiveNode =
+      node?.id === 'art-wip' && !artUnlockedRef.current ? null : node;
+    const nextId = effectiveNode?.id ?? null;
     if (nextId === hoveredProjectIdRef.current) return;
     hoveredProjectIdRef.current = nextId;
     syncSynthSwell();
-    if (!node) {
+    if (!effectiveNode) {
       onHoverNodeRef.current?.(null, null);
       return;
     }
-    const project = getProjectById(node.id) ?? null;
-    const anchor = nodeScreenPoint(node);
+    const project = getProjectById(effectiveNode.id) ?? null;
+    const anchor = nodeScreenPoint(effectiveNode);
     if (project && anchor) {
       onHoverNodeRef.current?.(project, anchor, buildObstacleSnapshot());
     } else {
@@ -1286,6 +1501,7 @@ export function GraphCanvas({
    * already owns the sticky focal highlight, dismisses that highlight instead.
    */
   const activateNode = (node: GraphNode) => {
+    if (node.id === 'art-wip' && !artUnlockedRef.current) return;
     if (
       shouldClearStickyFocalOnTap(
         node.id,
@@ -1323,6 +1539,13 @@ export function GraphCanvas({
     emitAudioPointer(e.clientX, e.clientY);
     const p = worldPoint(e.clientX, e.clientY);
     if (sim.state === 'drag') {
+      if (
+        downNodeIdRef.current === 'art-wip' &&
+        downPosRef.current &&
+        Math.hypot(p.x - downPosRef.current.x, p.y - downPosRef.current.y) >= 6
+      ) {
+        artUserDraggedRef.current = true;
+      }
       setCanvasCursor('crosshair');
       const last = lastDragPointRef.current;
       if (last) {
@@ -1343,6 +1566,7 @@ export function GraphCanvas({
   const onPointerDown = (e: ReactPointerEvent<HTMLCanvasElement>) => {
     const sim = simRef.current;
     if (!sim) return;
+    onCanvasInteractRef.current?.();
     wakeRef.current();
     emitAudioPointer(e.clientX, e.clientY);
     clearHoverDwell();

@@ -56,28 +56,32 @@ function countCrossings(positions: Positions, edges: GraphEdge[] = EDGES): numbe
   return crossings;
 }
 
-describe('8-project planar catalog', () => {
-  it('has exactly 8 projects and 13 tag-derived edges', () => {
-    expect(projects).toHaveLength(8);
+describe('9-project planar catalog', () => {
+  it('has exactly 9 projects and 13 permanent tag-derived edges', () => {
+    expect(projects).toHaveLength(9);
     expect(EDGES).toHaveLength(13);
     expect(projects).toHaveLength(PROJECT_IDS.length);
     expect(new Set(PROJECT_IDS).size).toBe(PROJECT_IDS.length);
   });
 
-  it('gives every project at least one graph connection', () => {
+  it('gives every project except art-wip at least one permanent connection', () => {
     const degree = new Map<string, number>(PROJECT_IDS.map((id) => [id, 0]));
     for (const edge of EDGES) {
       degree.set(edge.source, (degree.get(edge.source) ?? 0) + 1);
       degree.set(edge.target, (degree.get(edge.target) ?? 0) + 1);
     }
     for (const id of PROJECT_IDS) {
-      expect(degree.get(id), `${id} degree`).toBeGreaterThanOrEqual(1);
+      if (id === 'art-wip') {
+        expect(degree.get(id), `${id} degree`).toBe(0);
+      } else {
+        expect(degree.get(id), `${id} degree`).toBeGreaterThanOrEqual(1);
+      }
     }
   });
 
-  it('keeps sandwave-sim on only the acoustic tags and disconnected from kintsugi', () => {
+  it('keeps sandwave-sim on the acoustic tags plus implicit art tag and disconnected from kintsugi', () => {
     const sandwave = projects.find((project) => project.id === 'sandwave-sim');
-    expect(sandwave?.tags).toEqual(['Vanilla JS', 'Audio']);
+    expect(sandwave?.tags).toEqual(['Vanilla JS', 'Audio', 'art']);
     const connectedToKintsugi = EDGES.some(
       (edge) =>
         (edge.source === 'sandwave-sim' && edge.target === 'kintsugi-fracture') ||
@@ -91,6 +95,7 @@ describe('8-project planar catalog', () => {
     expect(PLANAR_NODE_SEEDS['pict-climate-risk-viz-chatbot']).toBeDefined();
     expect(PLANAR_NODE_SEEDS['kintsugi-fracture']).toBeDefined();
     expect(PLANAR_NODE_SEEDS['ivy-film-festival-2026']).toBeDefined();
+    expect(PLANAR_NODE_SEEDS['art-wip']).toBeDefined();
   });
 
   it('throws when asked to count crossings for an unknown project id', () => {
@@ -130,8 +135,15 @@ describe('graph planarity after unperturbed d3-force ticks', () => {
   it.each([
     ['desktop 1440x900', 1440, 900],
     ['mobile 393x852', 393, 852],
+    ['narrow 320x900', 320, 900],
   ])('maintains zero crossings and >=44px separation after 300 ticks on %s', (_label, width, height) => {
     const initialPositions = scaleSeeds(PLANAR_NODE_SEEDS, width, height);
+    for (const [id, [sx, sy]] of Object.entries(initialPositions)) {
+      expect(sx, `${id} x inside safe canvas`).toBeGreaterThanOrEqual(48);
+      expect(sx, `${id} x inside safe canvas`).toBeLessThanOrEqual(width - 48);
+      expect(sy, `${id} y inside safe canvas`).toBeGreaterThanOrEqual(48);
+      expect(sy, `${id} y inside safe canvas`).toBeLessThanOrEqual(height - 48);
+    }
     const sim = createSimulation({
       nodes: projects.map((project) => ({ id: project.id, label: project.shortTitle })),
       links: EDGES.map((edge) => ({

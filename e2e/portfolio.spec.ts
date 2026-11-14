@@ -10,6 +10,7 @@ const PROJECT_IDS = [
   'attention-max',
   'kintsugi-fracture',
   'ivy-film-festival-2026',
+  'art-wip',
 ];
 
 const GITHUB_URL = 'https://github.com/slowbutfast';
@@ -409,11 +410,11 @@ test.describe('portfolio graph SPA', () => {
     );
   });
 
-  test('list view renders 8 cards and a card click opens the project drawer', async ({ page }) => {
+  test('list view renders 9 cards and a card click opens the project drawer', async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto('/');
     await page.getByTestId('view-toggle').click();
-    expect(PROJECT_IDS).toHaveLength(8);
+    expect(PROJECT_IDS).toHaveLength(9);
     for (const id of PROJECT_IDS) {
       await expect(page.getByTestId(`card-${id}`)).toBeVisible();
     }
@@ -423,10 +424,10 @@ test.describe('portfolio graph SPA', () => {
     expect(errors).toEqual([]);
   });
 
-  test('graph view exposes all 8 project nodes through the semantic nav', async ({ page }) => {
+  test('graph view exposes all 9 project nodes through the semantic nav', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByTestId('graph-canvas')).toBeVisible();
-    await expect(page.locator('nav[aria-label="Projects"] button')).toHaveCount(8);
+    await expect(page.locator('nav[aria-label="Projects"] button')).toHaveCount(9);
     for (const id of PROJECT_IDS) {
       await expect(page.getByTestId(`nav-${id}`)).toHaveCount(1);
     }
@@ -1240,7 +1241,7 @@ test.describe('portfolio graph SPA', () => {
     expect(dimmedEdges.size).toBe(12);
   });
 
-  test('hover dwell suppresses fast sweeps and opens after 250ms', async ({ page }, testInfo) => {
+  test('hover dwell suppresses fast sweeps and opens after 200ms', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'hover previews are desktop-only');
     await page.goto('/');
     await page.waitForTimeout(1500);
@@ -1253,15 +1254,15 @@ test.describe('portfolio graph SPA', () => {
     const centerX = box.x + box.width / 2;
     const centerY = box.y + box.height / 2;
 
-    // Cross the centered node and leave well inside the 250ms dwell window.
+    // Cross the centered node and leave well inside the 200ms dwell window.
     await page.mouse.move(centerX, centerY);
     await page.mouse.move(box.x + 12, box.y + box.height - 12);
     await page.waitForTimeout(120);
     await expect(page.getByTestId('node-hover-card')).toHaveCount(0);
 
-    // Returning and dwelling opens the card only after the timer fires.
+    // Returning and dwelling opens the card only after the 200ms timer fires.
     await page.mouse.move(centerX, centerY);
-    await page.waitForTimeout(180);
+    await page.waitForTimeout(100);
     await expect(page.getByTestId('node-hover-card')).toHaveCount(0);
     await expect(page.getByTestId('node-hover-card')).toBeVisible();
   });
@@ -1729,5 +1730,127 @@ test.describe('portfolio graph SPA', () => {
     } finally {
       await client.send('Emulation.setCPUThrottlingRate', { rate: 1 });
     }
+  });
+
+  test('/art/ endpoint serves raw WIP HTML title and body', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/art/');
+    await expect(page).toHaveTitle('WIP');
+    await expect(page.locator('body')).toHaveText('WIP');
+    expect(errors).toEqual([]);
+  });
+
+  test('art-wip stays locked until dragged to connect, then unlocks color/hover/inspect persistently', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'hover card is desktop-only');
+    await page.goto('/');
+    const canvas = page.getByTestId('graph-canvas');
+    await expect(canvas).toHaveAttribute('data-art-unlocked', 'false');
+    await expect(canvas).toHaveAttribute('data-rainbow-nodes', '');
+    await expect(canvas).toHaveAttribute('data-revealed-labels', '');
+    await expect(canvas).toHaveAttribute('data-art-proximity-links', '');
+    await expect(canvas).toHaveAttribute('data-art-max-connections', '1');
+
+    // Before connection: hovering or clicking art-wip shows no color, no label, no hover card, no drawer.
+    await page.waitForTimeout(800);
+    const boxInitial = await canvas.boundingBox();
+    if (!boxInitial) throw new Error('graph canvas has no bounding box');
+    const initialArtPos = await canvas.getAttribute('data-art-node-pos');
+    if (!initialArtPos) throw new Error('missing data-art-node-pos');
+    const [initArtLocalX, initArtLocalY] = initialArtPos.split(',').map(Number);
+    const initArtX = boxInitial.x + initArtLocalX;
+    const initArtY = boxInitial.y + initArtLocalY;
+
+    await page.mouse.move(initArtX, initArtY);
+    await page.waitForTimeout(350);
+    await expect(page.getByTestId('node-hover-card')).toHaveCount(0);
+    await expect(canvas).toHaveAttribute('data-rainbow-nodes', '');
+
+    await page.mouse.click(initArtX, initArtY);
+    await expect(page.getByTestId('project-drawer')).toHaveCount(0);
+    await expect(canvas).toHaveAttribute('data-revealed-labels', '');
+    await expect(canvas).toHaveAttribute('data-rainbow-nodes', '');
+
+    await page.getByTestId('nav-art-wip').evaluate((el: HTMLButtonElement) => el.click());
+    await expect(page.getByTestId('project-drawer')).toHaveCount(0);
+
+    // Drag unrevealed art-wip toward center (open-dungeon): it latches automatically while in motion,
+    // fading in rainbow color and unlocking label, hover card, and inspector.
+    const artPosBeforeDrag = await canvas.getAttribute('data-art-node-pos');
+    if (!artPosBeforeDrag) throw new Error('missing data-art-node-pos');
+    const [artLocalX, artLocalY] = artPosBeforeDrag.split(',').map(Number);
+    const artX = boxInitial.x + artLocalX;
+    const artY = boxInitial.y + artLocalY;
+    const centerX = boxInitial.x + boxInitial.width / 2;
+    const centerY = boxInitial.y + boxInitial.height / 2;
+    await page.mouse.move(artX, artY);
+    await page.mouse.down();
+    await page.mouse.move(centerX, centerY, { steps: 16 });
+    await page.mouse.up();
+
+    await expect(canvas).toHaveAttribute('data-art-unlocked', 'true');
+    await expect(canvas).toHaveAttribute('data-art-proximity-links', /open-dungeon/);
+    await expect(canvas).toHaveAttribute('data-art-max-connections', /^[234]$/);
+    await expect(canvas).toHaveAttribute('data-rainbow-nodes', 'art-wip');
+    await expect(canvas).toHaveAttribute('data-revealed-labels', 'art-wip');
+
+    // Now inspecting art-wip opens ProjectDrawer normally (with hidden 'art' tag, no Overview/09).
+    await page.getByTestId('nav-art-wip').evaluate((el: HTMLButtonElement) => el.click());
+    await expect(page.getByTestId('project-drawer')).toBeVisible();
+    await expect(page.getByTestId('drawer-visit')).toHaveAttribute('href', '/art/');
+    await expect(page.getByTestId('project-drawer')).toContainText('art');
+    await expect(page.getByTestId('project-drawer')).toContainText('WIP');
+    await expect(page.getByTestId('project-drawer')).not.toContainText('Overview');
+    await expect(page.getByTestId('project-drawer')).not.toContainText('09');
+    await expect(
+      page.getByTestId('project-drawer').locator('.fluid-pill', { hasText: /^art$/i }),
+    ).toHaveCount(0);
+    await page.getByTestId('drawer-close').click();
+
+    // Reset layout does NOT reset the unlocked art node state or its discovered connections.
+    await page.getByTestId('controls-dropdown-trigger').click();
+    await page.getByTestId('reset-layout').click();
+    await expect(canvas).toHaveAttribute('data-art-unlocked', 'true');
+    await expect(canvas).toHaveAttribute('data-rainbow-nodes', 'art-wip');
+    await expect(canvas).toHaveAttribute('data-revealed-labels', /\bart-wip\b/);
+    await expect(canvas).toHaveAttribute('data-art-proximity-links', /open-dungeon/);
+    await expect(canvas).toHaveAttribute('data-art-max-connections', /^[234]$/);
+
+    // Full page reload ALSO preserves the unlocked art node state and connections.
+    await page.reload();
+    await expect(canvas).toHaveAttribute('data-art-unlocked', 'true');
+    await expect(canvas).toHaveAttribute('data-rainbow-nodes', 'art-wip');
+    await expect(canvas).toHaveAttribute('data-revealed-labels', /\bart-wip\b/);
+    await expect(canvas).toHaveAttribute('data-art-proximity-links', /open-dungeon/);
+    await expect(canvas).toHaveAttribute('data-art-max-connections', /^[234]$/);
+
+    // Pressing Reset layout twice consecutively with no canvas interaction clears art-wip state.
+    await page.getByTestId('controls-dropdown-trigger').click();
+    await page.getByTestId('reset-layout').click();
+    await expect(canvas).toHaveAttribute('data-art-unlocked', 'true');
+    if (!(await page.getByTestId('reset-layout').isVisible())) {
+      await page.getByTestId('controls-dropdown-trigger').click();
+    }
+    await page.getByTestId('reset-layout').click();
+    await expect(canvas).toHaveAttribute('data-art-unlocked', 'false');
+    await expect(canvas).toHaveAttribute('data-rainbow-nodes', '');
+    await expect(canvas).toHaveAttribute('data-revealed-labels', '');
+    await expect(canvas).toHaveAttribute('data-art-proximity-links', '');
+    await expect(canvas).toHaveAttribute('data-art-max-connections', '1');
+  });
+
+  test('art-wip stays locked on compact mobile viewport until explicitly dragged', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'mobile', 'mobile viewport check');
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto('/');
+    const canvas = page.getByTestId('graph-canvas');
+    await page.waitForTimeout(800);
+    await expect(canvas).toHaveAttribute('data-art-unlocked', 'false');
+    await expect(canvas).toHaveAttribute('data-art-proximity-links', '');
+    await expect(canvas).toHaveAttribute('data-rainbow-nodes', '');
+    await expect(canvas).toHaveAttribute('data-revealed-labels', '');
   });
 });

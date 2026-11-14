@@ -14,7 +14,7 @@ import {
   stepBridgeOscillator,
   type BridgeOscillatorState,
 } from '../utils/bridgeOscillator';
-import { PLANAR_NODE_SEEDS } from '../data/graphSeeds';
+import { PLANAR_NODE_SEEDS, scaleSeedPoint } from '../data/graphSeeds';
 
 export type SimState = 'idle' | 'hover' | 'drag' | 'coasting';
 
@@ -77,6 +77,8 @@ export interface GraphSimulation {
   dragEnd(options?: { cancel?: boolean }): void;
   /** Clear user pins and detached flags, then restore the planar seeds. */
   resetLayout(): void;
+  /** Dynamically attach a real spring link between two existing nodes. */
+  connectLink(sourceId: string, targetId: string): boolean;
   findNode(id: string): GraphNode | undefined;
   findLink(source: string, target: string): BridgeLinkState | undefined;
   restDistance(source: string, target: string): number;
@@ -209,7 +211,7 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
     for (const node of opts.nodes) {
       const seed = opts.seeds?.[node.id];
       if (seed) {
-        targets.set(node.id, [seed.x * w, seed.y * h]);
+        targets.set(node.id, scaleSeedPoint(seed, w, h, BOUNDARY_MARGIN));
         continue;
       }
       const explicit = opts.initialPositions?.[node.id];
@@ -257,16 +259,20 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
 
   const restDistances = new Map<string, number>();
   const linkKey = (a: string, b: string) => [a, b].sort().join('\u0000');
+  const permanentLinkKeys = new Set(opts.links.map((l) => linkKey(l.source, l.target)));
   const recomputeRestDistances = (w: number, h: number) => {
     restDistances.clear();
     for (const link of opts.links) {
-      // Seed distances are normalized to a 1x1 box. Scale each axis by the
-      // container size (the seed map uses an affine embedding).
+      // Seed distances use the same safe-canvas affine transform as homing
+      // targets so rest lengths match the boundary-safe planar layout.
       const a = seeds[link.source];
       const b = seeds[link.target];
-      const scaled = a && b
-        ? Math.hypot((a.x - b.x) * w, (a.y - b.y) * h)
-        : LINK_DISTANCE;
+      let scaled = LINK_DISTANCE;
+      if (a && b) {
+        const [ax, ay] = scaleSeedPoint(a, w, h, BOUNDARY_MARGIN);
+        const [bx, by] = scaleSeedPoint(b, w, h, BOUNDARY_MARGIN);
+        scaled = Math.hypot(ax - bx, ay - by);
+      }
       restDistances.set(linkKey(link.source, link.target), Math.max(1, scaled));
     }
   };
@@ -698,6 +704,17 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
         node.y = target[1];
       }
     }
+    const permanentStates = linkStates.filter((l) =>
+      permanentLinkKeys.has(linkKey(l.source, l.target)),
+    );
+    linkStates.length = 0;
+    linkStates.push(...permanentStates);
+    links.length = 0;
+    for (const l of opts.links) {
+      links.push({ ...l });
+    }
+    linkForce.links(links);
+    recomputeRestDistances(width, height);
     for (const link of linkStates) {
       link.isDetached = false;
       link.detachedAt = null;
@@ -711,6 +728,34 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
     sim.alphaTarget(0);
     sim.alpha(0.4).restart();
     updateLinkTopology();
+  }
+
+  function connectLink(sourceId: string, targetId: string): boolean {
+    if (sourceId === targetId) return false;
+    const sourceNode = nodes.find((n) => n.id === sourceId);
+    const targetNode = nodes.find((n) => n.id === targetId);
+    if (!sourceNode || !targetNode) return false;
+    const key = linkKey(sourceId, targetId);
+    if (linkStates.some((l) => linkKey(l.source, l.target) === key)) return false;
+
+    links.push({ source: sourceId, target: targetId });
+    linkForce.links(links);
+    restDistances.set(key, LINK_DISTANCE);
+    linkStates.push({
+      source: sourceId,
+      target: targetId,
+      sharedTagCount: 1,
+      restDistance: LINK_DISTANCE,
+      isDetached: false,
+      detachedAt: null,
+      reconnectCooldownUntil: 0,
+      oscillator: createBridgeOscillatorState(),
+      previousDistance: 0,
+      previousVelocity: 0,
+    });
+    refreshLinkStrength();
+    sim.alpha(Math.max(sim.alpha(), 0.25)).restart();
+    return true;
   }
 
   const isIdle = (): boolean => {
@@ -748,6 +793,7 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
     dragMove,
     dragEnd,
     resetLayout,
+    connectLink,
     findNode: (id) => nodes.find((n) => n.id === id),
     findLink: (source, target) => {
       const key = linkKey(source, target);

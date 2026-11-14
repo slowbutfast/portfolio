@@ -8,7 +8,7 @@ import {
 } from 'react';
 import { ExternalLink, GitBranch, X } from 'lucide-react';
 import type { Preview, ProjectData } from '../types/portfolio';
-import { projects } from '../data/projects';
+import { getVisibleTags, projects } from '../data/projects';
 import { formatIndex } from '../utils/drafting';
 import {
   chooseBestPopoverPosition,
@@ -132,7 +132,11 @@ export function ProjectDrawer({
     if (project.id === 'agentic-resume-builder' && project.terminalDemo) {
       list.push({ kind: 'terminal', label: 'Terminal' });
     }
-    if (project.previews.some((p) => p.kind === 'video' || p.kind === 'screenshot')) {
+    if (
+      project.previews.some(
+        (p) => p.kind === 'video' || p.kind === 'screenshot' || p.kind === 'wip',
+      )
+    ) {
       list.push({ kind: 'media', label: 'Media' });
     }
     // The legacy Link tab is retired: Code and Visit live in the sticky header
@@ -522,8 +526,8 @@ export function ProjectDrawer({
   };
 
   const mediaPreviews = project.previews.filter(
-    (p): p is Extract<Preview, { kind: 'video' | 'screenshot' }> =>
-      p.kind === 'video' || p.kind === 'screenshot',
+    (p): p is Extract<Preview, { kind: 'video' | 'screenshot' | 'wip' }> =>
+      p.kind === 'video' || p.kind === 'screenshot' || p.kind === 'wip',
   );
   const linkPreviews = project.previews.filter((p) => p.kind === 'linkout');
 
@@ -628,9 +632,11 @@ export function ProjectDrawer({
           )}
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <span className="inline-flex items-center rounded-full border border-[var(--color-outline)] px-2.5 py-0.5 font-secondary text-[10px] font-light uppercase tracking-[0.18em] text-[var(--color-muted)]">
-                {indexLabel}
-              </span>
+              {!project.omitIndex && (
+                <span className="inline-flex items-center rounded-full border border-[var(--color-outline)] px-2.5 py-0.5 font-secondary text-[10px] font-light uppercase tracking-[0.18em] text-[var(--color-muted)]">
+                  {indexLabel}
+                </span>
+              )}
 
               <div
                 className={`grid [grid-template-areas:'title'] ${
@@ -684,7 +690,7 @@ export function ProjectDrawer({
             </div>
           )}
           <div className="flex flex-wrap gap-2">
-            {project.tags.map((tag) => (
+            {getVisibleTags(project.tags).map((tag) => (
               <span
                 key={tag}
                 className="fluid-pill border-[var(--color-outline)]/40 font-light text-[var(--color-muted)]"
@@ -733,39 +739,41 @@ export function ProjectDrawer({
             )}
           </div>
 
-          <section
-            data-testid="drawer-overview"
-            aria-labelledby="drawer-overview-heading"
-            className="mt-5 border-t border-[var(--color-divider)] pt-4"
-          >
-            <h3
-              id="drawer-overview-heading"
-              className="font-secondary text-[10px] font-light uppercase tracking-[0.18em] text-[var(--color-muted)]"
+          {!project.hideOverview && (
+            <section
+              data-testid="drawer-overview"
+              aria-labelledby="drawer-overview-heading"
+              className="mt-5 border-t border-[var(--color-divider)] pt-4"
             >
-              Overview
-            </h3>
-            <p className="mt-2 text-sm leading-relaxed text-[var(--color-muted)]">
-              {project.classification}
-            </p>
-            {linkPreviews.length > 0 && (
-              <ul className="mt-3 flex flex-col gap-2">
-                {linkPreviews.map((preview, index) => (
-                  <li key={`${preview.url}-${index}`}>
-                    <a
-                      href={preview.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      data-testid={`overview-link-${index}`}
-                      className="fluid-pill min-h-11 gap-1.5 md:min-h-0"
-                    >
-                      <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-                      {preview.label} <span aria-hidden="true">↗</span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+              <h3
+                id="drawer-overview-heading"
+                className="font-secondary text-[10px] font-light uppercase tracking-[0.18em] text-[var(--color-muted)]"
+              >
+                Overview
+              </h3>
+              <p className="mt-2 text-sm leading-relaxed text-[var(--color-muted)]">
+                {project.classification}
+              </p>
+              {linkPreviews.length > 0 && (
+                <ul className="mt-3 flex flex-col gap-2">
+                  {linkPreviews.map((preview, index) => (
+                    <li key={`${preview.url}-${index}`}>
+                      <a
+                        href={preview.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        data-testid={`overview-link-${index}`}
+                        className="fluid-pill min-h-11 gap-1.5 md:min-h-0"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                        {preview.label} <span aria-hidden="true">↗</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
         </div>
       </div>
     </div>

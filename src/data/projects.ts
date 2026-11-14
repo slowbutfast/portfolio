@@ -1,4 +1,4 @@
-import type { ProjectData, TerminalDemo } from '../types/portfolio';
+import type { ParadigmTag, ProjectData, TerminalDemo } from '../types/portfolio';
 import openDungeonCapturedJson from './captured/open-dungeon.json';
 import resumeBuilderCapturedJson from './captured/agentic-resume-builder.json';
 import transcribePlusCapturedJson from './captured/transcribe-plus.json';
@@ -33,7 +33,7 @@ export const projects = [
     summary:
       'Generative text-adventure engine with a 20-tool MCP server and an OAuth-gated multiplayer canvas.',
     classification: 'GENERATIVE ADVENTURE // MCP RUNTIME',
-    tags: ['Express', 'Vanilla JS', 'LLM', 'Agent Tooling'],
+    tags: ['Express', 'Vanilla JS', 'LLM', 'Agent Tooling', 'art'],
     repo: 'https://github.com/slowbutfast/open-dungeon',
     liveUrl: 'https://open-dungeon-three.vercel.app/',
     previews: [
@@ -84,7 +84,7 @@ export const projects = [
     summary:
       'Local transcription workspace with a Vite + Express 5 monorepo and an offline product demo video.',
     classification: 'LOCAL AUDIO TRANSCRIPTION // MONOREPO',
-    tags: ['Express', 'Vanilla JS', 'Audio'],
+    tags: ['Express', 'Vanilla JS', 'Audio', 'art'],
     repo: 'https://github.com/slowbutfast/transcribe-plus',
     liveUrl: 'https://transcribe-plus-frontend.vercel.app/',
     previews: [
@@ -101,7 +101,7 @@ export const projects = [
     summary:
       'Vanilla JS Chladni plate acoustic simulator rendering nodal-line sand patterns with Web Audio.',
     classification: 'ACOUSTIC PHYSICS SIMULATION // CHLADNI PLATES',
-    tags: ['Vanilla JS', 'Audio'],
+    tags: ['Vanilla JS', 'Audio', 'art'],
     repo: 'https://github.com/slowbutfast/sandwave-sim',
     liveUrl: 'https://sandwave-sim.vercel.app/',
     previews: [
@@ -134,7 +134,7 @@ export const projects = [
     summary:
       'WebGL fracture study that reassembles procedurally shattered geometry along gilded kintsugi seams in real time.',
     classification: 'PROCEDURAL MESH GENERATION // WEBGL',
-    tags: ['Graphics'],
+    tags: ['Graphics', 'art'],
     repo: 'https://github.com/slowbutfast/kintsugi-fracture',
     liveUrl: 'https://kintsugi-fracture.vercel.app/',
     previews: [
@@ -148,7 +148,7 @@ export const projects = [
   {
     id: 'ivy-film-festival-2026',
     title: 'Ivy Film Festival 2026',
-    shortTitle: 'Ivy Film Fest',
+    shortTitle: 'Ivy Film\nFestival',
     summary:
       'Web design, visual identity, and interactive screening program for the student-run Ivy Film Festival.',
     classification: 'STUDENT FILM FESTIVAL // BRAND & WEB',
@@ -162,7 +162,28 @@ export const projects = [
       },
     ],
   },
+  {
+    id: 'art-wip',
+    title: 'art',
+    shortTitle: 'art',
+    summary: 'WIP',
+    classification: 'ART & VISUAL EXPERIMENTS // WIP',
+    tags: ['art'],
+    liveUrl: '/art/',
+    rainbowOnInteract: true,
+    omitIndex: true,
+    hideOverview: true,
+    revealLabelOnInspect: true,
+    previews: [],
+  },
 ] satisfies ProjectData[];
+
+/** Tags kept latent in graph topology and hidden from UI tag chips. */
+export const HIDDEN_TAGS: ReadonlySet<ParadigmTag> = new Set<ParadigmTag>(['art']);
+
+export function getVisibleTags(tags: readonly ParadigmTag[]): ParadigmTag[] {
+  return tags.filter((tag) => !HIDDEN_TAGS.has(tag));
+}
 
 export function getProjectById(id: string): ProjectData | undefined {
   return projects.find((p) => p.id === id);

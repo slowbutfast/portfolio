@@ -16,6 +16,7 @@ import { AboutModal } from './components/AboutModal';
 import { NodeHoverCard } from './components/NodeHoverCard';
 import { getAmbientSynth } from './audio/ambientSynth';
 import type { PopoverObstacles } from './utils/popoverPlacement';
+import { clearArtDiscoveryState, loadArtDiscoveryState } from './utils/artDiscovery';
 
 type ViewMode = 'graph' | 'list';
 type CanvasAnchor = { x: number; y: number };
@@ -50,6 +51,8 @@ export default function App() {
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [theme, setTheme] = useState<ThemeMode>(readStoredTheme);
   const [visitedIds, setVisitedIds] = useState<Set<string>>(readStoredVisited);
+  const [inspectedIds, setInspectedIds] = useState<Set<string>>(() => new Set());
+  const [hasInspectedAnyNode, setHasInspectedAnyNode] = useState(false);
   const [drawerAnchor, setDrawerAnchor] = useState<CanvasAnchor | null>(null);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [hoverState, setHoverState] = useState<HoverState>(null);
@@ -57,6 +60,8 @@ export default function App() {
   const [drawerObstacles, setDrawerObstacles] = useState<PopoverObstacles>();
   const [stickyFocalId, setStickyFocalId] = useState<string | null>(null);
   const [layoutResetVersion, setLayoutResetVersion] = useState(0);
+  const [artResetVersion, setArtResetVersion] = useState(0);
+  const lastActionWasResetRef = useRef(false);
   const [canvasCenter, setCanvasCenter] = useState(() => ({
     x: window.innerWidth / 2,
     y: window.innerHeight / 2,
@@ -205,8 +210,17 @@ export default function App() {
   const openProject = useCallback(
     (id: string, anchor?: CanvasAnchor, obstacles?: PopoverObstacles) => {
       if (!getProjectById(id)) return;
+      if (id === 'art-wip' && !loadArtDiscoveryState().unlocked) return;
+      lastActionWasResetRef.current = false;
       setIsAboutOpen(false);
       dismissHover();
+      setHasInspectedAnyNode(true);
+      setInspectedIds((previous) => {
+        if (previous.has(id)) return previous;
+        const next = new Set(previous);
+        next.add(id);
+        return next;
+      });
       if (
         document.activeElement instanceof HTMLElement &&
         document.activeElement !== document.body
@@ -282,17 +296,33 @@ export default function App() {
     });
   }, []);
 
+  const handleCanvasInteract = useCallback(() => {
+    lastActionWasResetRef.current = false;
+  }, []);
+
   const resetAll = useCallback(() => {
     setActiveTags(new Set());
     setSearch('');
     setLayoutResetVersion((version) => version + 1);
-    setVisitedIds(new Set());
+    if (lastActionWasResetRef.current) {
+      clearArtDiscoveryState();
+      setArtResetVersion((version) => version + 1);
+      setVisitedIds(new Set());
+      setInspectedIds(new Set());
+      lastActionWasResetRef.current = false;
+    } else {
+      const keepArt = loadArtDiscoveryState().unlocked;
+      setVisitedIds(keepArt ? new Set(['art-wip']) : new Set());
+      setInspectedIds(keepArt ? new Set(['art-wip']) : new Set());
+      lastActionWasResetRef.current = true;
+    }
     setStickyFocalId(null);
     setHoverObstacles(undefined);
     setDrawerObstacles(undefined);
   }, []);
 
   const clearStickyFocal = useCallback(() => {
+    lastActionWasResetRef.current = false;
     setStickyFocalId(null);
   }, []);
 
@@ -362,6 +392,7 @@ export default function App() {
             dimmedIds={dimmedIds}
             focusedId={view === 'graph' ? focusedId : null}
             visitedIds={visitedIds}
+            revealedIds={inspectedIds}
             initialSelectedId={selectedId}
             synth={synth}
             onHoverNode={handleHoverNode}
@@ -369,6 +400,8 @@ export default function App() {
             onResolveAnchor={handleResolveAnchor}
             onSelect={openProject}
             layoutResetVersion={layoutResetVersion}
+            artResetVersion={artResetVersion}
+            onCanvasInteract={handleCanvasInteract}
             onCanvasCenterChange={setCanvasCenter}
             stickyFocalId={stickyFocalId}
             onClearFocal={clearStickyFocal}
@@ -416,6 +449,7 @@ export default function App() {
           position={hoverState.position}
           canvasCenter={canvasCenter}
           obstacles={hoverObstacles}
+          showInspectHint={!hasInspectedAnyNode}
           onPointerEnter={clearHoverDismissal}
           onPointerLeave={scheduleHoverDismiss}
         />

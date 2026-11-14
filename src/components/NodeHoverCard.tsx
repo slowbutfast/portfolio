@@ -1,6 +1,7 @@
 import { ExternalLink, GitBranch } from 'lucide-react';
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { Preview, ProjectData } from '../types/portfolio';
+import { getVisibleTags } from '../data/projects';
 import {
   chooseBestPopoverPosition,
   type PopoverObstacles,
@@ -12,11 +13,12 @@ interface NodeHoverCardProps {
   /** Canvas center used to project the card outward from the graph cluster. */
   canvasCenter?: { x: number; y: number };
   obstacles?: PopoverObstacles;
+  showInspectHint?: boolean;
   onPointerEnter?: () => void;
   onPointerLeave?: () => void;
 }
 
-type MediaPreview = Extract<Preview, { kind: 'video' | 'screenshot' }>;
+type MediaPreview = Extract<Preview, { kind: 'video' | 'screenshot' | 'wip' }>;
 
 /** Fallback measurements until the first ResizeObserver frame. */
 const FALLBACK_WIDTH = 320;
@@ -29,6 +31,7 @@ export function NodeHoverCard({
   position,
   canvasCenter,
   obstacles,
+  showInspectHint = true,
   onPointerEnter,
   onPointerLeave,
 }: NodeHoverCardProps) {
@@ -78,6 +81,9 @@ export function NodeHoverCard({
     (preview): preview is Extract<MediaPreview, { kind: 'screenshot' }> =>
       preview.kind === 'screenshot',
   );
+  const wipPreview = project.previews.find(
+    (preview): preview is Extract<MediaPreview, { kind: 'wip' }> => preview.kind === 'wip',
+  );
 
   return (
     <div
@@ -105,6 +111,12 @@ export function NodeHoverCard({
           alt={project.title}
           className="h-32 w-full rounded-xl object-cover"
         />
+      ) : wipPreview ? (
+        <div className="flex h-32 w-full items-center justify-center rounded-xl border border-[var(--color-divider)] bg-[var(--color-bg)]">
+          <span className="font-mono text-xs uppercase tracking-[0.22em] text-[var(--color-muted)]">
+            {wipPreview.label}
+          </span>
+        </div>
       ) : project.terminalDemo ? (
         <div className="flex h-32 w-full flex-col justify-between rounded-xl border border-[var(--color-divider)] bg-[var(--color-bg)] p-3 font-mono text-[11px] text-[var(--color-muted)]">
           <span className="text-[var(--color-accent)]">&gt;_</span>
@@ -119,9 +131,11 @@ export function NodeHoverCard({
         >
           {project.title}
         </h3>
-        <span className="shrink-0 font-secondary text-[10px] font-light text-[var(--color-accent)]">
-          Click to inspect ↗
-        </span>
+        {showInspectHint && (
+          <span className="shrink-0 font-secondary text-[10px] font-light text-[var(--color-accent)]">
+            Click to inspect ↗
+          </span>
+        )}
       </div>
 
       <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[var(--color-muted)]">
@@ -129,7 +143,7 @@ export function NodeHoverCard({
       </p>
 
       <div className="mt-2 flex flex-wrap gap-1.5">
-        {project.tags.map((tag) => (
+        {getVisibleTags(project.tags).map((tag) => (
           <span
             key={tag}
             className="rounded-full border border-[var(--color-outline)] px-2 py-0.5 font-secondary text-[9px] font-light uppercase tracking-[0.12em] text-[var(--color-muted)]"
@@ -140,17 +154,19 @@ export function NodeHoverCard({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <a
-          href={project.repo}
-          target="_blank"
-          rel="noreferrer"
-          data-testid="hover-code"
-          aria-label={`${project.title} source code, opens in new tab`}
-          className="fluid-pill min-h-11 gap-1 md:min-h-0"
-        >
-          <GitBranch className="h-3.5 w-3.5" aria-hidden="true" />
-          Code <span aria-hidden="true">↗</span>
-        </a>
+        {project.repo && (
+          <a
+            href={project.repo}
+            target="_blank"
+            rel="noreferrer"
+            data-testid="hover-code"
+            aria-label={`${project.title} source code, opens in new tab`}
+            className="fluid-pill min-h-11 gap-1 md:min-h-0"
+          >
+            <GitBranch className="h-3.5 w-3.5" aria-hidden="true" />
+            Code <span aria-hidden="true">↗</span>
+          </a>
+        )}
         {project.liveUrl && (
           <a
             href={project.liveUrl}

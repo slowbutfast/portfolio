@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { projects } from './projects';
+import { getVisibleTags, projects } from './projects';
 import { deriveEdges } from '../utils/graphTopology';
 import { resolveCommand } from '../utils/terminalCommandResolver';
 import type { Preview } from '../types/portfolio';
@@ -15,8 +15,8 @@ function assetExists(src: string): boolean {
 }
 
 describe('project catalog contract', () => {
-  it('contains 8 projects with unique non-empty ids', () => {
-    expect(projects).toHaveLength(8);
+  it('contains 9 projects with unique non-empty ids', () => {
+    expect(projects).toHaveLength(9);
     const ids = projects.map((p) => p.id);
     expect(new Set(ids).size).toBe(ids.length);
     for (const id of ids) {
@@ -25,20 +25,20 @@ describe('project catalog contract', () => {
     }
   });
 
-  it('declares a non-empty classification on all 8 projects', () => {
-    expect(projects).toHaveLength(8);
+  it('declares a non-empty classification on all 9 projects', () => {
+    expect(projects).toHaveLength(9);
     for (const p of projects) {
       expect(typeof p.classification, `${p.id} classification type`).toBe('string');
       expect(p.classification.trim().length, `${p.id} classification empty`).toBeGreaterThan(0);
     }
   });
 
-  it('declares a mandatory non-empty shortTitle on all 8 projects', () => {
-    expect(projects).toHaveLength(8);
+  it('declares a mandatory non-empty shortTitle on all 9 projects', () => {
+    expect(projects).toHaveLength(9);
     for (const p of projects) {
       expect(typeof p.shortTitle, `${p.id} shortTitle type`).toBe('string');
       expect(p.shortTitle.trim().length, `${p.id} shortTitle empty`).toBeGreaterThan(0);
-      expect(p.shortTitle.length, `${p.id} shortTitle too long`).toBeLessThanOrEqual(16);
+      expect(p.shortTitle.length, `${p.id} shortTitle too long`).toBeLessThanOrEqual(18);
     }
     expect(projects.map((p) => p.shortTitle)).toEqual([
       'OpenDungeon',
@@ -48,7 +48,8 @@ describe('project catalog contract', () => {
       'Sandwave',
       'AttentionMax',
       'Kintsugi 3D',
-      'Ivy Film Fest',
+      'Ivy Film\nFestival',
+      'art',
     ]);
   });
 
@@ -62,6 +63,7 @@ describe('project catalog contract', () => {
       'attention-max',
       'kintsugi-fracture',
       'ivy-film-festival-2026',
+      'art-wip',
     ]);
   });
 
@@ -70,11 +72,11 @@ describe('project catalog contract', () => {
     const ivy = projects.find((p) => p.id === 'ivy-film-festival-2026');
     expect(kintsugi?.shortTitle).toBe('Kintsugi 3D');
     expect(kintsugi?.classification).toBe('PROCEDURAL MESH GENERATION // WEBGL');
-    expect(kintsugi?.tags).toEqual(['Graphics']);
+    expect(kintsugi?.tags).toEqual(['Graphics', 'art']);
     expect(kintsugi?.repo).toBe('https://github.com/slowbutfast/kintsugi-fracture');
     expect(kintsugi?.liveUrl).toBe('https://kintsugi-fracture.vercel.app/');
 
-    expect(ivy?.shortTitle).toBe('Ivy Film Fest');
+    expect(ivy?.shortTitle).toBe('Ivy Film\nFestival');
     expect(ivy?.classification).toBe('STUDENT FILM FESTIVAL // BRAND & WEB');
     expect(ivy?.summary).toBe(
       'Web design, visual identity, and interactive screening program for the student-run Ivy Film Festival.',
@@ -91,9 +93,9 @@ describe('project catalog contract', () => {
     expect(sandwave?.liveUrl).toBe('https://sandwave-sim.vercel.app/');
   });
 
-  it('treats repo as optional while every other project declares a GitHub URL', () => {
+  it('treats repo as optional while engineering projects declare a GitHub URL', () => {
     for (const p of projects) {
-      if (p.id === 'ivy-film-festival-2026') {
+      if (p.id === 'ivy-film-festival-2026' || p.id === 'art-wip') {
         expect(p.repo).toBeUndefined();
         continue;
       }
@@ -102,17 +104,36 @@ describe('project catalog contract', () => {
     }
   });
 
-  it('keeps sandwave-sim at exactly the two acoustic tags', () => {
+  it('configures art-wip with art/WIP metadata, /art/ liveUrl, and review flags', () => {
+    const art = projects.find((p) => p.id === 'art-wip');
+    expect(art?.title).toBe('art');
+    expect(art?.shortTitle).toBe('art');
+    expect(art?.summary).toBe('WIP');
+    expect(art?.tags).toEqual(['art']);
+    expect(getVisibleTags(art?.tags ?? [])).toEqual([]);
+    expect(art?.liveUrl).toBe('/art/');
+    expect(art?.rainbowOnInteract).toBe(true);
+    expect(art?.omitIndex).toBe(true);
+    expect(art?.hideOverview).toBe(true);
+    expect(art?.revealLabelOnInspect).toBe(true);
+    expect(art?.previews).toEqual([]);
+  });
+
+  it('keeps sandwave-sim at the acoustic tags plus implicit art tag', () => {
     const sandwave = projects.find((p) => p.id === 'sandwave-sim');
-    expect(sandwave?.tags).toEqual(['Vanilla JS', 'Audio']);
+    expect(sandwave?.tags).toEqual(['Vanilla JS', 'Audio', 'art']);
   });
 
 
-  it('declares a discriminated preview union on every project', () => {
+  it('declares a discriminated preview union on every project with media', () => {
     for (const p of projects) {
+      if (p.id === 'art-wip') {
+        expect(p.previews).toEqual([]);
+        continue;
+      }
       expect(p.previews.length).toBeGreaterThan(0);
       for (const preview of p.previews) {
-        expect(['terminal', 'video', 'screenshot', 'linkout']).toContain(preview.kind);
+        expect(['terminal', 'video', 'screenshot', 'linkout', 'wip']).toContain(preview.kind);
         if (preview.kind === 'video' || preview.kind === 'screenshot') {
           expect((preview as Extract<Preview, { kind: 'video' | 'screenshot' }>).src).toBeTruthy();
         }
@@ -143,7 +164,7 @@ describe('project catalog contract', () => {
     }
   });
 
-  it('derives exactly the pinned 13 edges from the real catalog', () => {
+  it('derives exactly the pinned 13 permanent edges from the real catalog', () => {
     const edges = deriveEdges(projects);
     expect(edges).toHaveLength(13);
     const keys = edges.map((e) => [e.source, e.target].sort().join('<->')).sort();
