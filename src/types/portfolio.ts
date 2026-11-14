@@ -49,6 +49,14 @@ export interface ProjectData {
   liveUrl?: string;
   /** Opt-in rainbow RGB pulse on hover or while visited (until canvas reset). */
   rainbowOnInteract?: boolean;
+  /** Hide the catalog index stamp (e.g. 09) in drawer and grid views. */
+  omitIndex?: boolean;
+  /** Hide the bottom Overview section in ProjectDrawer. */
+  hideOverview?: boolean;
+  /** Hide the canvas label pill until the project is clicked in this session. */
+  revealLabelOnInspect?: boolean;
+  /** Multiplier for gravitational pull on edges and attraction toward this node. */
+  gravityWeight?: number;
   previews: Preview[];
   terminalDemo?: TerminalDemo;
 }

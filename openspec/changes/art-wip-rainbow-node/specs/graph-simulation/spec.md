@@ -1,16 +1,23 @@
 ## MODIFIED Requirements
 
+### Requirement: Decentralized equal mass node distribution
+The system SHALL simulate standard nodes using uniform visual radius (22px) and uniform repulsive charge ($k_{charge} = -\min(w, h) \times 0.30$) with weak planar seed homing (`seedX`/`seedY` at `0.02`), soft link springs (base strength `0.015`), collision radius (`48px`), and distance floor (`distanceMin = 50`). As an intentional exception, nodes declaring `gravityWeight > 1` (`art-wip` with `gravityWeight: 2.5`) SHALL exert stronger link pull (`LINK_STRENGTH * maxWeight`) and gentle radial attraction toward themselves so connected neighbors gravitate more closely toward `ART`, while maintaining at least 44 pixels center-to-center clearance and zero straight-line edge crossings.
+
+#### Scenario: Graph initialization without central clump or corner pinning
+- **WHEN** the canvas is initialized with the 9 project nodes
+- **THEN** nodes distribute buoyantly across the viewport area maintaining at least 44 pixels center-to-center clearance without settling against viewport margins or collapsing onto OpenDungeon, while `art-wip` exerts stronger gravitational pull on its connected neighbors.
+
 ### Requirement: Dynamic hover gravitation wave
-The system SHALL gate both simulation hover physics (`sim.hover(node)`) and preview card opening behind a single `150ms` pointer dwell timer, cancelling the dwell timer and clearing hover synchronously on `pointerdown`, `dragStart`, `pointerleave`, `focusedId` change, a bidirectional `prefers-reduced-motion` transition, or while `state === 'coasting'`. Once dwell completes, the hovered node is transiently pinned (`fx = x; fy = y`) without becoming a persistent user placement.
+The system SHALL gate both simulation hover physics (`sim.hover(node)`) and preview card opening behind a single `200ms` pointer dwell timer, cancelling the dwell timer and clearing hover synchronously on `pointerdown`, `dragStart`, `pointerleave`, `focusedId` change, a bidirectional `prefers-reduced-motion` transition, or while `state === 'coasting'`. Once dwell completes, the hovered node is transiently pinned (`fx = x; fy = y`) without becoming a persistent user placement.
 
 The system SHALL render a purely visual deterministic ambient drift for every node with amplitude `3.5px`, updated at roughly `30fps`, paused while `document.hidden`, while the canvas is off-screen (`IntersectionObserver`), and under reduced motion. Rendering, pointer hit testing, and hover-card anchoring SHALL consume the same drift offset so the painted circle and its interactive target remain aligned. Ambient drift SHALL NOT exert any `d3-force` attraction or repulsion.
 
 #### Scenario: Pointer sweeps across a node without dwelling
-- **WHEN** the pointer crosses a node for less than `150ms` or while `state === 'coasting'`
+- **WHEN** the pointer crosses a node for less than `200ms` or while `state === 'coasting'`
 - **THEN** neither `sim.hover` nor `NodeHoverCard` activates.
 
-#### Scenario: Pointer dwells on a stationary node for 150ms
-- **WHEN** the pointer remains on node H for `150ms` in `idle` state
+#### Scenario: Pointer dwells on a stationary node for 200ms
+- **WHEN** the pointer remains on node H for `200ms` in `idle` state
 - **THEN** `sim.hover(H)` pins node H, the visual ambient drift continues within its `3.5px` bound, and `NodeHoverCard` opens peripherally away from the measured canvas center.
 
 #### Scenario: Pointer leaves or clicks a hovered node
@@ -21,11 +28,11 @@ The system SHALL render a purely visual deterministic ambient drift for every no
 The system SHALL place `NodeHoverCard` and the desktop `ProjectDrawer` by scoring eight candidate rectangles around the anchor using measured card/panel bounds (`ResizeObserver` for the card), circle-rect node overlap (`5000` target node, `1000` neighbors), Liang-Barsky segment-AABB intersections (`3x` weight for focal edges), a `72px` top-header clearance, viewport margins, and an outward-ray tie-breaker. The card SHALL use the measured canvas-container center, not the window center.
 
 #### Scenario: Hover or inspect popup opens near a dense focal hub
-- **WHEN** a popup opens for a node after the `150ms` dwell or a project click
+- **WHEN** a popup opens for a node after the `200ms` dwell or a project click
 - **THEN** the solver chooses the clamped candidate that covers the fewest nodes and connections, especially focal edges, without overflowing the viewport or header.
 
 ### Requirement: Sticky inspected focal context and draggable inspector
-The system SHALL retain the inspected project's focal connections and contiguous shared-tag labels after `ProjectDrawer` closes. The sticky focus SHALL clear when the `150ms` hover dwell activates on any node (including the inspected node), when a tap/click both begins and ends on empty canvas (`downNodeId === null`, `moved < 6`, and `!hitNode(pointerUp)`), when a clean tap/click lands on the node that currently owns the sticky focus while `ProjectDrawer` is closed (`moved < 6`), on `Reset`, or when switching to Grid view. Tapping a different node while another node owns the sticky focus SHALL open the inspector for that new node immediately. While the mobile sheet is open, `drawer-backdrop` intercepts taps above the sheet to close it, so empty-canvas focal clearing applies after the sheet is dismissed. The desktop `ProjectDrawer` SHALL treat its outer `8px` border band on all four edges as a draggable surface, showing the CSS `move` cursor while the pointer is over that band and supporting pointer-captured dragging clamped to the viewport, with a user-drag lock preventing anchor updates from snapping it back. The mobile `< 768px` bottom-sheet drawer SHALL remain non-draggable on its border and SHALL NOT show the `move` cursor.
+The system SHALL retain the inspected project's focal connections and contiguous shared-tag labels after `ProjectDrawer` closes. The sticky focus SHALL clear when the `200ms` hover dwell activates on any node (including the inspected node), when a tap/click both begins and ends on empty canvas (`downNodeId === null`, `moved < 6`, and `!hitNode(pointerUp)`), when a clean tap/click lands on the node that currently owns the sticky focus while `ProjectDrawer` is closed (`moved < 6`), on `Reset`, or when switching to Grid view. Tapping a different node while another node owns the sticky focus SHALL open the inspector for that new node immediately. While the mobile sheet is open, `drawer-backdrop` intercepts taps above the sheet to close it, so empty-canvas focal clearing applies after the sheet is dismissed. The desktop `ProjectDrawer` SHALL treat its outer `8px` border band on all four edges as a draggable surface, showing the CSS `move` cursor while the pointer is over that band and supporting pointer-captured dragging clamped to the viewport, with a user-drag lock preventing anchor updates from snapping it back. The mobile `< 768px` bottom-sheet drawer SHALL remain non-draggable on its border and SHALL NOT show the `move` cursor.
 
 #### Scenario: User closes the inspector
 - **WHEN** the user closes `ProjectDrawer`
@@ -96,7 +103,7 @@ The system SHALL guarantee that:
 ## ADDED Requirements
 
 ### Requirement: Rainbow RGB node pulsing until canvas reset
-For any project declaring `rainbowOnInteract: true` (`art-wip`), `GraphCanvas` SHALL render the node and its ferrofluid bridge endpoint color using a continuously cycling rainbow RGB color whenever the node is hovered, focused/selected, or present in `visitedIds`, persisting across drawer closes and page reloads until `"Reset layout"` clears `visitedIds`. The node label SHALL retain the theme's standard foreground color, and the node SHALL retain a theme-foreground outline with at least 3:1 contrast against the canvas. Any visible focal shared-tag pill on an edge connected to the active rainbow node SHALL render its tag text in a synchronized lower-saturation rainbow color; for each rendered hue, the text color SHALL maintain at least 4.5:1 contrast against the actual pill background. The muted color helper SHALL adjust lightness for the current theme/background rather than relying on a fixed HSL lightness. Under `prefers-reduced-motion: reduce`, `GraphCanvas` SHALL render a static deterministic rainbow-spectrum hue instead of animating, and the static shared-tag color SHALL meet the same text contrast threshold.
+For any project declaring `rainbowOnInteract: true` (`art-wip`), `GraphCanvas` SHALL render the node and its ferrofluid bridge endpoint color using a continuously cycling rainbow RGB color (`0.144 deg/ms`) whenever the node is hovered, focused/selected, or present in `visitedIds`, persisting across drawer closes and page reloads until `"Reset layout"` clears `visitedIds`. The node label SHALL retain the theme's standard foreground color, and the node SHALL retain a `#ffffff` `1.5px` outline. For projects declaring `revealLabelOnInspect: true` (`art-wip`), `GraphCanvas` SHALL hide the node's canvas label pill until the node is clicked/inspected in the current session, keeping it visible across drawer closes and `"Reset layout"` until page refresh. Multi-line `\n` node labels (such as `"Ivy Film\nFestival"`) SHALL render with `1.0` line spacing. Any visible focal shared-tag pill on an edge connected to the active rainbow node SHALL render its tag text in a synchronized lower-saturation rainbow color; for each rendered hue, the text color SHALL maintain at least 4.5:1 contrast against the actual pill background. The muted color helper SHALL adjust lightness for the current theme/background rather than relying on a fixed HSL lightness. Under `prefers-reduced-motion: reduce`, `GraphCanvas` SHALL render a static deterministic rainbow-spectrum hue instead of animating, and the static shared-tag color SHALL meet the same text contrast threshold.
 
 #### Scenario: Hovering the WIP art node activates rainbow pulsing
 - **WHEN** the pointer hovers over `art-wip` before it has been clicked

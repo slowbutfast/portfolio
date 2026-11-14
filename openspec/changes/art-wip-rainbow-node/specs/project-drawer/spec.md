@@ -22,9 +22,9 @@ The system SHALL render an interactive floating hover card (`NodeHoverCard`) on 
 
 ## ADDED Requirements
 
-### Requirement: WIP preview rendering in MediaView and ProjectDrawer
-`ProjectDrawer` SHALL include the `Media` tab for projects with `{ kind: 'wip' }` previews, and `MediaView` SHALL render a clean `WIP` placeholder panel for `wip` previews.
+### Requirement: Minimal inspector mode for unnumbered WIP entries
+`ProjectDrawer` SHALL omit the catalog index badge (`09`) when `project.omitIndex` is `true`, and omit the bottom `Overview` section (`drawer-overview`) when `project.hideOverview` is `true`, while retaining the `Media` tab for projects that declare `video`, `screenshot`, or `wip` previews.
 
-#### Scenario: Inspecting a WIP project displays WIP in the Media tab
+#### Scenario: Inspecting ART displays minimal WIP header without index, Media tab, or Overview
 - **WHEN** the user inspects `art-wip` in `ProjectDrawer`
-- **THEN** the `Media` tab is present and active, rendering a `WIP` preview block, and the sticky `Visit ↗` link points to `/art/`.
+- **THEN** the drawer displays `ART`, `WIP`, tags (`Design`, `Graphics`), and `Visit ↗` pointing to `/art/`, without an index badge, `Media` tab, or `Overview` section.

@@ -148,7 +148,7 @@ export const projects = [
   {
     id: 'ivy-film-festival-2026',
     title: 'Ivy Film Festival 2026',
-    shortTitle: 'Ivy Film Fest',
+    shortTitle: 'Ivy Film\nFestival',
     summary:
       'Web design, visual identity, and interactive screening program for the student-run Ivy Film Festival.',
     classification: 'STUDENT FILM FESTIVAL // BRAND & WEB',
@@ -164,17 +164,18 @@ export const projects = [
   },
   {
     id: 'art-wip',
-    title: 'Art (WIP)',
-    shortTitle: 'Art (WIP)',
-    summary: 'WIP — Art & visual experiments page currently under construction.',
+    title: 'ART',
+    shortTitle: 'ART',
+    summary: 'WIP',
     classification: 'ART & VISUAL EXPERIMENTS // WIP',
     tags: ['Design', 'Graphics'],
     liveUrl: '/art/',
     rainbowOnInteract: true,
-    previews: [
-      { kind: 'wip', label: 'WIP' },
-      { kind: 'linkout', url: '/art/', label: 'Visit WIP page' },
-    ],
+    omitIndex: true,
+    hideOverview: true,
+    revealLabelOnInspect: true,
+    gravityWeight: 2.5,
+    previews: [],
   },
 ] satisfies ProjectData[];
 

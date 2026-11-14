@@ -29,3 +29,12 @@
 
 - [x] 5.1 Run `npm run typecheck`, `npm run build`, `npm test`, and `npx playwright test`, verifying clean passes and `dist/art/index.html` emission.
 - [x] 5.2 Populate `verification.md` with the Requirement Adherence Matrix, resolved assumptions, and verbatim execution logs, and run `npx openspec validate "art-wip-rainbow-node" --strict`.
+
+## 6. PR #16 Review Patch (`PATCH-01`)
+
+- [x] 6.1 Update `ProjectData` (`omitIndex`, `hideOverview`, `revealLabelOnInspect`, `gravityWeight`) in `src/types/portfolio.ts` and update `art-wip` & `ivy-film-festival-2026` in `src/data/projects.ts`.
+- [x] 6.2 Speed up rainbow cycle 20% (`0.144 deg/ms`) in `src/utils/rainbowPulse.ts`.
+- [x] 6.3 Add weighted gravitational attraction (`gravityWeight`) in `src/physics/graphSimulation.ts` and `GraphCanvas.tsx`, and verify 0-crossing planarity & neighbor pull in unit tests.
+- [x] 6.4 Update `GraphCanvas.tsx`: `#ffffff` node stroke, `HOVER_DWELL_MS = 200`, hide `ART` label pill until clicked (`revealedIds` from `App.tsx`), and render `\n` multi-line labels (`"Ivy Film\nFestival"`) at `1.0` line spacing.
+- [x] 6.5 Update `ProjectDrawer.tsx` (`omitIndex`, `hideOverview`) and `ListView.tsx` (`omitIndex`, minimal `WIP` card when `previews` is empty).
+- [x] 6.6 Update `projects.test.ts`, `graphSimulation.test.ts`, and `e2e/portfolio.spec.ts`, re-run all checks, and update `verification.md`.

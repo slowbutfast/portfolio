@@ -27,6 +27,7 @@ interface GraphCanvasProps {
   dimmedIds: Set<string>;
   focusedId: string | null;
   visitedIds: Set<string>;
+  revealedIds?: Set<string>;
   initialSelectedId?: string | null;
   synth?: AmbientSynth | null;
   onHoverNode?: (
@@ -93,7 +94,7 @@ const EDGE_TAG_LINE_SPACING = 1.15;
 const EDGE_TAG_VERTICAL_PADDING = 4;
 
 /** Unified hover gate shared by simulation pinning and the DOM preview card. */
-const HOVER_DWELL_MS = 150;
+const HOVER_DWELL_MS = 200;
 /** Proximity-only webbing appears for non-edge pairs inside this distance. */
 const PROXIMITY_MAX_DIST = 96;
 
@@ -284,6 +285,7 @@ export function GraphCanvas({
   dimmedIds,
   focusedId,
   visitedIds,
+  revealedIds,
   initialSelectedId,
   synth,
   onHoverNode,
@@ -314,6 +316,9 @@ export function GraphCanvas({
   focusedRef.current = focusedId;
   const visitedRef = useRef(visitedIds);
   visitedRef.current = visitedIds;
+  const emptyRevealedRef = useRef<Set<string>>(new Set());
+  const revealedRef = useRef(revealedIds ?? emptyRevealedRef.current);
+  revealedRef.current = revealedIds ?? emptyRevealedRef.current;
   const onHoverNodeRef = useRef(onHoverNode);
   onHoverNodeRef.current = onHoverNode;
   const onCanvasDragStartRef = useRef(onCanvasDragStart);
@@ -343,7 +348,7 @@ export function GraphCanvas({
   const draggingNodeRef = useRef(false);
   const canHoverRef = useRef(false);
   const renderRef = useRef<() => void>(() => {});
-  const wakeRef = useRef<() => void>(() => {});
+  const wakeRef = useRef<(reheatSim?: boolean) => void>(() => {});
   const synthRef = useRef<AmbientSynth | null>(null);
   synthRef.current = synth ?? null;
   const lastDragPointRef = useRef<{ x: number; y: number; t: number } | null>(null);
@@ -385,7 +390,11 @@ export function GraphCanvas({
     canHoverRef.current =
       !reduceMotion && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
-    const simNodes = nodes.map((n) => ({ id: n.id, label: n.label }));
+    const simNodes = nodes.map((n) => ({
+      id: n.id,
+      label: n.label,
+      gravityWeight: getProjectById(n.id)?.gravityWeight,
+    }));
     const simLinks = edges.map((e) => ({ source: e.source, target: e.target }));
 
     let width = Math.max(1, Math.round(container.getBoundingClientRect().width));
@@ -558,6 +567,10 @@ export function GraphCanvas({
       if (canvas.dataset.rainbowNodes !== rainbowNodesValue) {
         canvas.dataset.rainbowNodes = rainbowNodesValue;
       }
+      const revealedLabelsValue = [...revealedRef.current].sort().join(',');
+      if (canvas.dataset.revealedLabels !== revealedLabelsValue) {
+        canvas.dataset.revealedLabels = revealedLabelsValue;
+      }
 
       const nodeColor = (id: string): string => {
         if (rainbowVibrant && rainbowActiveIds.has(id)) return rainbowVibrant;
@@ -711,26 +724,36 @@ export function GraphCanvas({
         ctx.fill();
         if (isRainbow) {
           ctx.lineWidth = 1.5;
-          ctx.strokeStyle = tokens.text;
+          ctx.strokeStyle = '#ffffff';
           ctx.stroke();
         }
 
+        const shouldHideLabel =
+          getProjectById(n.id)?.revealLabelOnInspect === true &&
+          !revealedRef.current.has(n.id);
+        if (shouldHideLabel) continue;
+
         ctx.font = LABEL_FONT;
-        const labelWidth = ctx.measureText(n.label).width;
+        const lines = n.label.split('\n');
+        const labelWidth = Math.max(...lines.map((line) => ctx.measureText(line).width));
         const pillWidth = labelWidth + 16;
-        const pillHeight = 20;
+        const lineHeight = LABEL_FONT_SIZE * 1.0;
+        const pillHeight = lines.length === 1 ? 20 : Math.ceil(lines.length * lineHeight + 8);
         const pillX = x - pillWidth / 2;
         const pillY = y + n.radius + 8;
 
         ctx.beginPath();
-        ctx.roundRect(pillX, pillY, pillWidth, pillHeight, pillHeight / 2);
+        ctx.roundRect(pillX, pillY, pillWidth, pillHeight, Math.min(10, pillHeight / 2));
         ctx.fillStyle = tokens.bg;
         ctx.fill();
 
         ctx.fillStyle = isActive && !isRainbow ? tokens.accent : tokens.text;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(n.label, x, pillY + pillHeight / 2);
+        const firstLineY = pillY + pillHeight / 2 - ((lines.length - 1) * lineHeight) / 2;
+        for (let lineIdx = 0; lineIdx < lines.length; lineIdx += 1) {
+          ctx.fillText(lines[lineIdx], x, firstLineY + lineIdx * lineHeight);
+        }
       }
 
       ctx.restore();
@@ -814,7 +837,7 @@ export function GraphCanvas({
 
     let idleSuspended = false;
 
-    const wake = () => {
+    const wake = (reheatSim = true) => {
       if (disposed) return;
       if (idleTimer !== 0) {
         window.clearTimeout(idleTimer);
@@ -822,9 +845,11 @@ export function GraphCanvas({
       }
       if (idleSuspended) {
         idleSuspended = false;
-        // A small alpha re-heats homing and oscillator integration just enough
-        // to respond without a visible jump.
-        sim.sim.alpha(Math.max(sim.sim.alpha(), 0.05)).restart();
+        if (reheatSim) {
+          // A small alpha re-heats homing and oscillator integration just enough
+          // to respond without a visible jump.
+          sim.sim.alpha(Math.max(sim.sim.alpha(), 0.05)).restart();
+        }
       }
       if (raf === 0) raf = requestAnimationFrame(loop);
     };
@@ -836,6 +861,13 @@ export function GraphCanvas({
       const now = performance.now();
       const t = transformRef.current;
       const goal = targetRef.current;
+      if (focusedRef.current) {
+        const focusedNode = sim.findNode(focusedRef.current);
+        if (focusedNode) {
+          goal.x = width / 2 - focusedNode.x;
+          goal.y = height / 2 - focusedNode.y;
+        }
+      }
       const dx = goal.x - t.x;
       const dy = goal.y - t.y;
       const cameraMoving = Math.abs(dx) > 0.05 || Math.abs(dy) > 0.05;
@@ -1041,7 +1073,7 @@ export function GraphCanvas({
     const reset = () => {
       goal.x = 0;
       goal.y = 0;
-      wakeRef.current();
+      wakeRef.current(false);
     };
 
     if (!initialSelectedId) {
@@ -1088,7 +1120,7 @@ export function GraphCanvas({
       if (Math.hypot(nextX - goal.x, nextY - goal.y) > 0.5) {
         goal.x = nextX;
         goal.y = nextY;
-        wakeRef.current();
+        wakeRef.current(false);
       }
     };
 

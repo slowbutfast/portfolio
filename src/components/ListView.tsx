@@ -63,11 +63,11 @@ function CardPreview({ project }: { project: ProjectData }) {
     );
   }
 
-  if (wipPreview) {
+  if (wipPreview || (!project.terminalDemo && project.previews.length === 0)) {
     return (
       <div className="flex aspect-video w-full items-center justify-center rounded-xl border border-[var(--color-outline)] bg-[var(--color-bg)]">
         <span className="font-mono text-sm uppercase tracking-[0.22em] text-[var(--color-muted)]">
-          {wipPreview.label}
+          {wipPreview?.label ?? project.summary}
         </span>
       </div>
     );
@@ -112,9 +112,11 @@ export function ListView({ projects, dimmedIds, onSelect }: ListViewProps) {
               >
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex min-w-0 items-center gap-3">
-                    <span className="select-none font-mono text-lg text-[var(--color-muted)]">
-                      {index}
-                    </span>
+                    {!project.omitIndex && (
+                      <span className="select-none font-mono text-lg text-[var(--color-muted)]">
+                        {index}
+                      </span>
+                    )}
                     <h2 className="truncate text-xl font-semibold leading-tight text-[var(--color-text)]">
                       {project.title}
                     </h2>

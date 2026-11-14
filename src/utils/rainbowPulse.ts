@@ -3,7 +3,7 @@ import type { ThemeMode } from '../types/portfolio';
 export type RainbowVariant = 'vibrant' | 'muted';
 
 const STATIC_REDUCED_MOTION_HUE = 285;
-const HUE_DEGREES_PER_MS = 0.12;
+const HUE_DEGREES_PER_MS = 0.144;
 const DARK_PILL_LUMINANCE = relativeLuminance([24, 25, 30]); // #18191e
 const LIGHT_PILL_LUMINANCE = relativeLuminance([234, 233, 229]); // #eae9e5
 const MIN_MUTED_CONTRAST = 4.55;

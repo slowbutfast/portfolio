@@ -38,7 +38,7 @@ describe('project catalog contract', () => {
     for (const p of projects) {
       expect(typeof p.shortTitle, `${p.id} shortTitle type`).toBe('string');
       expect(p.shortTitle.trim().length, `${p.id} shortTitle empty`).toBeGreaterThan(0);
-      expect(p.shortTitle.length, `${p.id} shortTitle too long`).toBeLessThanOrEqual(16);
+      expect(p.shortTitle.length, `${p.id} shortTitle too long`).toBeLessThanOrEqual(18);
     }
     expect(projects.map((p) => p.shortTitle)).toEqual([
       'OpenDungeon',
@@ -48,8 +48,8 @@ describe('project catalog contract', () => {
       'Sandwave',
       'AttentionMax',
       'Kintsugi 3D',
-      'Ivy Film Fest',
-      'Art (WIP)',
+      'Ivy Film\nFestival',
+      'ART',
     ]);
   });
 
@@ -76,7 +76,7 @@ describe('project catalog contract', () => {
     expect(kintsugi?.repo).toBe('https://github.com/slowbutfast/kintsugi-fracture');
     expect(kintsugi?.liveUrl).toBe('https://kintsugi-fracture.vercel.app/');
 
-    expect(ivy?.shortTitle).toBe('Ivy Film Fest');
+    expect(ivy?.shortTitle).toBe('Ivy Film\nFestival');
     expect(ivy?.classification).toBe('STUDENT FILM FESTIVAL // BRAND & WEB');
     expect(ivy?.summary).toBe(
       'Web design, visual identity, and interactive screening program for the student-run Ivy Film Festival.',
@@ -104,13 +104,19 @@ describe('project catalog contract', () => {
     }
   });
 
-  it('configures art-wip with WIP metadata, /art/ liveUrl, and rainbowOnInteract', () => {
+  it('configures art-wip with ART/WIP metadata, /art/ liveUrl, and PATCH-01 flags', () => {
     const art = projects.find((p) => p.id === 'art-wip');
-    expect(art?.shortTitle).toBe('Art (WIP)');
+    expect(art?.title).toBe('ART');
+    expect(art?.shortTitle).toBe('ART');
+    expect(art?.summary).toBe('WIP');
     expect(art?.tags).toEqual(['Design', 'Graphics']);
     expect(art?.liveUrl).toBe('/art/');
     expect(art?.rainbowOnInteract).toBe(true);
-    expect(art?.previews.some((preview) => preview.kind === 'wip')).toBe(true);
+    expect(art?.omitIndex).toBe(true);
+    expect(art?.hideOverview).toBe(true);
+    expect(art?.revealLabelOnInspect).toBe(true);
+    expect(art?.gravityWeight).toBe(2.5);
+    expect(art?.previews).toEqual([]);
   });
 
   it('keeps sandwave-sim at exactly the two acoustic tags', () => {
@@ -119,8 +125,12 @@ describe('project catalog contract', () => {
   });
 
 
-  it('declares a discriminated preview union on every project', () => {
+  it('declares a discriminated preview union on every project with media', () => {
     for (const p of projects) {
+      if (p.id === 'art-wip') {
+        expect(p.previews).toEqual([]);
+        continue;
+      }
       expect(p.previews.length).toBeGreaterThan(0);
       for (const preview of p.previews) {
         expect(['terminal', 'video', 'screenshot', 'linkout', 'wip']).toContain(preview.kind);

@@ -50,6 +50,7 @@ export default function App() {
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [theme, setTheme] = useState<ThemeMode>(readStoredTheme);
   const [visitedIds, setVisitedIds] = useState<Set<string>>(readStoredVisited);
+  const [inspectedIds, setInspectedIds] = useState<Set<string>>(() => new Set());
   const [hasInspectedAnyNode, setHasInspectedAnyNode] = useState(false);
   const [drawerAnchor, setDrawerAnchor] = useState<CanvasAnchor | null>(null);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
@@ -209,6 +210,12 @@ export default function App() {
       setIsAboutOpen(false);
       dismissHover();
       setHasInspectedAnyNode(true);
+      setInspectedIds((previous) => {
+        if (previous.has(id)) return previous;
+        const next = new Set(previous);
+        next.add(id);
+        return next;
+      });
       if (
         document.activeElement instanceof HTMLElement &&
         document.activeElement !== document.body
@@ -364,6 +371,7 @@ export default function App() {
             dimmedIds={dimmedIds}
             focusedId={view === 'graph' ? focusedId : null}
             visitedIds={visitedIds}
+            revealedIds={inspectedIds}
             initialSelectedId={selectedId}
             synth={synth}
             onHoverNode={handleHoverNode}

@@ -1241,7 +1241,7 @@ test.describe('portfolio graph SPA', () => {
     expect(dimmedEdges.size).toBe(16);
   });
 
-  test('hover dwell suppresses fast sweeps and opens after 150ms', async ({ page }, testInfo) => {
+  test('hover dwell suppresses fast sweeps and opens after 200ms', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'hover previews are desktop-only');
     await page.goto('/');
     await page.waitForTimeout(1500);
@@ -1254,15 +1254,15 @@ test.describe('portfolio graph SPA', () => {
     const centerX = box.x + box.width / 2;
     const centerY = box.y + box.height / 2;
 
-    // Cross the centered node and leave well inside the 150ms dwell window.
+    // Cross the centered node and leave well inside the 200ms dwell window.
     await page.mouse.move(centerX, centerY);
     await page.mouse.move(box.x + 12, box.y + box.height - 12);
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(120);
     await expect(page.getByTestId('node-hover-card')).toHaveCount(0);
 
-    // Returning and dwelling opens the card only after the 150ms timer fires.
+    // Returning and dwelling opens the card only after the 200ms timer fires.
     await page.mouse.move(centerX, centerY);
-    await page.waitForTimeout(70);
+    await page.waitForTimeout(100);
     await expect(page.getByTestId('node-hover-card')).toHaveCount(0);
     await expect(page.getByTestId('node-hover-card')).toBeVisible();
   });
@@ -1740,36 +1740,45 @@ test.describe('portfolio graph SPA', () => {
     expect(errors).toEqual([]);
   });
 
-  test('art-wip rainbow state persists until Reset layout and hides Click to inspect after node click', async ({
+  test('art-wip rainbow state, hidden label reveal, omitted overview/index, and Click to inspect lifecycle', async ({
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'hover card is desktop-only');
     await page.goto('/');
     const canvas = page.getByTestId('graph-canvas');
     await expect(canvas).toHaveAttribute('data-rainbow-nodes', '');
+    await expect(canvas).toHaveAttribute('data-revealed-labels', '');
 
-    // Inspecting art-wip activates rainbow pulsing and reveals WIP media + /art/ Visit link.
+    // Inspecting art-wip activates rainbow pulsing, reveals ART label, and omits 09/Overview.
     await page.getByTestId('nav-art-wip').evaluate((el: HTMLButtonElement) => el.click());
     await expect(page.getByTestId('project-drawer')).toBeVisible();
     await expect(page.getByTestId('drawer-visit')).toHaveAttribute('href', '/art/');
+    await expect(page.getByTestId('project-drawer')).toContainText('ART');
     await expect(page.getByTestId('project-drawer')).toContainText('WIP');
+    await expect(page.getByTestId('project-drawer')).not.toContainText('Overview');
+    await expect(page.getByTestId('project-drawer')).not.toContainText('09');
     await expect(canvas).toHaveAttribute('data-rainbow-nodes', 'art-wip');
+    await expect(canvas).toHaveAttribute('data-revealed-labels', 'art-wip');
     await expect(canvas).toHaveAttribute('data-rainbow-tag-pills', /^(?:[1-9]\d*)$/);
 
-    // Close drawer and reload: rainbow state persists via visitedIds.
+    // Close drawer and reload: rainbow state persists via visitedIds, but ART label re-hides.
     await page.getByTestId('drawer-close').click();
     await expect(page.getByTestId('project-drawer')).toHaveCount(0);
     await page.reload();
     await expect(canvas).toHaveAttribute('data-rainbow-nodes', 'art-wip');
+    await expect(canvas).toHaveAttribute('data-revealed-labels', '');
 
-    // Click any node to hide "Click to inspect ↗" for the session, then Reset layout.
+    // Re-inspect art-wip so label is revealed, then click any node and Reset layout.
+    await page.getByTestId('nav-art-wip').evaluate((el: HTMLButtonElement) => el.click());
+    await expect(canvas).toHaveAttribute('data-revealed-labels', 'art-wip');
     await page.getByTestId('nav-open-dungeon').evaluate((el: HTMLButtonElement) => el.click());
     await page.getByTestId('drawer-close').click();
     await page.getByTestId('controls-dropdown-trigger').click();
     await page.getByTestId('reset-layout').click();
 
-    // Reset layout clears rainbow node pulsing, but "Click to inspect ↗" stays hidden.
+    // Reset layout clears rainbow node pulsing, but ART label and hidden "Click to inspect ↗" persist.
     await expect(canvas).toHaveAttribute('data-rainbow-nodes', '');
+    await expect(canvas).toHaveAttribute('data-revealed-labels', /\bart-wip\b/);
     await page.waitForTimeout(1500);
     await page.getByTestId('nav-open-dungeon').focus();
     await page.waitForTimeout(600);
@@ -1779,8 +1788,9 @@ test.describe('portfolio graph SPA', () => {
     await expect(page.getByTestId('node-hover-card')).toBeVisible();
     await expect(page.getByTestId('node-hover-card')).not.toContainText('Click to inspect');
 
-    // Full page reload restores "Click to inspect ↗".
+    // Full page reload restores "Click to inspect ↗" and hides ART label again.
     await page.reload();
+    await expect(canvas).toHaveAttribute('data-revealed-labels', '');
     await page.waitForTimeout(1500);
     await page.getByTestId('nav-open-dungeon').focus();
     await page.waitForTimeout(600);

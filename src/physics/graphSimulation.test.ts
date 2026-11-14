@@ -876,4 +876,40 @@ describe('fling amplitude', () => {
     expect(result.peak).toBeLessThanOrEqual(4.0);
     expect(result.final).toBeLessThan(0.01);
   });
+
+  it('pulls connected nodes closer toward a higher gravityWeight node', () => {
+    const baselineSim = createSimulation({
+      nodes: [
+        { id: 'hub', label: 'Hub' },
+        { id: 'leaf', label: 'Leaf' },
+      ],
+      links: [{ source: 'hub', target: 'leaf', tags: ['a'] }],
+      seeds: { hub: { x: 0.2, y: 0.5 }, leaf: { x: 0.8, y: 0.5 } },
+      width: 1000,
+      height: 700,
+    });
+    for (let i = 0; i < 120; i++) baselineSim.tick();
+    const bHub = baselineSim.findNode('hub')!;
+    const bLeaf = baselineSim.findNode('leaf')!;
+    const baselineDist = Math.hypot(bHub.x - bLeaf.x, bHub.y - bLeaf.y);
+    baselineSim.destroy();
+
+    const weightedSim = createSimulation({
+      nodes: [
+        { id: 'hub', label: 'Hub', gravityWeight: 2.5 },
+        { id: 'leaf', label: 'Leaf' },
+      ],
+      links: [{ source: 'hub', target: 'leaf', tags: ['a'] }],
+      seeds: { hub: { x: 0.2, y: 0.5 }, leaf: { x: 0.8, y: 0.5 } },
+      width: 1000,
+      height: 700,
+    });
+    for (let i = 0; i < 120; i++) weightedSim.tick();
+    const wHub = weightedSim.findNode('hub')!;
+    const wLeaf = weightedSim.findNode('leaf')!;
+    const weightedDist = Math.hypot(wHub.x - wLeaf.x, wHub.y - wLeaf.y);
+    weightedSim.destroy();
+
+    expect(weightedDist).toBeLessThan(baselineDist);
+  });
 });
