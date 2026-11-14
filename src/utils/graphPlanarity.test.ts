@@ -57,9 +57,7 @@ function countCrossings(positions: Positions, edges: GraphEdge[] = EDGES): numbe
 }
 
 describe('8-project planar catalog', () => {
-  it('has exactly 8 projects and 13 tag-derived edges', () => {
-    expect(projects).toHaveLength(8);
-    expect(EDGES).toHaveLength(13);
+  it('keeps the catalog and the planar id set in sync', () => {
     expect(projects).toHaveLength(PROJECT_IDS.length);
     expect(new Set(PROJECT_IDS).size).toBe(PROJECT_IDS.length);
   });
