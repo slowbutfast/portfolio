@@ -1,9 +1,17 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { getVisibleTags, projects } from './projects';
+import {
+  catalog,
+  getVisibleTags,
+  HIDDEN_TAGS,
+  projects,
+} from './projects';
+import { PLANAR_NODE_SEEDS } from './graphSeeds';
 import { deriveEdges } from '../utils/graphTopology';
+import { validateCatalog } from './catalogSchema';
+import { countSeedCrossings } from '../utils/graphPlanarity';
 import { resolveCommand } from '../utils/terminalCommandResolver';
 import type { Preview } from '../types/portfolio';
 
@@ -14,62 +22,65 @@ function assetExists(src: string): boolean {
   return existsSync(resolve(repoRoot, clean));
 }
 
+const fixture = JSON.parse(
+  readFileSync(resolve(repoRoot, 'src/data/__fixtures__/projects.pre-refactor.json'), 'utf8'),
+) as {
+  projects: unknown;
+  seeds: unknown;
+  hiddenTags: string[];
+  visibleTags: string[][];
+};
+
+describe('golden equivalence with the pre-refactor catalog', () => {
+  it('hydrates the exact same projects, seeds, hidden tags, and visible tags', () => {
+    expect(projects).toEqual(fixture.projects);
+    expect(PLANAR_NODE_SEEDS).toEqual(fixture.seeds);
+    expect([...HIDDEN_TAGS]).toEqual(fixture.hiddenTags);
+    expect(projects.map((project) => getVisibleTags(project.tags))).toEqual(
+      fixture.visibleTags,
+    );
+  });
+});
+
 describe('project catalog contract', () => {
-  it('contains 9 projects with unique non-empty ids', () => {
-    expect(projects).toHaveLength(9);
-    const ids = projects.map((p) => p.id);
+  it('validates the real catalog against the canonical schema', () => {
+    expect(validateCatalog(catalog)).toEqual([]);
+  });
+
+  it('contains unique kebab-case ids', () => {
+    const ids = projects.map((project) => project.id);
     expect(new Set(ids).size).toBe(ids.length);
     for (const id of ids) {
-      expect(typeof id).toBe('string');
-      expect(id.length).toBeGreaterThan(0);
+      expect(id).toMatch(/^[a-z0-9-]+$/);
     }
   });
 
-  it('declares a non-empty classification on all 9 projects', () => {
-    expect(projects).toHaveLength(9);
-    for (const p of projects) {
-      expect(typeof p.classification, `${p.id} classification type`).toBe('string');
-      expect(p.classification.trim().length, `${p.id} classification empty`).toBeGreaterThan(0);
+  it('declares a non-empty classification and short title on every project', () => {
+    for (const project of projects) {
+      expect(project.classification.trim().length, `${project.id} classification`).toBeGreaterThan(0);
+      expect(project.shortTitle.trim().length, `${project.id} shortTitle`).toBeGreaterThan(0);
+      expect(project.shortTitle.length, `${project.id} shortTitle too long`).toBeLessThanOrEqual(18);
     }
   });
 
-  it('declares a mandatory non-empty shortTitle on all 9 projects', () => {
-    expect(projects).toHaveLength(9);
-    for (const p of projects) {
-      expect(typeof p.shortTitle, `${p.id} shortTitle type`).toBe('string');
-      expect(p.shortTitle.trim().length, `${p.id} shortTitle empty`).toBeGreaterThan(0);
-      expect(p.shortTitle.length, `${p.id} shortTitle too long`).toBeLessThanOrEqual(18);
-    }
-    expect(projects.map((p) => p.shortTitle)).toEqual([
-      'OpenDungeon',
-      'Resume Builder',
-      'Climate Risk',
-      'Transcribe+',
-      'Sandwave',
-      'AttentionMax',
-      'Kintsugi 3D',
-      'Ivy Film\nFestival',
-      'art',
-    ]);
+  it('keys seeds by exactly the project ids', () => {
+    expect(Object.keys(PLANAR_NODE_SEEDS).sort()).toEqual(
+      projects.map((project) => project.id).sort(),
+    );
   });
 
-  it('preserves the pinned catalog order and ids', () => {
-    expect(projects.map((p) => p.id)).toEqual([
-      'open-dungeon',
-      'agentic-resume-builder',
-      'pict-climate-risk-viz-chatbot',
-      'transcribe-plus',
-      'sandwave-sim',
-      'attention-max',
-      'kintsugi-fracture',
-      'ivy-film-festival-2026',
-      'art-wip',
-    ]);
+  it('derives a crossing-free edge set from the real catalog', () => {
+    const edges = deriveEdges(projects);
+    expect(edges.length).toBeGreaterThan(0);
+    const positions = Object.fromEntries(
+      Object.entries(PLANAR_NODE_SEEDS).map(([id, seed]) => [id, [seed.x, seed.y] as [number, number]]),
+    );
+    expect(countSeedCrossings(positions, edges, projects.map((project) => project.id))).toBe(0);
   });
 
-  it('defines the new projects with the required classification and summary', () => {
-    const kintsugi = projects.find((p) => p.id === 'kintsugi-fracture');
-    const ivy = projects.find((p) => p.id === 'ivy-film-festival-2026');
+  it('defines kintsugi and ivy with their required metadata', () => {
+    const kintsugi = projects.find((project) => project.id === 'kintsugi-fracture');
+    const ivy = projects.find((project) => project.id === 'ivy-film-festival-2026');
     expect(kintsugi?.shortTitle).toBe('Kintsugi 3D');
     expect(kintsugi?.classification).toBe('PROCEDURAL MESH GENERATION // WEBGL');
     expect(kintsugi?.tags).toEqual(['Graphics', 'art']);
@@ -78,34 +89,32 @@ describe('project catalog contract', () => {
 
     expect(ivy?.shortTitle).toBe('Ivy Film\nFestival');
     expect(ivy?.classification).toBe('STUDENT FILM FESTIVAL // BRAND & WEB');
-    expect(ivy?.summary).toBe(
-      'Web design, visual identity, and interactive screening program for the student-run Ivy Film Festival.',
-    );
     expect(ivy?.tags).toEqual(['Design']);
     expect(ivy?.repo).toBeUndefined();
     expect(ivy?.liveUrl).toBe('https://www.ivyfilmfestival.org/');
   });
 
   it('declares live demo URLs for transcribe-plus and sandwave-sim', () => {
-    const transcribe = projects.find((p) => p.id === 'transcribe-plus');
-    const sandwave = projects.find((p) => p.id === 'sandwave-sim');
-    expect(transcribe?.liveUrl).toBe('https://transcribe-plus-frontend.vercel.app/');
-    expect(sandwave?.liveUrl).toBe('https://sandwave-sim.vercel.app/');
+    expect(projects.find((project) => project.id === 'transcribe-plus')?.liveUrl).toBe(
+      'https://transcribe-plus-frontend.vercel.app/',
+    );
+    expect(projects.find((project) => project.id === 'sandwave-sim')?.liveUrl).toBe(
+      'https://sandwave-sim.vercel.app/',
+    );
   });
 
   it('treats repo as optional while engineering projects declare a GitHub URL', () => {
-    for (const p of projects) {
-      if (p.id === 'ivy-film-festival-2026' || p.id === 'art-wip') {
-        expect(p.repo).toBeUndefined();
+    for (const project of projects) {
+      if (project.id === 'ivy-film-festival-2026' || project.id === 'art-wip') {
+        expect(project.repo).toBeUndefined();
         continue;
       }
-      expect(typeof p.repo, `${p.id} repo`).toBe('string');
-      expect(p.repo).toMatch(/^https:\/\/github\.com\//);
+      expect(project.repo, `${project.id} repo`).toMatch(/^https:\/\/github\.com\//);
     }
   });
 
   it('configures art-wip with art/WIP metadata, /art/ liveUrl, and review flags', () => {
-    const art = projects.find((p) => p.id === 'art-wip');
+    const art = projects.find((project) => project.id === 'art-wip');
     expect(art?.title).toBe('art');
     expect(art?.shortTitle).toBe('art');
     expect(art?.summary).toBe('WIP');
@@ -120,19 +129,21 @@ describe('project catalog contract', () => {
   });
 
   it('keeps sandwave-sim at the acoustic tags plus implicit art tag', () => {
-    const sandwave = projects.find((p) => p.id === 'sandwave-sim');
-    expect(sandwave?.tags).toEqual(['Vanilla JS', 'Audio', 'art']);
+    expect(projects.find((project) => project.id === 'sandwave-sim')?.tags).toEqual([
+      'Vanilla JS',
+      'Audio',
+      'art',
+    ]);
   });
 
-
   it('declares a discriminated preview union on every project with media', () => {
-    for (const p of projects) {
-      if (p.id === 'art-wip') {
-        expect(p.previews).toEqual([]);
+    for (const project of projects) {
+      if (project.id === 'art-wip') {
+        expect(project.previews).toEqual([]);
         continue;
       }
-      expect(p.previews.length).toBeGreaterThan(0);
-      for (const preview of p.previews) {
+      expect(project.previews.length).toBeGreaterThan(0);
+      for (const preview of project.previews) {
         expect(['terminal', 'video', 'screenshot', 'linkout', 'wip']).toContain(preview.kind);
         if (preview.kind === 'video' || preview.kind === 'screenshot') {
           expect((preview as Extract<Preview, { kind: 'video' | 'screenshot' }>).src).toBeTruthy();
@@ -142,48 +153,32 @@ describe('project catalog contract', () => {
   });
 
   it('points every video/screenshot src at a bundler-imported asset under src/assets/', () => {
-    for (const p of projects) {
-      for (const preview of p.previews) {
+    for (const project of projects) {
+      for (const preview of project.previews) {
         if (preview.kind === 'video' || preview.kind === 'screenshot') {
           const { src } = preview as Extract<Preview, { kind: 'video' | 'screenshot' }>;
-          expect(assetExists(src), `${p.id} missing asset: ${src}`).toBe(true);
+          expect(assetExists(src), `${project.id} missing asset: ${src}`).toBe(true);
         }
       }
     }
   });
 
   it('resolves every terminal command chip to a valid captured entry', () => {
-    for (const p of projects) {
-      if (!p.terminalDemo) continue;
-      expect(p.terminalDemo.commands.length).toBeGreaterThan(0);
-      for (const chip of p.terminalDemo.commands) {
-        const resolved = resolveCommand(p.terminalDemo.commands, chip.command);
-        expect(typeof resolved.exitCode, `${p.id}: ${chip.command}`).toBe('number');
-        expect(resolved.output.length, `${p.id}: ${chip.command}`).toBeGreaterThan(0);
+    for (const project of projects) {
+      if (!project.terminalDemo) continue;
+      expect(project.terminalDemo.commands.length).toBeGreaterThan(0);
+      for (const chip of project.terminalDemo.commands) {
+        const resolved = resolveCommand(project.terminalDemo.commands, chip.command);
+        expect(typeof resolved.exitCode, `${project.id}: ${chip.command}`).toBe('number');
+        expect(resolved.output.length, `${project.id}: ${chip.command}`).toBeGreaterThan(0);
       }
     }
   });
 
-  it('derives exactly the pinned 13 permanent edges from the real catalog', () => {
+  it('keeps art-wip disconnected from permanent edges', () => {
     const edges = deriveEdges(projects);
-    expect(edges).toHaveLength(13);
-    const keys = edges.map((e) => [e.source, e.target].sort().join('<->')).sort();
-    expect(keys).toEqual(
-      [
-        'agentic-resume-builder<->attention-max',
-        'agentic-resume-builder<->ivy-film-festival-2026',
-        'agentic-resume-builder<->open-dungeon',
-        'attention-max<->ivy-film-festival-2026',
-        'attention-max<->kintsugi-fracture',
-        'attention-max<->open-dungeon',
-        'attention-max<->sandwave-sim',
-        'attention-max<->transcribe-plus',
-        'open-dungeon<->pict-climate-risk-viz-chatbot',
-        'open-dungeon<->sandwave-sim',
-        'open-dungeon<->transcribe-plus',
-        'pict-climate-risk-viz-chatbot<->transcribe-plus',
-        'sandwave-sim<->transcribe-plus',
-      ].sort(),
+    expect(edges.some((edge) => edge.source === 'art-wip' || edge.target === 'art-wip')).toBe(
+      false,
     );
   });
 });

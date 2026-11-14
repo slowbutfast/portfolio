@@ -1,15 +1,9 @@
-export type ParadigmTag =
-  | 'LLM'
-  | 'Express'
-  | 'Vanilla JS'
-  | 'Audio'
-  | 'Agent Tooling'
-  | 'LaTeX'
-  | 'Geospatial'
-  | 'WebExtension'
-  | 'Graphics'
-  | 'Design'
-  | 'art';
+/**
+ * Controlled tag vocabulary is declared in `src/data/projects.catalog.json` and
+ * validated at runtime. Kept as `string` so Studio CRUD can add tags without a
+ * code change, while `catalog.tags` remains the single source of truth.
+ */
+export type ParadigmTag = string;
 
 export type TerminalStatus = 'ok' | 'warn' | 'error';
 

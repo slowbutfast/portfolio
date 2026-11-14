@@ -3,6 +3,7 @@ import { PLANAR_NODE_SEEDS, scaleSeeds } from '../data/graphSeeds';
 import { projects } from '../data/projects';
 import { deriveEdges, type GraphEdge } from '../utils/graphTopology';
 import { createSimulation } from '../physics/graphSimulation';
+import { countSeedCrossings, pointInTriangle } from './graphPlanarity';
 
 type Point = [number, number];
 type Positions = Record<string, Point>;
@@ -10,58 +11,14 @@ type Positions = Record<string, Point>;
 const PROJECT_IDS = projects.map((project) => project.id);
 const EDGES: GraphEdge[] = deriveEdges(projects);
 
-function cross(origin: Point, a: Point, b: Point): number {
-  return (a[0] - origin[0]) * (b[1] - origin[1]) - (a[1] - origin[1]) * (b[0] - origin[0]);
-}
-
-function properIntersection(a: Point, b: Point, c: Point, d: Point): boolean {
-  const d1 = cross(c, d, a);
-  const d2 = cross(c, d, b);
-  const d3 = cross(a, b, c);
-  const d4 = cross(a, b, d);
-  return d1 * d2 < 0 && d3 * d4 < 0;
-}
-
-/** Count proper crossings; unknown and missing ids are hard errors. */
 function countCrossings(positions: Positions, edges: GraphEdge[] = EDGES): number {
-  const known = new Set(PROJECT_IDS);
-  for (const id of Object.keys(positions)) {
-    if (!known.has(id)) throw new Error(`Unknown project id in position map: ${id}`);
-  }
-  for (const edge of edges) {
-    if (!positions[edge.source] || !positions[edge.target]) {
-      throw new Error(`Missing position for edge ${edge.source} <-> ${edge.target}`);
-    }
-  }
-
-  const segments = edges.map((edge) => ({
-    ...edge,
-    a: positions[edge.source],
-    b: positions[edge.target],
-  }));
-  let crossings = 0;
-  for (let i = 0; i < segments.length; i += 1) {
-    for (let j = i + 1; j < segments.length; j += 1) {
-      const left = segments[i];
-      const right = segments[j];
-      const sharesEndpoint =
-        left.source === right.source ||
-        left.source === right.target ||
-        left.target === right.source ||
-        left.target === right.target;
-      if (sharesEndpoint) continue;
-      if (properIntersection(left.a, left.b, right.a, right.b)) crossings += 1;
-    }
-  }
-  return crossings;
+  return countSeedCrossings(positions, edges, PROJECT_IDS);
 }
 
-describe('9-project planar catalog', () => {
-  it('has exactly 9 projects and 13 permanent tag-derived edges', () => {
-    expect(projects).toHaveLength(9);
-    expect(EDGES).toHaveLength(13);
-    expect(projects).toHaveLength(PROJECT_IDS.length);
-    expect(new Set(PROJECT_IDS).size).toBe(PROJECT_IDS.length);
+describe('planar catalog invariants', () => {
+  it('derives a non-empty crossing-free permanent edge set', () => {
+    expect(EDGES.length).toBeGreaterThan(0);
+    expect(PROJECT_IDS.length).toBe(new Set(PROJECT_IDS).size);
   });
 
   it('gives every project except art-wip at least one permanent connection', () => {
@@ -124,10 +81,8 @@ describe('PLANAR_NODE_SEEDS embedding', () => {
     const c = positions['attention-max'];
     const p = positions['sandwave-sim'];
 
-    const total = Math.abs(cross(a, b, c));
-    const parts =
-      Math.abs(cross(p, a, b)) + Math.abs(cross(p, b, c)) + Math.abs(cross(p, c, a));
-    expect(parts).toBeCloseTo(total, 6);
+    expect(pointInTriangle(p, a, b, c)).toBe(true);
+    expect(pointInTriangle([0, 0], a, b, c)).toBe(false);
   });
 });
 

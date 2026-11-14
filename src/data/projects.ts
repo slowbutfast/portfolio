@@ -1,190 +1,102 @@
-import type { ParadigmTag, ProjectData, TerminalDemo } from '../types/portfolio';
-import openDungeonCapturedJson from './captured/open-dungeon.json';
-import resumeBuilderCapturedJson from './captured/agentic-resume-builder.json';
-import transcribePlusCapturedJson from './captured/transcribe-plus.json';
-import sandwaveSimCapturedJson from './captured/sandwave-sim.json';
-import attentionMaxCapturedJson from './captured/attention-max.json';
-import openDungeonScreenshot from '../assets/screenshots/open-dungeon.png';
-import pictClimateScreenshot from '../assets/screenshots/pict-climate-risk-viz-chatbot.png';
-import transcribeClip from '../assets/clip.mp4';
-import sandwaveScreenshot from '../assets/screenshots/sandwave-sim.png';
-import attentionMaxScreenshot from '../assets/screenshots/attention-max.png';
+import type { ParadigmTag, Preview, ProjectData, TerminalDemo } from '../types/portfolio';
+import { validateCatalog, type CatalogPreview, type ProjectCatalog } from './catalogSchema';
+import catalogJson from './projects.catalog.json';
+import { ALL_TAGS, catalog, HIDDEN_TAGS, getVisibleTags } from './tagRegistry';
+
+export { ALL_TAGS, HIDDEN_TAGS, catalog, getVisibleTags };
+
+const catalogData = catalogJson as ProjectCatalog;
 
 interface CapturedDemo {
   prompt: string;
   commands: TerminalDemo['commands'];
 }
 
-const openDungeonCaptured = openDungeonCapturedJson as CapturedDemo;
-const resumeBuilderCaptured = resumeBuilderCapturedJson as CapturedDemo;
-const transcribePlusCaptured = transcribePlusCapturedJson as CapturedDemo;
-const sandwaveSimCaptured = sandwaveSimCapturedJson as CapturedDemo;
-const attentionMaxCaptured = attentionMaxCapturedJson as CapturedDemo;
+// Narrow globs: only real media and captured terminal demos become modules.
+const assetModules = import.meta.glob('../assets/**/*.{png,jpg,jpeg,webp,mp4,webm}', {
+  eager: true,
+  import: 'default',
+}) as Record<string, string>;
 
-function demo(captured: CapturedDemo, prompt: string): TerminalDemo {
-  return { prompt, commands: captured.commands };
+const capturedModules = import.meta.glob('./captured/*.json', {
+  eager: true,
+  import: 'default',
+}) as Record<string, CapturedDemo>;
+
+const ASSET_PREFIX = '../assets/';
+const CAPTURED_PREFIX = './captured/';
+
+const assetKeys = new Set(
+  Object.keys(assetModules).map((key) => key.slice(ASSET_PREFIX.length)),
+);
+const capturedKeys = new Set(
+  Object.keys(capturedModules)
+    .filter((key) => key.startsWith(CAPTURED_PREFIX) && key.endsWith('.json'))
+    .map((key) => key.slice(CAPTURED_PREFIX.length, -'.json'.length)),
+);
+
+const catalogErrors = validateCatalog(catalogData, { assetKeys, capturedKeys });
+if (catalogErrors.length > 0) {
+  throw new Error(`Invalid projects.catalog.json:\n- ${catalogErrors.join('\n- ')}`);
 }
 
-export const projects = [
-  {
-    id: 'open-dungeon',
-    title: 'OpenDungeon',
-    shortTitle: 'OpenDungeon',
-    summary:
-      'Generative text-adventure engine with a 20-tool MCP server and an OAuth-gated multiplayer canvas.',
-    classification: 'GENERATIVE ADVENTURE // MCP RUNTIME',
-    tags: ['Express', 'Vanilla JS', 'LLM', 'Agent Tooling', 'art'],
-    repo: 'https://github.com/slowbutfast/open-dungeon',
-    liveUrl: 'https://open-dungeon-three.vercel.app/',
-    previews: [
-      { kind: 'terminal', label: 'Terminal' },
-      { kind: 'screenshot', src: openDungeonScreenshot, caption: 'OpenDungeon web canvas' },
-      { kind: 'linkout', url: 'https://open-dungeon-three.vercel.app/', label: 'Launch live app' },
-    ],
-    terminalDemo: demo(openDungeonCaptured, '$ node'),
-  },
-  {
-    id: 'agentic-resume-builder',
-    title: 'Agentic Resume Builder',
-    shortTitle: 'Resume Builder',
-    summary:
-      'Python CLI that renders tailored LaTeX resumes from structured YAML via an argparse-driven build pipeline.',
-    classification: 'AGENTIC DOCUMENT PIPELINE // LaTeX',
-    tags: ['Agent Tooling', 'LaTeX', 'Design'],
-    repo: 'https://github.com/slowbutfast/agentic-resume-builder',
-    previews: [{ kind: 'terminal', label: 'Terminal' }],
-    terminalDemo: demo(resumeBuilderCaptured, '$ python3 build_resume.py'),
-  },
-  {
-    id: 'pict-climate-risk-viz-chatbot',
-    title: 'PICT Climate Risk Viz',
-    shortTitle: 'Climate Risk',
-    summary:
-      'Geospatial climate-risk chat and raster visualization built on an Express backend with React 19.',
-    classification: 'GEOSPATIAL CLIMATE INTELLIGENCE // RASTER VIZ',
-    tags: ['Express', 'LLM', 'Geospatial'],
-    repo: 'https://github.com/BrownEarthLab/pict-climate-risk-viz-chatbot',
-    previews: [
-      {
-        kind: 'screenshot',
-        src: pictClimateScreenshot,
-        caption: 'PICT Climate Risk raster dashboard',
-      },
-      {
-        kind: 'linkout',
-        url: 'https://github.com/BrownEarthLab/pict-climate-risk-viz-chatbot',
-        label: 'View repository',
-      },
-    ],
-  },
-  {
-    id: 'transcribe-plus',
-    title: 'Transcribe Plus',
-    shortTitle: 'Transcribe+',
-    summary:
-      'Local transcription workspace with a Vite + Express 5 monorepo and an offline product demo video.',
-    classification: 'LOCAL AUDIO TRANSCRIPTION // MONOREPO',
-    tags: ['Express', 'Vanilla JS', 'Audio', 'art'],
-    repo: 'https://github.com/slowbutfast/transcribe-plus',
-    liveUrl: 'https://transcribe-plus-frontend.vercel.app/',
-    previews: [
-      { kind: 'video', src: transcribeClip, caption: 'Transcribe Plus product walkthrough' },
-      { kind: 'terminal', label: 'Terminal' },
-      { kind: 'linkout', url: 'https://github.com/slowbutfast/transcribe-plus', label: 'View repository' },
-    ],
-    terminalDemo: demo(transcribePlusCaptured, '$ npm test'),
-  },
-  {
-    id: 'sandwave-sim',
-    title: 'Sandwave Sim',
-    shortTitle: 'Sandwave',
-    summary:
-      'Vanilla JS Chladni plate acoustic simulator rendering nodal-line sand patterns with Web Audio.',
-    classification: 'ACOUSTIC PHYSICS SIMULATION // CHLADNI PLATES',
-    tags: ['Vanilla JS', 'Audio', 'art'],
-    repo: 'https://github.com/slowbutfast/sandwave-sim',
-    liveUrl: 'https://sandwave-sim.vercel.app/',
-    previews: [
-      { kind: 'screenshot', src: sandwaveScreenshot, caption: 'Sandwave Chladni plate view' },
-      { kind: 'terminal', label: 'Terminal' },
-      { kind: 'linkout', url: 'https://github.com/slowbutfast/sandwave-sim', label: 'View repository' },
-    ],
-    terminalDemo: demo(sandwaveSimCaptured, '$ npm test'),
-  },
-  {
-    id: 'attention-max',
-    title: 'Attention Max',
-    shortTitle: 'AttentionMax',
-    summary:
-      'Firefox MV3 extension that gamifies focus sessions with a popup timer and an options dashboard.',
-    classification: 'FOCUS PROTOCOL EXTENSION // MV3',
-    tags: ['Vanilla JS', 'WebExtension', 'Design', 'Graphics'],
-    repo: 'https://github.com/slowbutfast/attention-max-public',
-    previews: [
-      { kind: 'screenshot', src: attentionMaxScreenshot, caption: 'Attention Max popup UI' },
-      { kind: 'terminal', label: 'Terminal' },
-      { kind: 'linkout', url: 'https://github.com/slowbutfast/attention-max-public', label: 'View repository' },
-    ],
-    terminalDemo: demo(attentionMaxCaptured, '$ npm test'),
-  },
-  {
-    id: 'kintsugi-fracture',
-    title: 'Kintsugi Fracture',
-    shortTitle: 'Kintsugi 3D',
-    summary:
-      'WebGL fracture study that reassembles procedurally shattered geometry along gilded kintsugi seams in real time.',
-    classification: 'PROCEDURAL MESH GENERATION // WEBGL',
-    tags: ['Graphics', 'art'],
-    repo: 'https://github.com/slowbutfast/kintsugi-fracture',
-    liveUrl: 'https://kintsugi-fracture.vercel.app/',
-    previews: [
-      {
-        kind: 'linkout',
-        url: 'https://kintsugi-fracture.vercel.app/',
-        label: 'Launch live app',
-      },
-    ],
-  },
-  {
-    id: 'ivy-film-festival-2026',
-    title: 'Ivy Film Festival 2026',
-    shortTitle: 'Ivy Film\nFestival',
-    summary:
-      'Web design, visual identity, and interactive screening program for the student-run Ivy Film Festival.',
-    classification: 'STUDENT FILM FESTIVAL // BRAND & WEB',
-    tags: ['Design'],
-    liveUrl: 'https://www.ivyfilmfestival.org/',
-    previews: [
-      {
-        kind: 'linkout',
-        url: 'https://www.ivyfilmfestival.org/',
-        label: 'Visit festival site',
-      },
-    ],
-  },
-  {
-    id: 'art-wip',
-    title: 'art',
-    shortTitle: 'art',
-    summary: 'WIP',
-    classification: 'ART & VISUAL EXPERIMENTS // WIP',
-    tags: ['art'],
-    liveUrl: '/art/',
-    rainbowOnInteract: true,
-    omitIndex: true,
-    hideOverview: true,
-    revealLabelOnInspect: true,
-    previews: [],
-  },
-] satisfies ProjectData[];
-
-/** Tags kept latent in graph topology and hidden from UI tag chips. */
-export const HIDDEN_TAGS: ReadonlySet<ParadigmTag> = new Set<ParadigmTag>(['art']);
-
-export function getVisibleTags(tags: readonly ParadigmTag[]): ParadigmTag[] {
-  return tags.filter((tag) => !HIDDEN_TAGS.has(tag));
+function resolveAsset(assetKey: string): string {
+  const url = assetModules[`${ASSET_PREFIX}${assetKey}`];
+  if (!url) throw new Error(`Unknown assetKey "${assetKey}"`);
+  return url;
 }
+
+function hydratePreview(preview: CatalogPreview): Preview {
+  switch (preview.kind) {
+    case 'screenshot':
+      return { kind: 'screenshot', src: resolveAsset(preview.assetKey), caption: preview.caption };
+    case 'video': {
+      const hydrated: Extract<Preview, { kind: 'video' }> = {
+        kind: 'video',
+        src: resolveAsset(preview.assetKey),
+        caption: preview.caption,
+      };
+      if (preview.poster) hydrated.poster = resolveAsset(preview.poster);
+      return hydrated;
+    }
+    default:
+      return preview;
+  }
+}
+
+function hydrateTerminalDemo(demo: {
+  capturedKey: string;
+  prompt: string;
+}): TerminalDemo {
+  const captured = capturedModules[`${CAPTURED_PREFIX}${demo.capturedKey}.json`];
+  if (!captured) throw new Error(`Unknown capturedKey "${demo.capturedKey}"`);
+  return { prompt: demo.prompt, commands: captured.commands };
+}
+
+function hydrateProject(project: ProjectCatalog['projects'][number]): ProjectData {
+  const hydrated: ProjectData = {
+    id: project.id,
+    title: project.title,
+    shortTitle: project.shortTitle,
+    summary: project.summary,
+    classification: project.classification,
+    tags: [...project.tags],
+    previews: project.previews.map(hydratePreview),
+  };
+  if (project.repo !== undefined) hydrated.repo = project.repo;
+  if (project.liveUrl !== undefined) hydrated.liveUrl = project.liveUrl;
+  if (project.rainbowOnInteract) hydrated.rainbowOnInteract = true;
+  if (project.omitIndex) hydrated.omitIndex = true;
+  if (project.hideOverview) hydrated.hideOverview = true;
+  if (project.revealLabelOnInspect) hydrated.revealLabelOnInspect = true;
+  if (project.terminalDemo) hydrated.terminalDemo = hydrateTerminalDemo(project.terminalDemo);
+  return hydrated;
+}
+
+export const projects: ProjectData[] = catalogData.projects.map(hydrateProject);
 
 export function getProjectById(id: string): ProjectData | undefined {
-  return projects.find((p) => p.id === id);
+  return projects.find((project) => project.id === id);
 }
+
+export type { ParadigmTag };
