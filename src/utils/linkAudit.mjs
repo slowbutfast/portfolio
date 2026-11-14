@@ -1,48 +1,32 @@
 /**
  * Shared link auditor used by both `scripts/audit-links.mjs` and the dev-only
- * Studio plugin. Performs manual redirect traversal with DNS resolution and
- * blocks loopback / private / link-local / reserved targets on every hop.
+ * Studio plugin. Pure ESM JavaScript so the CLI runs on any Node 22.x without
+ * relying on TypeScript type stripping.
+ *
+ * Performs manual redirect traversal with DNS resolution, blocks loopback /
+ * private / link-local / reserved targets on every hop, and pins the validated
+ * IP on default Node HTTP/HTTPS connections to close the DNS-rebinding window.
  */
 import { lookup } from 'node:dns/promises';
+import http from 'node:http';
+import https from 'node:https';
 import { isIP } from 'node:net';
 
 export const URL_PATTERN = /https?:\/\/[^\s"'`<>]+/g;
-
-export type LinkOutcome = 'pass' | 'warning' | 'fail';
-
-export interface LinkCheckResult {
-  url: string;
-  status: number;
-  outcome: LinkOutcome;
-  attempts: number;
-  latencyMs: number;
-  finalUrl?: string;
-  blocked?: boolean;
-  error?: string;
-}
-
-export interface LinkCheckOptions {
-  fetchImpl?: typeof fetch;
-  timeoutMs?: number;
-  retries?: number;
-  maxRedirects?: number;
-  resolveImpl?: (hostname: string) => Promise<string[]>;
-  userAgent?: string;
-}
 
 const DEFAULT_USER_AGENT =
   'Mozilla/5.0 (compatible; portfolio-link-auditor/1.0; +https://github.com/slowbutfast)';
 
 /** Extract absolute http(s) URLs from TypeScript/JSON source text. */
-export function extractUrlsFromSource(source: string): string[] {
+export function extractUrlsFromSource(source) {
   const matches = source.match(URL_PATTERN) ?? [];
   return matches
     .map((url) => url.replace(/[.,;:)\]}]+$/, ''))
     .filter((url) => url.startsWith('http://') || url.startsWith('https://'));
 }
 
-export function extractUniqueUrls(sources: readonly string[]): string[] {
-  const urls = new Set<string>();
+export function extractUniqueUrls(sources) {
+  const urls = new Set();
   for (const source of sources) {
     for (const url of extractUrlsFromSource(source)) urls.add(url);
   }
@@ -50,7 +34,7 @@ export function extractUniqueUrls(sources: readonly string[]): string[] {
 }
 
 /** Classify an HTTP status as pass, warning, or fail. */
-export function classifyStatus(status: number): LinkOutcome {
+export function classifyStatus(status) {
   if (status >= 200 && status < 400) return 'pass';
   if (status === 999 || status === 429 || status === 403 || status === 401) {
     return 'warning';
@@ -58,11 +42,11 @@ export function classifyStatus(status: number): LinkOutcome {
   return 'fail';
 }
 
-export function isValidEmail(value: string): boolean {
+export function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value);
 }
 
-function ipv4Octets(address: string): number[] | null {
+function ipv4Octets(address) {
   const parts = address.split('.');
   if (parts.length !== 4) return null;
   const octets = parts.map((part) => Number(part));
@@ -72,7 +56,7 @@ function ipv4Octets(address: string): number[] | null {
   return octets;
 }
 
-function isPrivateIpv4(octets: number[]): boolean {
+function isPrivateIpv4(octets) {
   const [a, b] = octets;
   if (a === 0 || a === 10 || a === 127) return true;
   if (a === 100 && b >= 64 && b <= 127) return true;
@@ -85,11 +69,16 @@ function isPrivateIpv4(octets: number[]): boolean {
   return false;
 }
 
-function isPrivateIpv6(address: string): boolean {
+function isPrivateIpv6(address) {
   const value = address.toLowerCase().split('%')[0];
   if (value === '::' || value === '::1') return true;
   if (value.startsWith('fc') || value.startsWith('fd')) return true;
-  if (value.startsWith('fe8') || value.startsWith('fe9') || value.startsWith('fea') || value.startsWith('feb')) {
+  if (
+    value.startsWith('fe8') ||
+    value.startsWith('fe9') ||
+    value.startsWith('fea') ||
+    value.startsWith('feb')
+  ) {
     return true;
   }
   if (value.startsWith('ff')) return true;
@@ -113,7 +102,7 @@ function isPrivateIpv6(address: string): boolean {
 }
 
 /** True when a literal host or resolved address must never be fetched. */
-export function isBlockedAddress(address: string): boolean {
+export function isBlockedAddress(address) {
   const normalized = address.replace(/^\[|\]$/g, '');
   const family = isIP(normalized);
   if (family === 4) {
@@ -121,45 +110,107 @@ export function isBlockedAddress(address: string): boolean {
     return octets ? isPrivateIpv4(octets) : true;
   }
   if (family === 6) return isPrivateIpv6(normalized);
-  // Non-IP values (e.g. decimal/integer hosts) are treated conservatively.
   return /^\d+$/.test(normalized) || /^0x[0-9a-f]+$/i.test(normalized);
 }
 
-async function defaultResolve(hostname: string): Promise<string[]> {
+async function defaultResolve(hostname) {
   const records = await lookup(hostname, { all: true, verbatim: true });
   return records.map((record) => record.address);
 }
 
-async function assertSafeUrl(url: URL, resolveImpl: (hostname: string) => Promise<string[]>): Promise<void> {
+/**
+ * Validate a URL and return the address the socket must connect to. The
+ * returned address is pinned for the actual request, so a second DNS lookup
+ * cannot redirect the connection to a private range.
+ */
+async function resolveSafeTarget(url, resolveImpl) {
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
     throw new Error(`blocked protocol ${url.protocol}`);
   }
   if (url.username || url.password) throw new Error('blocked credentialed URL');
   const hostname = url.hostname.replace(/^\[|\]$/g, '');
-  // Integer and decimal IPv4 notations (e.g. http://2130706433) bypass naive
-  // string checks; reject them before DNS resolution.
   if (/^\d+$/.test(hostname) || /^0x[0-9a-f]+$/i.test(hostname)) {
     throw new Error('blocked numeric host');
   }
   const literalFamily = isIP(hostname);
   if (literalFamily) {
     if (isBlockedAddress(hostname)) throw new Error(`blocked private address ${hostname}`);
-    return;
+    return { address: hostname, family: literalFamily };
   }
   const addresses = await resolveImpl(hostname);
   if (addresses.length === 0) throw new Error(`could not resolve ${hostname}`);
   for (const address of addresses) {
     if (isBlockedAddress(address)) throw new Error(`blocked private address ${address}`);
   }
+  return { address: addresses[0], family: isIP(addresses[0]) || 4 };
 }
 
-async function fetchWithTimeout(
-  fetchImpl: typeof fetch,
-  url: string,
-  method: string,
-  timeoutMs: number,
-  userAgent: string,
-): Promise<Response> {
+/**
+ * Build Node `http`/`https` request options that connect to a validated IP while
+ * preserving the URL's `Host` header and TLS SNI `servername`.
+ */
+export function buildPinnedRequestOptions(url, address) {
+  const parsed = url instanceof URL ? url : new URL(url);
+  const secure = parsed.protocol === 'https:';
+  const hostname = parsed.hostname.replace(/^\[|\]$/g, '');
+  return {
+    module: secure ? 'https' : 'http',
+    options: {
+      hostname: address,
+      port: parsed.port || (secure ? 443 : 80),
+      path: `${parsed.pathname}${parsed.search}`,
+      method: 'GET',
+      headers: {
+        Host: parsed.host,
+        accept: 'text/html,*/*',
+      },
+      ...(secure ? { servername: hostname } : {}),
+    },
+  };
+}
+
+function responseLike(status, headers) {
+  return {
+    status,
+    ok: status >= 200 && status < 300,
+    headers: {
+      get(name) {
+        const value = headers[name.toLowerCase()];
+        return Array.isArray(value) ? value[0] ?? null : value ?? null;
+      },
+    },
+  };
+}
+
+function requestPinned(method, url, address, timeoutMs, userAgent) {
+  return new Promise((resolve, reject) => {
+    const { module, options } = buildPinnedRequestOptions(url, address);
+    const transport = module === 'https' ? https : http;
+    const request = transport.request(
+      {
+        ...options,
+        method,
+        headers: { ...options.headers, 'user-agent': userAgent },
+      },
+      (response) => {
+        response.resume();
+        response.on('end', () => {
+          resolve(responseLike(response.statusCode ?? 0, response.headers));
+        });
+      },
+    );
+    request.setTimeout(timeoutMs, () => {
+      const error = new Error('request timeout');
+      // Preserve the retry path used for AbortController timeouts.
+      error.name = 'AbortError';
+      request.destroy(error);
+    });
+    request.on('error', reject);
+    request.end();
+  });
+}
+
+async function fetchWithTimeout(fetchImpl, url, method, timeoutMs, userAgent) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -174,7 +225,7 @@ async function fetchWithTimeout(
   }
 }
 
-function redirectTarget(response: Response, current: string): string | null {
+function redirectTarget(response, current) {
   const status = response.status;
   if (status < 300 || status >= 400) return null;
   const location = response.headers?.get?.('location');
@@ -188,21 +239,22 @@ function redirectTarget(response: Response, current: string): string | null {
 
 /**
  * Check a single URL. `fetchImpl`/`resolveImpl` are injectable so unit tests
- * never touch the network. Returns status, classification and latency.
+ * never touch the network. Without a custom `fetchImpl`, the validated IP is
+ * pinned on the Node HTTP/HTTPS socket.
  */
 export async function checkUrl(
-  url: string,
+  url,
   {
-    fetchImpl = globalThis.fetch,
+    fetchImpl,
     timeoutMs = 5000,
     retries = 2,
     maxRedirects = 5,
     resolveImpl = defaultResolve,
     userAgent = DEFAULT_USER_AGENT,
-  }: LinkCheckOptions = {},
-): Promise<LinkCheckResult> {
+  } = {},
+) {
   const started = Date.now();
-  const result = (partial: Partial<LinkCheckResult>): LinkCheckResult => ({
+  const result = (partial) => ({
     url,
     status: 0,
     outcome: 'fail',
@@ -211,22 +263,22 @@ export async function checkUrl(
     ...partial,
   });
 
-  if (typeof fetchImpl !== 'function') {
-    return result({ error: 'fetch unavailable' });
-  }
-
-  let lastError: string | null = null;
+  let lastError = null;
   const attempts = Math.max(1, retries + 1);
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     let current = url;
     try {
       for (let hop = 0; hop <= maxRedirects; hop += 1) {
         const parsed = new URL(current);
-        await assertSafeUrl(parsed, resolveImpl);
+        const target = await resolveSafeTarget(parsed, resolveImpl);
+        const request = (method) =>
+          fetchImpl
+            ? fetchWithTimeout(fetchImpl, current, method, timeoutMs, userAgent)
+            : requestPinned(method, current, target.address, timeoutMs, userAgent);
 
-        let response = await fetchWithTimeout(fetchImpl, current, 'HEAD', timeoutMs, userAgent);
+        let response = await request('HEAD');
         if (response.status === 405 || response.status === 403) {
-          response = await fetchWithTimeout(fetchImpl, current, 'GET', timeoutMs, userAgent);
+          response = await request('GET');
         }
 
         const next = redirectTarget(response, current);
@@ -266,7 +318,6 @@ export async function checkUrl(
       }
       lastError = message;
       if (error instanceof Error && error.name === 'AbortError') continue;
-      // DNS failures are retryable, but protocol/URL errors are terminal.
       if (!/could not resolve/.test(message)) break;
     }
   }

@@ -35,11 +35,26 @@ export interface CheckUrlResult {
   error?: string;
 }
 
+export interface PinnedRequestOptions {
+  hostname: string;
+  port: number | string;
+  path: string;
+  method?: string;
+  headers: Record<string, string>;
+  servername?: string;
+}
+
+export interface PinnedRequest {
+  module: 'http' | 'https';
+  options: PinnedRequestOptions;
+}
+
 export const URL_PATTERN: RegExp;
 export function extractUrlsFromSource(source: string): string[];
 export function extractUniqueUrls(sources: string[]): string[];
 export function classifyStatus(status: number): LinkOutcome;
 export function isValidEmail(value: string): boolean;
 export function isBlockedAddress(address: string): boolean;
+export function buildPinnedRequestOptions(url: string | URL, address: string): PinnedRequest;
 export function checkUrl(url: string, options?: CheckUrlOptions): Promise<CheckUrlResult>;
 export function loadSourceUrls(root?: string): Promise<string[]>;

@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  ALL_TAGS,
   catalog,
   getVisibleTags,
   HIDDEN_TAGS,
@@ -10,7 +11,7 @@ import {
 } from './projects';
 import { PLANAR_NODE_SEEDS } from './graphSeeds';
 import { deriveEdges } from '../utils/graphTopology';
-import { validateCatalog } from './catalogSchema';
+import { serializeCatalog, validateCatalog } from './catalogSchema';
 import { countSeedCrossings } from '../utils/graphPlanarity';
 import { resolveCommand } from '../utils/terminalCommandResolver';
 import type { Preview } from '../types/portfolio';
@@ -25,7 +26,7 @@ function assetExists(src: string): boolean {
 const fixture = JSON.parse(
   readFileSync(resolve(repoRoot, 'src/data/__fixtures__/projects.pre-refactor.json'), 'utf8'),
 ) as {
-  projects: unknown;
+  projects: Array<{ tags: string[] }>;
   seeds: unknown;
   hiddenTags: string[];
   visibleTags: string[][];
@@ -39,6 +40,18 @@ describe('golden equivalence with the pre-refactor catalog', () => {
     expect(projects.map((project) => getVisibleTags(project.tags))).toEqual(
       fixture.visibleTags,
     );
+  });
+
+  it('derives ALL_TAGS in pre-refactor project-appearance order', () => {
+    const expected = Array.from(
+      new Set<string>(fixture.projects.flatMap((project) => project.tags)),
+    );
+    expect(ALL_TAGS).toEqual(expected);
+  });
+
+  it('commits projects.catalog.json in canonical serializeCatalog form', () => {
+    const raw = readFileSync(resolve(repoRoot, 'src/data/projects.catalog.json'), 'utf8');
+    expect(raw).toBe(serializeCatalog(catalog));
   });
 });
 

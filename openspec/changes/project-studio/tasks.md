@@ -26,3 +26,11 @@
 - [x] 5.1 Add isolated dev-mode Studio E2E suite (`e2e/playwright.studio.config.ts` on port `5299`, `reuseExistingServer: false`, `desktop`-only, skipped under `PREVIEW_URL`, temp `PORTFOLIO_STUDIO_CATALOG_PATH`) and verify real `src/data/projects.catalog.json` remains clean.
 - [x] 5.2 Add `npm run build` `dist/` grep check and `vite preview` verification confirming zero `StudioApp`, `/__studio/api`, or `#/studio` exposure in production.
 - [x] 5.3 Run full verification suite (`npm run typecheck && npm run build && npm run test:unit && CI=1 npx playwright test --config=./playwright.config.ts && CI=1 npx playwright test --config=./e2e/playwright.studio.config.ts`) and record empirical results in `verification.md`.
+
+## Patch 01: Fix PR #18 Review Findings (Concurrency, Canonical Catalog, Node 22 Audit, CSPRNG Token, Edge Deduplication, DNS Pinning)
+
+- [x] P01.1 Scaffold/run reproducing tests in `src/utils/studioPlugin.test.ts` (concurrent `PUT` with same `expectedRevision` → one `200`, one `409`), `src/data/projects.test.ts` (`ALL_TAGS` matches pre-refactor order & `projects.catalog.json` equals `serializeCatalog`), and `src/utils/auditLinks.test.ts` (IP-pinned connection preserves `Host`/TLS `servername`).
+- [x] P01.2 Fix `vite-studio-plugin.ts`: move `readFile` + `expectedRevision` check + validation + atomic write inside `writeQueue`, and generate tokens with `randomBytes(32).toString('hex')`.
+- [x] P01.3 Fix `src/data/tagRegistry.ts`, `src/data/catalogSchema.ts`, and `src/data/projects.catalog.json`: derive `ALL_TAGS` in project-appearance order matching pre-refactor `App.tsx`, deduplicate edge derivation via `deriveEdges` from `../utils/graphTopology`, and commit `projects.catalog.json` in exact `serializeCatalog` canonical form.
+- [x] P01.4 Fix Node `22.x` compatibility & DNS-rebinding pinning in `scripts/audit-links.mjs` / `src/utils/linkAudit.*`: ensure `node scripts/audit-links.mjs` imports pure `.mjs`/`.js` without requiring experimental TS stripping, and pin the validated IP when making default Node `http`/`https` requests (preserving `Host` and TLS `servername`).
+- [x] P01.5 Verify reproduction tests pass, run `npm run typecheck && npm run test:unit && npm run build && npm run test:links` + Playwright suites, reconcile the E2E count in `verification.md`, and mark `PATCH-01` `RESOLVED` in `patch.md`.

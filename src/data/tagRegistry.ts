@@ -7,8 +7,14 @@ export const catalog = catalogJson as ProjectCatalog;
 /** Tags kept latent in graph topology and hidden from UI tag chips. */
 export const HIDDEN_TAGS: ReadonlySet<ParadigmTag> = new Set<ParadigmTag>(catalog.hiddenTags);
 
-/** Ordered tag vocabulary from the canonical catalog. */
-export const ALL_TAGS: ParadigmTag[] = catalog.tags;
+/**
+ * Ordered tag vocabulary in first project-appearance order, matching the
+ * pre-refactor `projects.flatMap((project) => project.tags)` derivation so the
+ * ControlsOverlay pills keep their original order.
+ */
+export const ALL_TAGS: ParadigmTag[] = Array.from(
+  new Set<ParadigmTag>(catalog.projects.flatMap((project) => project.tags)),
+);
 
 export function getVisibleTags(
   tags: readonly ParadigmTag[],

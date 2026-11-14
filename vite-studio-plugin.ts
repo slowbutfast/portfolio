@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { dirname, extname, resolve, sep } from 'node:path';
@@ -13,7 +13,7 @@ import {
   checkUrl,
   extractUniqueUrls,
   type LinkCheckResult,
-} from './src/utils/linkAudit';
+} from './src/utils/linkAudit.mjs';
 
 const ASSET_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.mp4', '.webm']);
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
@@ -51,7 +51,7 @@ function resolveOptions(options: StudioPluginOptions): ResolvedOptions {
     profilePath: resolve(options.profilePath ?? resolve(root, 'src/data/profile.ts')),
     assetsDir: resolve(options.assetsDir ?? resolve(root, 'src/assets')),
     capturedDir: resolve(options.capturedDir ?? resolve(root, 'src/data/captured')),
-    token: options.token ?? createHash('sha256').update(`${process.pid}:${Date.now()}:${Math.random()}`).digest('hex'),
+    token: options.token ?? randomBytes(32).toString('hex'),
     writeEnabled:
       options.writeEnabled ??
       (process.env.PORTFOLIO_STUDIO_WRITE !== undefined
@@ -226,37 +226,47 @@ export function createStudioMiddleware(options: StudioPluginOptions = {}) {
         return;
       }
 
-      const currentBytes = await readFile(resolved.catalogPath, 'utf8');
-      if (payload.expectedRevision !== revisionOf(currentBytes)) {
-        sendJson(res, 409, { error: 'Stale expectedRevision' });
-        return;
-      }
-      const registries = await loadRegistries(resolved);
-      const errors = validateCatalog(payload.catalog, registries);
-      if (errors.length > 0) {
-        sendJson(res, 400, { error: errors.join('; '), errors });
-        return;
-      }
-
       const serialized = serializeCatalog(payload.catalog);
       const revision = revisionOf(serialized);
+      type PutOutcome = { status: number; payload: Record<string, unknown> };
+      const outcomeBox: { value: PutOutcome | null } = { value: null };
+
+      // Read, revision-check, validate, serialize, and write all execute inside
+      // the serialized queue so concurrent PUTs cannot both pass the stale check.
       writeQueue = writeQueue
         .catch(() => {
           // A failed write must not poison subsequent attempts.
         })
         .then(async () => {
-        await mkdir(dirname(resolved.catalogPath), { recursive: true });
-        const tempPath = `${resolved.catalogPath}.tmp`;
-        await writeFile(tempPath, serialized, 'utf8');
-        await rename(tempPath, resolved.catalogPath);
-      });
+          const currentBytes = await readFile(resolved.catalogPath, 'utf8');
+          if (payload.expectedRevision !== revisionOf(currentBytes)) {
+            outcomeBox.value = { status: 409, payload: { error: 'Stale expectedRevision' } };
+            return;
+          }
+          const registries = await loadRegistries(resolved);
+          const errors = validateCatalog(payload.catalog, registries);
+          if (errors.length > 0) {
+            outcomeBox.value = { status: 400, payload: { error: errors.join('; '), errors } };
+            return;
+          }
+          await mkdir(dirname(resolved.catalogPath), { recursive: true });
+          const tempPath = `${resolved.catalogPath}.tmp`;
+          await writeFile(tempPath, serialized, 'utf8');
+          await rename(tempPath, resolved.catalogPath);
+          outcomeBox.value = { status: 200, payload: { revision } };
+        });
       try {
         await writeQueue;
       } catch (cause) {
         sendJson(res, 500, { error: cause instanceof Error ? cause.message : String(cause) });
         return;
       }
-      sendJson(res, 200, { revision });
+      const outcome = outcomeBox.value;
+      if (!outcome) {
+        sendJson(res, 500, { error: 'Write completed without an outcome' });
+        return;
+      }
+      sendJson(res, outcome.status, outcome.payload);
       return;
     }
 

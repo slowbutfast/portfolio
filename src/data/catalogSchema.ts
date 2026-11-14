@@ -1,5 +1,6 @@
 import type { ParadigmTag } from '../types/portfolio';
-import { countSeedCrossings, type GraphEdgeLike, type Positions } from '../utils/graphPlanarity';
+import { deriveEdges } from '../utils/graphTopology';
+import { countSeedCrossings, type Positions } from '../utils/graphPlanarity';
 
 export const PROJECT_ID_PATTERN = /^[a-z0-9-]+$/;
 export const RESERVED_PROJECT_ID = 'art-wip';
@@ -277,19 +278,12 @@ export function validateCatalog(input: unknown, registries: CatalogRegistries = 
       if (!(id in seeds)) errors.push(`seeds is missing project id "${id}"`);
     }
     if (errors.length === 0 && Array.isArray(projects)) {
-      const edges: GraphEdgeLike[] = [];
-      const tagged = projects.filter(
-        (project): project is Record<string, unknown> & { id: string; tags: string[] } =>
-          isRecord(project) && typeof project.id === 'string' && Array.isArray(project.tags),
+      // Every shape invariant passed above, so the cast is safe; reuse the
+      // production edge derivation instead of maintaining a second copy.
+      const edges = deriveEdges(
+        projects as Array<{ id: string; tags: string[] }>,
+        hiddenSet,
       );
-      for (let i = 0; i < tagged.length; i += 1) {
-        for (let j = i + 1; j < tagged.length; j += 1) {
-          const shared = tagged[i].tags.some(
-            (tag) => !hiddenSet.has(tag) && tagged[j].tags.includes(tag),
-          );
-          if (shared) edges.push({ source: tagged[i].id, target: tagged[j].id });
-        }
-      }
       const positions: Positions = {};
       for (const [id, seed] of Object.entries(seeds)) {
         if (isRecord(seed) && typeof seed.x === 'number' && typeof seed.y === 'number') {

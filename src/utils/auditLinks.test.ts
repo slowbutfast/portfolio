@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 // Plain Node ESM script; types live in scripts/audit-links.d.mts.
 import {
+  buildPinnedRequestOptions,
   checkUrl,
   classifyStatus,
   extractUniqueUrls,
@@ -223,6 +224,27 @@ describe('SSRF hardening', () => {
     });
     expect(typeof result.latencyMs).toBe('number');
     expect(result.latencyMs).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('DNS pinning', () => {
+  it('connects to the validated IP while preserving Host and TLS servername', () => {
+    const httpsTarget = buildPinnedRequestOptions(
+      'https://example.com/path?q=1',
+      '93.184.216.34',
+    );
+    expect(httpsTarget.module).toBe('https');
+    expect(httpsTarget.options.hostname).toBe('93.184.216.34');
+    expect(httpsTarget.options.servername).toBe('example.com');
+    expect(httpsTarget.options.headers.Host).toBe('example.com');
+    expect(httpsTarget.options.path).toBe('/path?q=1');
+
+    const httpTarget = buildPinnedRequestOptions('http://example.com:8080/a', '93.184.216.34');
+    expect(httpTarget.module).toBe('http');
+    expect(httpTarget.options.hostname).toBe('93.184.216.34');
+    expect(httpTarget.options.port).toBe('8080');
+    expect(httpTarget.options.headers.Host).toBe('example.com:8080');
+    expect(httpTarget.options.servername).toBeUndefined();
   });
 });
 

@@ -249,6 +249,26 @@ describe('studio dev plugin', () => {
     expect(stale.status).toBe(409);
   });
 
+  it('serializes concurrent writes with the same expectedRevision', async () => {
+    const edited = structuredClone(catalog);
+    edited.projects[0].summary = 'Concurrent write';
+    const request = () =>
+      invoke(middleware, {
+        method: 'PUT',
+        headers: { host: 'localhost:5199', 'x-studio-token': TOKEN },
+        body: JSON.stringify({
+          expectedRevision: revisionOf(catalogText),
+          catalog: edited,
+        }),
+      });
+
+    const [first, second] = await Promise.all([request(), request()]);
+    expect([first.status, second.status].sort()).toEqual([200, 409]);
+
+    const written = JSON.parse(await readFile(catalogPath, 'utf8')) as ProjectCatalog;
+    expect(written.projects[0].summary).toBe('Concurrent write');
+  });
+
   it('requires the token for link auditing and ignores client-supplied URLs', async () => {
     expect((await invoke(middleware, { method: 'POST', url: '/__studio/api/audit-links' })).status).toBe(
       403,

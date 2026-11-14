@@ -11,19 +11,21 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
+  buildPinnedRequestOptions,
   checkUrl,
   classifyStatus,
   extractUniqueUrls,
   extractUrlsFromSource,
   isValidEmail,
   URL_PATTERN,
-} from '../src/utils/linkAudit.ts';
+} from '../src/utils/linkAudit.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..');
 const TARGET_FILES = ['src/data/projects.catalog.json', 'src/data/profile.ts'];
 
 export {
+  buildPinnedRequestOptions,
   checkUrl,
   classifyStatus,
   extractUniqueUrls,
