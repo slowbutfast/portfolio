@@ -42,6 +42,15 @@ export function saveArtDiscoveryState(state: ArtDiscoveryState): void {
   }
 }
 
+export function clearArtDiscoveryState(): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.removeItem(ART_DISCOVERY_STORAGE_KEY);
+  } catch {
+    // Ignore storage privacy-mode errors.
+  }
+}
+
 function parseColorChannels(color: string): [number, number, number] | null {
   const hex = color.trim();
   if (hex.startsWith('#')) {

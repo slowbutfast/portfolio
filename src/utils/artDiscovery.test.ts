@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ART_DISCOVERY_STORAGE_KEY,
   blendHexWithRgb,
+  clearArtDiscoveryState,
   loadArtDiscoveryState,
   saveArtDiscoveryState,
 } from './artDiscovery';
@@ -63,5 +64,19 @@ describe('artDiscovery', () => {
     expect(blendHexWithRgb('#000000', 'rgb(100, 200, 50)', 0)).toBe('#000000');
     expect(blendHexWithRgb('#000000', 'rgb(100, 200, 50)', 0.5)).toBe('rgb(50, 100, 25)');
     expect(blendHexWithRgb('#000000', 'rgb(100, 200, 50)', 1)).toBe('rgb(100, 200, 50)');
+  });
+
+  it('clears persisted discovery state cleanly', () => {
+    saveArtDiscoveryState({
+      unlocked: true,
+      connectedIds: ['open-dungeon'],
+      maxConnections: 2,
+    });
+    clearArtDiscoveryState();
+    expect(loadArtDiscoveryState()).toEqual({
+      unlocked: false,
+      connectedIds: [],
+      maxConnections: 1,
+    });
   });
 });

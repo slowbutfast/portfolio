@@ -1824,5 +1824,33 @@ test.describe('portfolio graph SPA', () => {
     await expect(canvas).toHaveAttribute('data-revealed-labels', /\bart-wip\b/);
     await expect(canvas).toHaveAttribute('data-art-proximity-links', /open-dungeon/);
     await expect(canvas).toHaveAttribute('data-art-max-connections', /^[234]$/);
+
+    // Pressing Reset layout twice consecutively with no canvas interaction clears art-wip state.
+    await page.getByTestId('controls-dropdown-trigger').click();
+    await page.getByTestId('reset-layout').click();
+    await expect(canvas).toHaveAttribute('data-art-unlocked', 'true');
+    if (!(await page.getByTestId('reset-layout').isVisible())) {
+      await page.getByTestId('controls-dropdown-trigger').click();
+    }
+    await page.getByTestId('reset-layout').click();
+    await expect(canvas).toHaveAttribute('data-art-unlocked', 'false');
+    await expect(canvas).toHaveAttribute('data-rainbow-nodes', '');
+    await expect(canvas).toHaveAttribute('data-revealed-labels', '');
+    await expect(canvas).toHaveAttribute('data-art-proximity-links', '');
+    await expect(canvas).toHaveAttribute('data-art-max-connections', '1');
+  });
+
+  test('art-wip stays locked on compact mobile viewport until explicitly dragged', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'mobile', 'mobile viewport check');
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto('/');
+    const canvas = page.getByTestId('graph-canvas');
+    await page.waitForTimeout(800);
+    await expect(canvas).toHaveAttribute('data-art-unlocked', 'false');
+    await expect(canvas).toHaveAttribute('data-art-proximity-links', '');
+    await expect(canvas).toHaveAttribute('data-rainbow-nodes', '');
+    await expect(canvas).toHaveAttribute('data-revealed-labels', '');
   });
 });

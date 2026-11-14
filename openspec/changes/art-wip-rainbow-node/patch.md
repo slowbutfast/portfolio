@@ -8,6 +8,7 @@
 | `PATCH-03` | 2026-11-14 | User Review Follow-up on PR #16 | `src/types/portfolio.ts`, `src/data/projects.ts`, `src/data/graphSeeds.ts`, `src/utils/graphTopology.ts`, `src/components/GraphCanvas.tsx`, `src/utils/graphPlanarity.test.ts`, `src/data/projects.test.ts`, `src/physics/graphSimulation.test.ts`, `e2e/portfolio.spec.ts` | APPLIED |
 | `PATCH-04` | 2026-11-14 | User Review Follow-up on PR #16 | `src/data/projects.ts`, `src/utils/graphTopology.ts`, `src/components/NodeHoverCard.tsx`, `src/components/ProjectDrawer.tsx`, `src/components/ListView.tsx`, `src/App.tsx`, `src/physics/graphSimulation.ts`, `src/components/GraphCanvas.tsx`, `src/data/projects.test.ts`, `src/physics/graphSimulation.test.ts`, `e2e/portfolio.spec.ts` | APPLIED |
 | `PATCH-05` | 2026-11-14 | User Review Follow-up on PR #16 | `src/utils/artDiscovery.ts`, `src/utils/artDiscovery.test.ts`, `src/components/GraphCanvas.tsx`, `src/App.tsx`, `e2e/portfolio.spec.ts` | APPLIED |
+| `PATCH-06` | 2026-11-14 | User Review Follow-up on PR #16 (Mobile) | `src/utils/artDiscovery.ts`, `src/utils/artDiscovery.test.ts`, `src/App.tsx`, `src/components/GraphCanvas.tsx`, `e2e/portfolio.spec.ts` | APPLIED |
 
 ---
 
@@ -64,6 +65,20 @@
 
 ---
 
+### [PATCH-06] Explicit Drag Gate, Viewport-Scaled Proximity Radius & Double-Reset Debug Clear
+- **Date**: 2026-11-14 08:46:00 UTC
+- **Feedback Source**: User Mobile Testing Follow-up (PR #16)
+- **Reported Issue**:
+  1. On compact mobile screens (`375×667`), `art-wip`'s initial seed distance to `open-dungeon` (`~163px`) was smaller than the fixed `180px` proximity radius, causing `art-wip` to auto-connect and unlock on initial page load.
+  2. Provide a consecutive double-reset gesture (pressing `"Reset layout"` twice with no canvas interaction in between) to clear `portfolio_art_state` without clearing browser cache.
+- **Root Cause**: Proximity latching ran unconditionally on every render frame without checking whether the user had dragged `art-wip`, and used an unscaled `180px` threshold on small mobile viewports.
+- **Target Files**: `src/utils/artDiscovery.ts`, `src/utils/artDiscovery.test.ts`, `src/App.tsx`, `src/components/GraphCanvas.tsx`, `e2e/portfolio.spec.ts`.
+- **Verification Command**: `npm run typecheck && npm run build && npm run test:unit && CI=1 npx playwright test --config=./playwright.config.ts && npx openspec validate "art-wip-rainbow-node" --strict`
+- **Status**: APPLIED
+
+
+---
+
 ### [PATCH-04] Hidden `'art'` Tag, Progressive `forceLink` Latching (`1 -> 2 -> 3 -> 4`), Rainbow Gradient Bridges & Resettable Reveal
 - **Date**: 2026-11-14 08:13:00 UTC
 - **Feedback Source**: User Review Follow-up (PR #16)
@@ -90,6 +105,20 @@
   4. Persist the unlocked state and discovered connections in `localStorage` (`portfolio_art_state`) so neither `"Reset layout"` nor page reloads reset it.
 - **Root Cause**: `PATCH-04` gated proximity latching on prior click (`revealedRef`) and cleared `art-wip` reveal/connections on reset/reload.
 - **Target Files**: `src/utils/artDiscovery.ts`, `src/utils/artDiscovery.test.ts`, `src/components/GraphCanvas.tsx`, `src/App.tsx`, `e2e/portfolio.spec.ts`.
+- **Verification Command**: `npm run typecheck && npm run build && npm run test:unit && CI=1 npx playwright test --config=./playwright.config.ts && npx openspec validate "art-wip-rainbow-node" --strict`
+- **Status**: APPLIED
+
+
+---
+
+### [PATCH-06] Explicit Drag Gate, Viewport-Scaled Proximity Radius & Double-Reset Debug Clear
+- **Date**: 2026-11-14 08:46:00 UTC
+- **Feedback Source**: User Mobile Testing Follow-up (PR #16)
+- **Reported Issue**:
+  1. On compact mobile screens (`375×667`), `art-wip`'s initial seed distance to `open-dungeon` (`~163px`) was smaller than the fixed `180px` proximity radius, causing `art-wip` to auto-connect and unlock on initial page load.
+  2. Provide a consecutive double-reset gesture (pressing `"Reset layout"` twice with no canvas interaction in between) to clear `portfolio_art_state` without clearing browser cache.
+- **Root Cause**: Proximity latching ran unconditionally on every render frame without checking whether the user had dragged `art-wip`, and used an unscaled `180px` threshold on small mobile viewports.
+- **Target Files**: `src/utils/artDiscovery.ts`, `src/utils/artDiscovery.test.ts`, `src/App.tsx`, `src/components/GraphCanvas.tsx`, `e2e/portfolio.spec.ts`.
 - **Verification Command**: `npm run typecheck && npm run build && npm run test:unit && CI=1 npx playwright test --config=./playwright.config.ts && npx openspec validate "art-wip-rainbow-node" --strict`
 - **Status**: APPLIED
 
@@ -127,6 +156,20 @@
 
 ---
 
+### [PATCH-06] Explicit Drag Gate, Viewport-Scaled Proximity Radius & Double-Reset Debug Clear
+- **Date**: 2026-11-14 08:46:00 UTC
+- **Feedback Source**: User Mobile Testing Follow-up (PR #16)
+- **Reported Issue**:
+  1. On compact mobile screens (`375×667`), `art-wip`'s initial seed distance to `open-dungeon` (`~163px`) was smaller than the fixed `180px` proximity radius, causing `art-wip` to auto-connect and unlock on initial page load.
+  2. Provide a consecutive double-reset gesture (pressing `"Reset layout"` twice with no canvas interaction in between) to clear `portfolio_art_state` without clearing browser cache.
+- **Root Cause**: Proximity latching ran unconditionally on every render frame without checking whether the user had dragged `art-wip`, and used an unscaled `180px` threshold on small mobile viewports.
+- **Target Files**: `src/utils/artDiscovery.ts`, `src/utils/artDiscovery.test.ts`, `src/App.tsx`, `src/components/GraphCanvas.tsx`, `e2e/portfolio.spec.ts`.
+- **Verification Command**: `npm run typecheck && npm run build && npm run test:unit && CI=1 npx playwright test --config=./playwright.config.ts && npx openspec validate "art-wip-rainbow-node" --strict`
+- **Status**: APPLIED
+
+
+---
+
 ### [PATCH-04] Hidden `'art'` Tag, Progressive `forceLink` Latching (`1 -> 2 -> 3 -> 4`), Rainbow Gradient Bridges & Resettable Reveal
 - **Date**: 2026-11-14 08:13:00 UTC
 - **Feedback Source**: User Review Follow-up (PR #16)
@@ -153,5 +196,19 @@
   4. Persist the unlocked state and discovered connections in `localStorage` (`portfolio_art_state`) so neither `"Reset layout"` nor page reloads reset it.
 - **Root Cause**: `PATCH-04` gated proximity latching on prior click (`revealedRef`) and cleared `art-wip` reveal/connections on reset/reload.
 - **Target Files**: `src/utils/artDiscovery.ts`, `src/utils/artDiscovery.test.ts`, `src/components/GraphCanvas.tsx`, `src/App.tsx`, `e2e/portfolio.spec.ts`.
+- **Verification Command**: `npm run typecheck && npm run build && npm run test:unit && CI=1 npx playwright test --config=./playwright.config.ts && npx openspec validate "art-wip-rainbow-node" --strict`
+- **Status**: APPLIED
+
+
+---
+
+### [PATCH-06] Explicit Drag Gate, Viewport-Scaled Proximity Radius & Double-Reset Debug Clear
+- **Date**: 2026-11-14 08:46:00 UTC
+- **Feedback Source**: User Mobile Testing Follow-up (PR #16)
+- **Reported Issue**:
+  1. On compact mobile screens (`375×667`), `art-wip`'s initial seed distance to `open-dungeon` (`~163px`) was smaller than the fixed `180px` proximity radius, causing `art-wip` to auto-connect and unlock on initial page load.
+  2. Provide a consecutive double-reset gesture (pressing `"Reset layout"` twice with no canvas interaction in between) to clear `portfolio_art_state` without clearing browser cache.
+- **Root Cause**: Proximity latching ran unconditionally on every render frame without checking whether the user had dragged `art-wip`, and used an unscaled `180px` threshold on small mobile viewports.
+- **Target Files**: `src/utils/artDiscovery.ts`, `src/utils/artDiscovery.test.ts`, `src/App.tsx`, `src/components/GraphCanvas.tsx`, `e2e/portfolio.spec.ts`.
 - **Verification Command**: `npm run typecheck && npm run build && npm run test:unit && CI=1 npx playwright test --config=./playwright.config.ts && npx openspec validate "art-wip-rainbow-node" --strict`
 - **Status**: APPLIED

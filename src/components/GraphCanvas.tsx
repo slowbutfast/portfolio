@@ -54,6 +54,10 @@ interface GraphCanvasProps {
   ) => void;
   /** Bumped by the 3-dot menu's "Reset layout" action. */
   layoutResetVersion?: number;
+  /** Bumped on consecutive double-reset to clear art-wip discovery state. */
+  artResetVersion?: number;
+  /** Called on any canvas pointerdown so consecutive-reset tracking clears. */
+  onCanvasInteract?: () => void;
   /** Measured canvas-container center for peripheral hover-card anchoring. */
   onCanvasCenterChange?: (center: { x: number; y: number }) => void;
   /** Highlighted node retained after the inspector closes. */
@@ -301,6 +305,8 @@ export function GraphCanvas({
   onResolveAnchor,
   onSelect,
   layoutResetVersion = 0,
+  artResetVersion = 0,
+  onCanvasInteract,
   onCanvasCenterChange,
   stickyFocalId = null,
   onClearFocal,
@@ -334,6 +340,9 @@ export function GraphCanvas({
   );
   const artMaxConnectionsRef = useRef<number>(artDiscoveryInitRef.current.maxConnections);
   const artFadeStartMsRef = useRef<number | null>(null);
+  const artUserDraggedRef = useRef<boolean>(false);
+  const onCanvasInteractRef = useRef(onCanvasInteract);
+  onCanvasInteractRef.current = onCanvasInteract;
   const onHoverNodeRef = useRef(onHoverNode);
   onHoverNodeRef.current = onHoverNode;
   const onCanvasDragStartRef = useRef(onCanvasDragStart);
@@ -619,11 +628,15 @@ export function GraphCanvas({
         return tokens.nodeUnvisited;
       };
 
-      // Latch progressive `d3-force` links whenever `art-wip` enters
-      // proximity of `'art'`-tagged projects (even while still unrevealed/in motion),
-      // unlocking its label, color fade-in, hover, and inspector on first connection.
-      const artPos = active.get('art-wip');
+      // Latch progressive `d3-force` links only after an explicit user drag on
+      // `art-wip`, using a viewport-scaled proximity radius so mobile/small
+      // screens never auto-connect on load.
+      const artPos = artUserDraggedRef.current ? active.get('art-wip') : undefined;
       if (artPos) {
+        const artProximityDist = Math.min(
+          ART_PROXIMITY_MAX_DIST,
+          Math.max(96, Math.min(width, height) * 0.28),
+        );
         for (const otherId of sortedNodeIds) {
           if (otherId === 'art-wip') continue;
           if (artConnectedIdsRef.current.has(otherId)) continue;
@@ -632,7 +645,7 @@ export function GraphCanvas({
           const otherPos = active.get(otherId);
           if (!otherPos) continue;
           const distance = Math.hypot(artPos[0] - otherPos[0], artPos[1] - otherPos[1]);
-          if (distance < ART_PROXIMITY_MAX_DIST && sim.connectLink('art-wip', otherId)) {
+          if (distance < artProximityDist && sim.connectLink('art-wip', otherId)) {
             const wasUnlocked = artUnlockedRef.current;
             artConnectedIdsRef.current.add(otherId);
             artMaxConnectionsRef.current = Math.min(4, artMaxConnectionsRef.current + 1);
@@ -1288,6 +1301,7 @@ export function GraphCanvas({
 
   useEffect(() => {
     if (layoutResetVersion <= 0) return;
+    artUserDraggedRef.current = false;
     simRef.current?.resetLayout();
     for (const id of artConnectedIdsRef.current) {
       simRef.current?.connectLink('art-wip', id);
@@ -1295,6 +1309,18 @@ export function GraphCanvas({
     renderRef.current();
     wakeRef.current();
   }, [layoutResetVersion]);
+
+  useEffect(() => {
+    if (artResetVersion <= 0) return;
+    artUnlockedRef.current = false;
+    artConnectedIdsRef.current.clear();
+    artMaxConnectionsRef.current = 1;
+    artUserDraggedRef.current = false;
+    artFadeStartMsRef.current = null;
+    simRef.current?.resetLayout();
+    renderRef.current();
+    wakeRef.current();
+  }, [artResetVersion]);
 
   // Inspector close/open and sticky-highlight changes must repaint a graph that
   // may already be idle-suspended.
@@ -1513,6 +1539,13 @@ export function GraphCanvas({
     emitAudioPointer(e.clientX, e.clientY);
     const p = worldPoint(e.clientX, e.clientY);
     if (sim.state === 'drag') {
+      if (
+        downNodeIdRef.current === 'art-wip' &&
+        downPosRef.current &&
+        Math.hypot(p.x - downPosRef.current.x, p.y - downPosRef.current.y) >= 6
+      ) {
+        artUserDraggedRef.current = true;
+      }
       setCanvasCursor('crosshair');
       const last = lastDragPointRef.current;
       if (last) {
@@ -1533,6 +1566,7 @@ export function GraphCanvas({
   const onPointerDown = (e: ReactPointerEvent<HTMLCanvasElement>) => {
     const sim = simRef.current;
     if (!sim) return;
+    onCanvasInteractRef.current?.();
     wakeRef.current();
     emitAudioPointer(e.clientX, e.clientY);
     clearHoverDwell();

@@ -62,3 +62,8 @@
 - [x] 10.1 Add `src/utils/artDiscovery.ts` for `portfolio_art_state` persistence and `blendHexWithRgb` color fade interpolation.
 - [x] 10.2 Gate `art-wip` label, color, hover card, and inspector on first proximity connection in `GraphCanvas.tsx` and `App.tsx`, allow proximity latching while unrevealed, fade in rainbow color over `450ms`, and preserve unlocked state + connections across `Reset layout` and page reloads.
 - [x] 10.3 Add `src/utils/artDiscovery.test.ts`, update `e2e/portfolio.spec.ts`, and update OpenSpec docs (`patch.md`, `specs/`, `verification.md`).
+
+## 11. `PATCH-06` — Explicit Drag Gate, Viewport-Scaled Proximity Radius & Double-Reset Debug Clear
+- [x] 11.1 Add `artUserDraggedRef` drag gate (`>= 6px`) and viewport-scaled proximity radius in `GraphCanvas.tsx` so mobile/small screens never auto-connect on load.
+- [x] 11.2 Add `clearArtDiscoveryState()` in `artDiscovery.ts` and consecutive double-reset support in `App.tsx` + `GraphCanvas.tsx` (`artResetVersion`, `onCanvasInteract`).
+- [x] 11.3 Update `artDiscovery.test.ts`, `e2e/portfolio.spec.ts` (compact mobile lock + double-reset), and OpenSpec docs (`patch.md`, `specs/`, `verification.md`).

@@ -16,7 +16,7 @@ import { AboutModal } from './components/AboutModal';
 import { NodeHoverCard } from './components/NodeHoverCard';
 import { getAmbientSynth } from './audio/ambientSynth';
 import type { PopoverObstacles } from './utils/popoverPlacement';
-import { loadArtDiscoveryState } from './utils/artDiscovery';
+import { clearArtDiscoveryState, loadArtDiscoveryState } from './utils/artDiscovery';
 
 type ViewMode = 'graph' | 'list';
 type CanvasAnchor = { x: number; y: number };
@@ -60,6 +60,8 @@ export default function App() {
   const [drawerObstacles, setDrawerObstacles] = useState<PopoverObstacles>();
   const [stickyFocalId, setStickyFocalId] = useState<string | null>(null);
   const [layoutResetVersion, setLayoutResetVersion] = useState(0);
+  const [artResetVersion, setArtResetVersion] = useState(0);
+  const lastActionWasResetRef = useRef(false);
   const [canvasCenter, setCanvasCenter] = useState(() => ({
     x: window.innerWidth / 2,
     y: window.innerHeight / 2,
@@ -209,6 +211,7 @@ export default function App() {
     (id: string, anchor?: CanvasAnchor, obstacles?: PopoverObstacles) => {
       if (!getProjectById(id)) return;
       if (id === 'art-wip' && !loadArtDiscoveryState().unlocked) return;
+      lastActionWasResetRef.current = false;
       setIsAboutOpen(false);
       dismissHover();
       setHasInspectedAnyNode(true);
@@ -293,19 +296,33 @@ export default function App() {
     });
   }, []);
 
+  const handleCanvasInteract = useCallback(() => {
+    lastActionWasResetRef.current = false;
+  }, []);
+
   const resetAll = useCallback(() => {
     setActiveTags(new Set());
     setSearch('');
     setLayoutResetVersion((version) => version + 1);
-    const keepArt = loadArtDiscoveryState().unlocked;
-    setVisitedIds(keepArt ? new Set(['art-wip']) : new Set());
-    setInspectedIds(keepArt ? new Set(['art-wip']) : new Set());
+    if (lastActionWasResetRef.current) {
+      clearArtDiscoveryState();
+      setArtResetVersion((version) => version + 1);
+      setVisitedIds(new Set());
+      setInspectedIds(new Set());
+      lastActionWasResetRef.current = false;
+    } else {
+      const keepArt = loadArtDiscoveryState().unlocked;
+      setVisitedIds(keepArt ? new Set(['art-wip']) : new Set());
+      setInspectedIds(keepArt ? new Set(['art-wip']) : new Set());
+      lastActionWasResetRef.current = true;
+    }
     setStickyFocalId(null);
     setHoverObstacles(undefined);
     setDrawerObstacles(undefined);
   }, []);
 
   const clearStickyFocal = useCallback(() => {
+    lastActionWasResetRef.current = false;
     setStickyFocalId(null);
   }, []);
 
@@ -383,6 +400,8 @@ export default function App() {
             onResolveAnchor={handleResolveAnchor}
             onSelect={openProject}
             layoutResetVersion={layoutResetVersion}
+            artResetVersion={artResetVersion}
+            onCanvasInteract={handleCanvasInteract}
             onCanvasCenterChange={setCanvasCenter}
             stickyFocalId={stickyFocalId}
             onClearFocal={clearStickyFocal}
