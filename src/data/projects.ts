@@ -164,8 +164,8 @@ export const projects = [
   },
   {
     id: 'art-wip',
-    title: 'ART',
-    shortTitle: 'ART',
+    title: 'art',
+    shortTitle: 'art',
     summary: 'WIP',
     classification: 'ART & VISUAL EXPERIMENTS // WIP',
     tags: ['Design', 'Graphics'],
@@ -174,7 +174,6 @@ export const projects = [
     omitIndex: true,
     hideOverview: true,
     revealLabelOnInspect: true,
-    gravityWeight: 2.5,
     previews: [],
   },
 ] satisfies ProjectData[];

@@ -390,11 +390,7 @@ export function GraphCanvas({
     canHoverRef.current =
       !reduceMotion && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
-    const simNodes = nodes.map((n) => ({
-      id: n.id,
-      label: n.label,
-      gravityWeight: getProjectById(n.id)?.gravityWeight,
-    }));
+    const simNodes = nodes.map((n) => ({ id: n.id, label: n.label }));
     const simLinks = edges.map((e) => ({ source: e.source, target: e.target }));
 
     let width = Math.max(1, Math.round(container.getBoundingClientRect().width));

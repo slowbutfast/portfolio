@@ -55,8 +55,6 @@ export interface ProjectData {
   hideOverview?: boolean;
   /** Hide the canvas label pill until the project is clicked in this session. */
   revealLabelOnInspect?: boolean;
-  /** Multiplier for gravitational pull on edges and attraction toward this node. */
-  gravityWeight?: number;
   previews: Preview[];
   terminalDemo?: TerminalDemo;
 }

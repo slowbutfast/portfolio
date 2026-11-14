@@ -1,11 +1,11 @@
 ## MODIFIED Requirements
 
 ### Requirement: Decentralized equal mass node distribution
-The system SHALL simulate standard nodes using uniform visual radius (22px) and uniform repulsive charge ($k_{charge} = -\min(w, h) \times 0.30$) with weak planar seed homing (`seedX`/`seedY` at `0.02`), soft link springs (base strength `0.015`), collision radius (`48px`), and distance floor (`distanceMin = 50`). As an intentional exception, nodes declaring `gravityWeight > 1` (`art-wip` with `gravityWeight: 2.5`) SHALL exert stronger link pull (`LINK_STRENGTH * maxWeight`) and gentle radial attraction toward themselves so connected neighbors gravitate more closely toward `ART`, while maintaining at least 44 pixels center-to-center clearance and zero straight-line edge crossings.
+The system SHALL simulate all 9 nodes with equal visual radius (22px) and equal repulsive charge ($k_{charge} = -\min(w, h) \times 0.30$) with weak planar seed homing (`seedX`/`seedY` at `0.02`), soft link springs (`0.015`), collision radius (`48px`), and distance floor (`distanceMin = 50`), without any gravitational center sink or special per-node `gravityWeight` override on `art-wip`.
 
 #### Scenario: Graph initialization without central clump or corner pinning
 - **WHEN** the canvas is initialized with the 9 project nodes
-- **THEN** nodes distribute buoyantly across the viewport area maintaining at least 44 pixels center-to-center clearance without settling against viewport margins or collapsing onto OpenDungeon, while `art-wip` exerts stronger gravitational pull on its connected neighbors.
+- **THEN** nodes distribute buoyantly across the entire viewport area maintaining at least 44 pixels center-to-center clearance without settling against viewport margins or collapsing onto OpenDungeon or `art-wip`.
 
 ### Requirement: Dynamic hover gravitation wave
 The system SHALL gate both simulation hover physics (`sim.hover(node)`) and preview card opening behind a single `200ms` pointer dwell timer, cancelling the dwell timer and clearing hover synchronously on `pointerdown`, `dragStart`, `pointerleave`, `focusedId` change, a bidirectional `prefers-reduced-motion` transition, or while `state === 'coasting'`. Once dwell completes, the hovered node is transiently pinned (`fx = x; fy = y`) without becoming a persistent user placement.

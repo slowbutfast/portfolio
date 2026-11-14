@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Verified project metadata catalog and preview mapping
-The system SHALL maintain a typed dataset in `src/data/projects.ts` using `satisfies ProjectData[]` to guarantee compile-time verification across all 9 projects with concrete preview mappings, paradigm tags, full descriptive titles, mandatory non-empty `shortTitle: string` entries for graph nodes, optional `repo?: string` handling for design/art works, optional `rainbowOnInteract?: boolean`, `omitIndex?: boolean`, `hideOverview?: boolean`, `revealLabelOnInspect?: boolean`, `gravityWeight?: number`, and authentic asset sources:
+The system SHALL maintain a typed dataset in `src/data/projects.ts` using `satisfies ProjectData[]` to guarantee compile-time verification across all 9 projects with concrete preview mappings, paradigm tags, full descriptive titles, mandatory non-empty `shortTitle: string` entries for graph nodes, optional `repo?: string` handling for design/art works, optional `rainbowOnInteract?: boolean`, `omitIndex?: boolean`, `hideOverview?: boolean`, `revealLabelOnInspect?: boolean`, and authentic asset sources:
 
 | Project ID | Mandatory Short Title | Paradigm Tags | Previews | Asset Source |
 | :--- | :--- | :--- | :--- | :--- |
@@ -13,7 +13,7 @@ The system SHALL maintain a typed dataset in `src/data/projects.ts` using `satis
 | `attention-max` | `AttentionMax` | `Vanilla JS`, `WebExtension`, `Design`, `Graphics` | `screenshot`, `terminal`, `linkout` | Real 700×1040 extension popup UI screenshot, real `npm test` output, repository link |
 | `kintsugi-fracture` | `Kintsugi 3D` | `Graphics` | `screenshot`, `linkout` | Real 3D model processor screenshot, repository and Vercel live links |
 | `ivy-film-festival-2026` | `Ivy Film\nFestival` | `Design` | `screenshot`, `linkout` | Real festival landing page screenshot, live linkout (no repo) |
-| `art-wip` | `ART` | `Design`, `Graphics` | `[]` (`liveUrl: '/art/'`) | Static `/art/` WIP endpoint, `rainbowOnInteract: true`, `omitIndex: true`, `hideOverview: true`, `revealLabelOnInspect: true` (no repo) |
+| `art-wip` | `art` | `Design`, `Graphics` | `[]` (`liveUrl: '/art/'`) | Static `/art/` WIP endpoint, `rainbowOnInteract: true`, `omitIndex: true`, `hideOverview: true`, `revealLabelOnInspect: true` (no repo) |
 
 #### Scenario: Loading the project catalog
 - **WHEN** the portfolio initializes

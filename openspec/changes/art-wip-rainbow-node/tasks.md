@@ -38,3 +38,10 @@
 - [x] 6.4 Update `GraphCanvas.tsx`: `#ffffff` node stroke, `HOVER_DWELL_MS = 200`, hide `ART` label pill until clicked (`revealedIds` from `App.tsx`), and render `\n` multi-line labels (`"Ivy Film\nFestival"`) at `1.0` line spacing.
 - [x] 6.5 Update `ProjectDrawer.tsx` (`omitIndex`, `hideOverview`) and `ListView.tsx` (`omitIndex`, minimal `WIP` card when `previews` is empty).
 - [x] 6.6 Update `projects.test.ts`, `graphSimulation.test.ts`, and `e2e/portfolio.spec.ts`, re-run all checks, and update `verification.md`.
+
+
+## 7. PR #16 Review Patch (`PATCH-02`)
+
+- [x] 7.1 Remove `gravityWeight`, `gravityPullForce`, `linkStrengthFor`, and `sim.on('end')` / `.alphaDecay(0.03)` overrides in `src/types/portfolio.ts`, `src/physics/graphSimulation.ts`, and `src/components/GraphCanvas.tsx` to restore decentralized equal-mass node physics.
+- [x] 7.2 Update `art-wip` `title` and `shortTitle` to `'art'` in `src/data/projects.ts` and update `specs/graph-simulation/spec.md`, `specs/project-catalog/spec.md`, and `patch.md`.
+- [x] 7.3 Update `projects.test.ts`, `graphSimulation.test.ts`, and `e2e/portfolio.spec.ts`, re-run all checks, and update `verification.md`.

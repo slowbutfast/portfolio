@@ -49,7 +49,7 @@ describe('project catalog contract', () => {
       'AttentionMax',
       'Kintsugi 3D',
       'Ivy Film\nFestival',
-      'ART',
+      'art',
     ]);
   });
 
@@ -104,10 +104,10 @@ describe('project catalog contract', () => {
     }
   });
 
-  it('configures art-wip with ART/WIP metadata, /art/ liveUrl, and PATCH-01 flags', () => {
+  it('configures art-wip with art/WIP metadata, /art/ liveUrl, and review flags', () => {
     const art = projects.find((p) => p.id === 'art-wip');
-    expect(art?.title).toBe('ART');
-    expect(art?.shortTitle).toBe('ART');
+    expect(art?.title).toBe('art');
+    expect(art?.shortTitle).toBe('art');
     expect(art?.summary).toBe('WIP');
     expect(art?.tags).toEqual(['Design', 'Graphics']);
     expect(art?.liveUrl).toBe('/art/');
@@ -115,7 +115,6 @@ describe('project catalog contract', () => {
     expect(art?.omitIndex).toBe(true);
     expect(art?.hideOverview).toBe(true);
     expect(art?.revealLabelOnInspect).toBe(true);
-    expect(art?.gravityWeight).toBe(2.5);
     expect(art?.previews).toEqual([]);
   });
 

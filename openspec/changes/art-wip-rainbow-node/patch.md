@@ -4,6 +4,7 @@
 | Patch ID | Date | Trigger / Feedback Source | Target Files | Status |
 | :--- | :--- | :--- | :--- | :--- |
 | `PATCH-01` | 2026-11-14 | User Review Feedback on PR #16 | `src/types/portfolio.ts`, `src/data/projects.ts`, `src/utils/rainbowPulse.ts`, `src/physics/graphSimulation.ts`, `src/components/GraphCanvas.tsx`, `src/App.tsx`, `src/components/ProjectDrawer.tsx`, `src/components/ListView.tsx`, `src/data/projects.test.ts`, `src/physics/graphSimulation.test.ts`, `e2e/portfolio.spec.ts` | APPLIED |
+| `PATCH-02` | 2026-11-14 | User Review Follow-up on PR #16 | `src/types/portfolio.ts`, `src/data/projects.ts`, `src/physics/graphSimulation.ts`, `src/components/GraphCanvas.tsx`, `src/data/projects.test.ts`, `src/physics/graphSimulation.test.ts`, `e2e/portfolio.spec.ts` | APPLIED |
 
 ---
 
@@ -25,4 +26,18 @@
 - **Root Cause**: Post-PR review refinements for aesthetic minimalism, mystery discovery, and typography.
 - **Target Files**: `src/types/portfolio.ts`, `src/data/projects.ts`, `src/utils/rainbowPulse.ts`, `src/physics/graphSimulation.ts`, `src/components/GraphCanvas.tsx`, `src/App.tsx`, `src/components/ProjectDrawer.tsx`, `src/components/ListView.tsx`, `src/data/projects.test.ts`, `src/physics/graphSimulation.test.ts`, `e2e/portfolio.spec.ts`.
 - **Verification Command**: `npm run typecheck && npm run build && npm run test:unit && CI=1 npx playwright test && npx openspec validate "art-wip-rainbow-node" --strict`
+- **Status**: APPLIED
+
+
+---
+
+### [PATCH-02] Restore Equal-Mass Node Physics & Lowercase `art` Title
+- **Date**: 2026-11-14 07:28:00 UTC
+- **Feedback Source**: User Review Follow-up (PR #16)
+- **Reported Issue**:
+  1. Restore equal-mass/charge/link physics on `art-wip` (remove `gravityWeight`, `gravityPullForce`, and `linkStrengthFor` overrides so `art-wip` behaves identically to all other nodes).
+  2. Change `art-wip` `title` and `shortTitle` from `ART` to lowercase `art`.
+- **Root Cause**: Follow-up aesthetic & physics balance preference after `PATCH-01`.
+- **Target Files**: `src/types/portfolio.ts`, `src/data/projects.ts`, `src/physics/graphSimulation.ts`, `src/components/GraphCanvas.tsx`, `src/data/projects.test.ts`, `src/physics/graphSimulation.test.ts`, `e2e/portfolio.spec.ts`.
+- **Verification Command**: `npm run typecheck && npm run build && npm run test:unit && CI=1 npx playwright test --config=./playwright.config.ts && npx openspec validate "art-wip-rainbow-node" --strict`
 - **Status**: APPLIED

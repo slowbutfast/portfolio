@@ -1749,11 +1749,11 @@ test.describe('portfolio graph SPA', () => {
     await expect(canvas).toHaveAttribute('data-rainbow-nodes', '');
     await expect(canvas).toHaveAttribute('data-revealed-labels', '');
 
-    // Inspecting art-wip activates rainbow pulsing, reveals ART label, and omits 09/Overview.
+    // Inspecting art-wip activates rainbow pulsing, reveals art label, and omits 09/Overview.
     await page.getByTestId('nav-art-wip').evaluate((el: HTMLButtonElement) => el.click());
     await expect(page.getByTestId('project-drawer')).toBeVisible();
     await expect(page.getByTestId('drawer-visit')).toHaveAttribute('href', '/art/');
-    await expect(page.getByTestId('project-drawer')).toContainText('ART');
+    await expect(page.getByTestId('project-drawer')).toContainText('art');
     await expect(page.getByTestId('project-drawer')).toContainText('WIP');
     await expect(page.getByTestId('project-drawer')).not.toContainText('Overview');
     await expect(page.getByTestId('project-drawer')).not.toContainText('09');

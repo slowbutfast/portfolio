@@ -23,8 +23,6 @@ export interface SimulationNode {
   id: string;
   /** Human-readable canvas label; defaults to the id when omitted. */
   label?: string;
-  /** Multiplier for gravitational attraction toward this node (defaults to 1). */
-  gravityWeight?: number;
 }
 
 export interface SimulationOptions {
@@ -310,22 +308,6 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
     }
   };
 
-  const weightById = new Map(
-    opts.nodes.map((node) => [node.id, Math.max(1, node.gravityWeight ?? 1)]),
-  );
-
-  const linkStrengthFor = (link: SimulationLinkDatum<GraphNode>): number => {
-    const sourceId =
-      typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
-    const targetId =
-      typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
-    const multiplier = Math.max(
-      weightById.get(sourceId) ?? 1,
-      weightById.get(targetId) ?? 1,
-    );
-    return LINK_STRENGTH * multiplier;
-  };
-
   const linkForce = forceLink<GraphNode, SimulationLinkDatum<GraphNode>>(links)
     .id((d) => d.id)
     .distance((link) => {
@@ -333,7 +315,7 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
       const t = (link.target as GraphNode).id ?? (link.target as unknown as string);
       return restDistances.get(linkKey(String(s), String(t))) ?? LINK_DISTANCE;
     })
-    .strength(linkStrengthFor);
+    .strength(LINK_STRENGTH);
 
   let state: SimState = 'idle';
   let hoveredNode: GraphNode | null = null;
@@ -376,40 +358,16 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
     }
   };
 
-  const gravityPullForce = (alpha: number): void => {
-    for (const attractor of nodes) {
-      const weight = weightById.get(attractor.id) ?? 1;
-      if (weight <= 1) continue;
-      const pull = 0.008 * (weight - 1) * alpha;
-      for (const node of nodes) {
-        if (node === attractor || node === dragNode || homeAnchors.has(node.id)) continue;
-        node.vx = (node.vx ?? 0) + (attractor.x - node.x) * pull;
-        node.vy = (node.vy ?? 0) + (attractor.y - node.y) * pull;
-      }
-    }
-  };
-
   const sim = forceSimulation<GraphNode>(nodes)
-    .alphaDecay(0.03)
     .force('charge', chargeForce)
     .force('link', linkForce)
     .force('collide', collideForce)
     .force('seedX', seedForceX)
     .force('seedY', seedForceY)
-    .force('gravityPull', gravityPullForce)
     .force('home', homeForce)
     .stop();
 
   sim.force('boundary', createBoundaryForce(width, height, BOUNDARY_MARGIN, nodes));
-
-  sim.on('end', () => {
-    if (state === 'idle') {
-      for (const node of nodes) {
-        node.vx = 0;
-        node.vy = 0;
-      }
-    }
-  });
 
   const nodeById = (id: string): GraphNode | undefined => nodes.find((n) => n.id === id);
 
@@ -420,10 +378,10 @@ export function createSimulation(opts: SimulationOptions): GraphSimulation {
    */
   const refreshLinkStrength = (): void => {
     linkForce.strength((link) => {
-      if (state !== 'drag' || !dragNode) return linkStrengthFor(link);
+      if (state !== 'drag' || !dragNode) return LINK_STRENGTH;
       const source = link.source as GraphNode;
       const target = link.target as GraphNode;
-      return source === dragNode || target === dragNode ? 0 : linkStrengthFor(link);
+      return source === dragNode || target === dragNode ? 0 : LINK_STRENGTH;
     });
   };
 
