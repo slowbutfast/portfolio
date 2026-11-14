@@ -163,7 +163,7 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 
 ### 5. Human Identity & Discoverability
 - The top-left wordmark is the author's name (`Gregory Lazatin`), rendered as naked typography with no pill, panel, or background container.
-- Top-right navigation is equally bare and ordered: `About`, `GitHub ↗`, `Graph` / `Grid`, `Sound`, `Dark` / `Light`, and a 3-dot overflow menu (`...`).
+- Top-right navigation is equally bare and ordered: `About`, `GitHub ↗`, `Graph` / `Grid`, `Sound`, `Dark` / `Light`, and a 3-dot overflow menu (`...`). When Sound is enabled, the three-dot glyph itself renders in `--color-accent` on both desktop and mobile; no separate indicator dot or badge is used.
 - Hovering any node on a fine-pointer device reveals an interactive media card with its video or screenshot, title, tags, summary, and direct `Code ↗` / `Visit ↗` actions. A 150ms pointer-transfer grace period keeps the card alive when the cursor moves from node to card.
 - The About modal carries the canonical Brown University bio and top-mounted Email, LinkedIn, GitHub, and Resume links; the resume preview is a click-to-load sandboxed Google Drive iframe.
 
@@ -206,7 +206,7 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 ## Component Anatomy
 
 ### Floating Top Bar
-- Naked typography floating directly over the canvas: `Gregory Lazatin` at top-left; `About`, `GitHub ↗`, `Graph` / `Grid`, `Sound`, `Dark` / `Light`, and a 3-dot overflow menu (`...`) at top-right, in that exact order.
+- Naked typography floating directly over the canvas: `Gregory Lazatin` at top-left; `About`, `GitHub ↗`, `Graph` / `Grid`, `Sound`, `Dark` / `Light`, and a 3-dot overflow menu (`...`) at top-right, in that exact order. The 3-dot glyph is the sound-active affordance: it takes `--color-accent` while Sound is enabled and returns to the muted text color when Sound is off.
 - No background fill, no border, and no pill wrapper around the top bar or its text links. A progressive gradient scrim from `var(--color-bg)` to transparent preserves legibility when Grid cards scroll beneath the bar.
 - Clicking the wordmark returns to graph view and resets the HUD. `Dark` / `Light` toggles the theme directly in the bar; the 3-dot menu opens a `rounded-2xl` popover containing the `Filters` heading, search, stackable tag pills, and a singular `Reset` action that clears filters, layout, and visited-node colors.
 

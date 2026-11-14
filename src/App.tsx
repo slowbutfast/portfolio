@@ -300,6 +300,13 @@ export default function App() {
     if (view !== 'graph') setStickyFocalId(null);
   }, [view]);
 
+  // Grid view unmounts GraphCanvas, so App reconciles the swell here: opening
+  // the drawer from a card must excite the same bandpass as a graph inspect.
+  useEffect(() => {
+    if (view !== 'list') return;
+    synth.onNodeHover(selectedId !== null);
+  }, [view, selectedId, synth]);
+
   const toggleTheme = useCallback(() => {
     setTheme((current) => (current === 'dark' ? 'light' : 'dark'));
   }, []);

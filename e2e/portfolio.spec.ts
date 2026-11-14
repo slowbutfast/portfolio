@@ -259,9 +259,15 @@ test.describe('portfolio graph SPA', () => {
     await expect(toggle).toHaveAttribute('aria-pressed', 'false');
     await expect(toggle).toHaveAccessibleName('Sound');
 
+    const settingsTrigger = page.getByTestId('controls-dropdown-trigger');
+    const settingsIcon = page.getByTestId('controls-dropdown-icon');
+    await expect(settingsTrigger).toHaveAttribute('data-sound-active', 'false');
+
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-pressed', 'true');
     await expect(toggle).toHaveAccessibleName('Sound');
+    await expect(settingsTrigger).toHaveAttribute('data-sound-active', 'true');
+    await expect(settingsIcon).toHaveClass(/text-\[var\(--color-accent\)\]/);
     expect(
       await page.evaluate(() => localStorage.getItem('portfolio_sound_enabled')),
     ).toBe('true');
@@ -270,9 +276,46 @@ test.describe('portfolio graph SPA', () => {
     await expect(page.getByTestId('audio-toggle')).toHaveAttribute('aria-pressed', 'true');
     await page.getByTestId('audio-toggle').click();
     await expect(page.getByTestId('audio-toggle')).toHaveAttribute('aria-pressed', 'false');
+    await expect(settingsTrigger).toHaveAttribute('data-sound-active', 'false');
+    await expect(settingsIcon).not.toHaveClass(/text-\[var\(--color-accent\)\]/);
     expect(
       await page.evaluate(() => localStorage.getItem('portfolio_sound_enabled')),
     ).toBe('false');
+    expect(errors).toEqual([]);
+  });
+
+  test('canvas mirrors inspect and drag audio swell state', async ({ page }, testInfo) => {
+    const errors = trackErrors(page);
+    await page.goto('/#/p/open-dungeon');
+    await expect(page.getByTestId('project-drawer')).toBeVisible();
+    const canvas = page.getByTestId('graph-canvas');
+
+    // Inspect (including a deep link) keeps the bandpass swell active.
+    await expect(canvas).toHaveAttribute('data-audio-swell', 'true');
+
+    // Desktop hover must hand off into inspect instead of dropping when the
+    // pointer leaves the canvas for the anchored drawer.
+    if (!isMobile(testInfo)) {
+      await page.mouse.move(20, 20);
+      await expect(canvas).toHaveAttribute('data-audio-swell', 'true');
+    }
+
+    await page.getByTestId('drawer-close').click();
+    await expect(page.getByTestId('project-drawer')).toHaveCount(0);
+    await expect(canvas).toHaveAttribute('data-audio-swell', 'false');
+
+    // Pressing and dragging a node activates the swell until release.
+    await focusNode(page);
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error('graph canvas has no bounding box');
+    const centerX = box.x + box.width / 2;
+    const centerY = box.y + box.height / 2;
+    await page.mouse.move(centerX, centerY);
+    await page.mouse.down();
+    await page.mouse.move(centerX + 60, centerY + 40, { steps: 6 });
+    await expect(canvas).toHaveAttribute('data-audio-swell', 'true');
+    await page.mouse.up();
+    await expect(canvas).toHaveAttribute('data-audio-swell', 'false');
     expect(errors).toEqual([]);
   });
 
@@ -344,6 +387,24 @@ test.describe('portfolio graph SPA', () => {
     await expect(page.getByTestId('drawer-visit')).toHaveAttribute(
       'href',
       'https://kintsugi-fracture.vercel.app/',
+    );
+  });
+
+  test('Transcribe Plus and Sandwave Sim drawers expose their live demo links', async ({ page }) => {
+    await page.goto('/#/p/transcribe-plus');
+    await expect(page.getByTestId('project-drawer')).toBeVisible();
+    await expect(page.getByTestId('drawer-visit')).toBeVisible();
+    await expect(page.getByTestId('drawer-visit')).toHaveAttribute(
+      'href',
+      'https://transcribe-plus-frontend.vercel.app/',
+    );
+
+    await page.goto('/#/p/sandwave-sim');
+    await expect(page.getByTestId('project-drawer')).toBeVisible();
+    await expect(page.getByTestId('drawer-visit')).toBeVisible();
+    await expect(page.getByTestId('drawer-visit')).toHaveAttribute(
+      'href',
+      'https://sandwave-sim.vercel.app/',
     );
   });
 
@@ -594,12 +655,17 @@ test.describe('portfolio graph SPA', () => {
     expect(toggleBox?.height ?? 0).toBeGreaterThanOrEqual(44);
     expect(sliderBox?.height ?? 0).toBeGreaterThanOrEqual(44);
 
+    const trigger = page.getByTestId('controls-dropdown-trigger');
+    const triggerIcon = page.getByTestId('controls-dropdown-icon');
+    await expect(trigger).toHaveAttribute('data-sound-active', 'false');
+    await expect(page.getByTestId('controls-sound-indicator')).toHaveCount(0);
+    await expect(triggerIcon).not.toHaveClass(/text-\[var\(--color-accent\)\]/);
+
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-pressed', 'true');
-    const indicator = page.getByTestId('controls-sound-indicator');
-    await expect(indicator).toBeVisible();
-    const dotBox = await indicator.boundingBox();
-    expect(dotBox?.width ?? 0).toBeGreaterThanOrEqual(5);
+    await expect(trigger).toHaveAttribute('data-sound-active', 'true');
+    await expect(triggerIcon).toHaveClass(/text-\[var\(--color-accent\)\]/);
+    await expect(page.getByTestId('controls-sound-indicator')).toHaveCount(0);
 
     await slider.evaluate((element, next) => {
       const input = element as HTMLInputElement;

@@ -18,6 +18,8 @@ import {
   DEFAULT_SOUND_VOLUME,
   DRAG_VELOCITY_FULL_SCALE,
   HOVER_SWELL_GAIN,
+  HOVER_SWELL_PLATEAU,
+  HOVER_SWELL_PLATEAU_DELAY_MS,
   MASTER_GAIN,
   NOISE_FLOOR_GAIN,
   PAN_MAX,
@@ -219,6 +221,8 @@ export class AmbientSynth {
   private visibilityHandler: (() => void) | null = null;
   private gestureBound = false;
   private gestureHandler: (() => void) | null = null;
+  private swellActive = false;
+  private swellPlateauTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(deps: AmbientSynthDeps = {}) {
     this.deps = deps;
@@ -445,9 +449,36 @@ export class AmbientSynth {
     );
   }
 
-  onNodeHover(isHovered: boolean): void {
+  onNodeHover(isHovered: boolean, retrigger = false): void {
     if (!this.ctx || !this.nodes) return;
-    ramp(this.nodes.hoverGain.gain, isHovered ? HOVER_SWELL_GAIN : 0, this.ctx);
+    if (isHovered) {
+      // Repeated syncs from React effects must not re-open the swell or reset
+      // the plateau timer while inspection/drag is already active. Opening the
+      // inspector opts into one explicit retrigger so desktop hears a fresh
+      // cue even after hover has already settled to the plateau.
+      if (this.swellActive && !retrigger) return;
+      this.swellActive = true;
+      const ctx = this.ctx;
+      ramp(this.nodes.hoverGain.gain, HOVER_SWELL_GAIN, ctx);
+      this.clearSwellPlateau();
+      const hoverGain = this.nodes.hoverGain;
+      this.swellPlateauTimer = setTimeout(() => {
+        this.swellPlateauTimer = null;
+        if (!this.swellActive || this.ctx !== ctx) return;
+        ramp(hoverGain.gain, HOVER_SWELL_GAIN * HOVER_SWELL_PLATEAU, ctx);
+      }, HOVER_SWELL_PLATEAU_DELAY_MS);
+      return;
+    }
+    this.clearSwellPlateau();
+    this.swellActive = false;
+    ramp(this.nodes.hoverGain.gain, 0, this.ctx);
+  }
+
+  private clearSwellPlateau(): void {
+    if (this.swellPlateauTimer !== null) {
+      clearTimeout(this.swellPlateauTimer);
+      this.swellPlateauTimer = null;
+    }
   }
 
   onDragVelocity(vx: number, vy: number): void {
@@ -458,6 +489,8 @@ export class AmbientSynth {
   }
 
   dispose(): void {
+    this.clearSwellPlateau();
+    this.swellActive = false;
     if (this.ctx) {
       void this.ctx.suspend();
     }

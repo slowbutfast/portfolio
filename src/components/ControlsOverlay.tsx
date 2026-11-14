@@ -241,20 +241,20 @@ export function ControlsOverlay({
             <button
               type="button"
               data-testid="controls-dropdown-trigger"
+              data-sound-active={soundEnabled ? 'true' : 'false'}
               aria-label="Filters & Layout"
               aria-expanded={open}
               aria-controls="portfolio-controls"
               onClick={() => setOpen((value) => !value)}
               className={`${bareText} relative min-w-11 justify-center md:min-w-0`}
             >
-              <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
-              {soundEnabled && (
-                <span
-                  data-testid="controls-sound-indicator"
-                  aria-hidden="true"
-                  className="sound-indicator absolute right-0 top-0 h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]"
-                />
-              )}
+              <MoreHorizontal
+                data-testid="controls-dropdown-icon"
+                aria-hidden="true"
+                className={`h-4 w-4 ${
+                  soundEnabled ? 'text-[var(--color-accent)]' : ''
+                }`}
+              />
             </button>
 
             {open && (
