@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { projects } from './projects';
+import { getVisibleTags, projects } from './projects';
 import { deriveEdges } from '../utils/graphTopology';
 import { resolveCommand } from '../utils/terminalCommandResolver';
 import type { Preview } from '../types/portfolio';
@@ -109,7 +109,8 @@ describe('project catalog contract', () => {
     expect(art?.title).toBe('art');
     expect(art?.shortTitle).toBe('art');
     expect(art?.summary).toBe('WIP');
-    expect(art?.tags).toEqual([]);
+    expect(art?.tags).toEqual(['art']);
+    expect(getVisibleTags(art?.tags ?? [])).toEqual([]);
     expect(art?.liveUrl).toBe('/art/');
     expect(art?.rainbowOnInteract).toBe(true);
     expect(art?.omitIndex).toBe(true);

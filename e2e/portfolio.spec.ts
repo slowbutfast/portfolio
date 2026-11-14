@@ -1740,7 +1740,7 @@ test.describe('portfolio graph SPA', () => {
     expect(errors).toEqual([]);
   });
 
-  test('art-wip rainbow state, hidden label reveal, omitted overview/index, and Click to inspect lifecycle', async ({
+  test('art-wip rainbow state, hidden label reveal, progressive art links, and reset lifecycle', async ({
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'hover card is desktop-only');
@@ -1748,8 +1748,11 @@ test.describe('portfolio graph SPA', () => {
     const canvas = page.getByTestId('graph-canvas');
     await expect(canvas).toHaveAttribute('data-rainbow-nodes', '');
     await expect(canvas).toHaveAttribute('data-revealed-labels', '');
+    await expect(canvas).toHaveAttribute('data-art-proximity-links', '');
+    await expect(canvas).toHaveAttribute('data-art-max-connections', '1');
 
-    // Inspecting art-wip activates rainbow pulsing, reveals art label, and omits 09/Overview.
+    // Inspecting art-wip activates rainbow pulsing, reveals art label, omits 09/Overview,
+    // and keeps the latent 'art' tag hidden from the inspector panel.
     await page.getByTestId('nav-art-wip').evaluate((el: HTMLButtonElement) => el.click());
     await expect(page.getByTestId('project-drawer')).toBeVisible();
     await expect(page.getByTestId('drawer-visit')).toHaveAttribute('href', '/art/');
@@ -1757,28 +1760,53 @@ test.describe('portfolio graph SPA', () => {
     await expect(page.getByTestId('project-drawer')).toContainText('WIP');
     await expect(page.getByTestId('project-drawer')).not.toContainText('Overview');
     await expect(page.getByTestId('project-drawer')).not.toContainText('09');
+    await expect(
+      page.getByTestId('project-drawer').locator('.fluid-pill', { hasText: /^art$/i }),
+    ).toHaveCount(0);
     await expect(canvas).toHaveAttribute('data-rainbow-nodes', 'art-wip');
     await expect(canvas).toHaveAttribute('data-revealed-labels', 'art-wip');
     await expect(canvas).toHaveAttribute('data-art-proximity-links', '');
 
-    // Close drawer and reload: rainbow state persists via visitedIds, but ART label re-hides.
+    // Close drawer and drag revealed art-wip toward center (open-dungeon) to latch its
+    // first progressive real link and bump the max-connections cap from 1 -> 2.
     await page.getByTestId('drawer-close').click();
     await expect(page.getByTestId('project-drawer')).toHaveCount(0);
+    await page.waitForTimeout(800);
+    const boxForDrag = await canvas.boundingBox();
+    if (!boxForDrag) throw new Error('graph canvas has no bounding box');
+    const artPosAttr = await canvas.getAttribute('data-art-node-pos');
+    if (!artPosAttr) throw new Error('missing data-art-node-pos');
+    const [artLocalX, artLocalY] = artPosAttr.split(',').map(Number);
+    const artX = boxForDrag.x + artLocalX;
+    const artY = boxForDrag.y + artLocalY;
+    const centerX = boxForDrag.x + boxForDrag.width / 2;
+    const centerY = boxForDrag.y + boxForDrag.height / 2;
+    await page.mouse.move(artX, artY);
+    await page.mouse.down();
+    await page.mouse.move(centerX, centerY, { steps: 16 });
+    await page.mouse.up();
+    await expect(canvas).toHaveAttribute('data-art-proximity-links', /open-dungeon/);
+    await expect(canvas).toHaveAttribute('data-art-max-connections', /^[234]$/);
+
+    // Reload: rainbow state persists via visitedIds, but art-wip label & dynamic links reset.
     await page.reload();
     await expect(canvas).toHaveAttribute('data-rainbow-nodes', 'art-wip');
     await expect(canvas).toHaveAttribute('data-revealed-labels', '');
+    await expect(canvas).toHaveAttribute('data-art-proximity-links', '');
+    await expect(canvas).toHaveAttribute('data-art-max-connections', '1');
 
-    // Re-inspect art-wip so label is revealed, then click any node and Reset layout.
+    // Re-inspect art-wip so label is revealed, then click Reset layout.
     await page.getByTestId('nav-art-wip').evaluate((el: HTMLButtonElement) => el.click());
     await expect(canvas).toHaveAttribute('data-revealed-labels', 'art-wip');
-    await page.getByTestId('nav-open-dungeon').evaluate((el: HTMLButtonElement) => el.click());
     await page.getByTestId('drawer-close').click();
     await page.getByTestId('controls-dropdown-trigger').click();
     await page.getByTestId('reset-layout').click();
 
-    // Reset layout clears rainbow node pulsing, but ART label and hidden "Click to inspect ↗" persist.
+    // Reset layout clears rainbow pulsing, re-hides the art-wip reveal, and resets proximity links.
     await expect(canvas).toHaveAttribute('data-rainbow-nodes', '');
-    await expect(canvas).toHaveAttribute('data-revealed-labels', /\bart-wip\b/);
+    await expect(canvas).toHaveAttribute('data-revealed-labels', '');
+    await expect(canvas).toHaveAttribute('data-art-proximity-links', '');
+    await expect(canvas).toHaveAttribute('data-art-max-connections', '1');
     await page.waitForTimeout(1500);
     await page.getByTestId('nav-open-dungeon').focus();
     await page.waitForTimeout(600);
@@ -1786,9 +1814,10 @@ test.describe('portfolio graph SPA', () => {
     if (!box) throw new Error('graph canvas has no bounding box');
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await expect(page.getByTestId('node-hover-card')).toBeVisible();
+    await expect(page.getByTestId('node-hover-card')).not.toContainText(/\bart\b/);
     await expect(page.getByTestId('node-hover-card')).not.toContainText('Click to inspect');
 
-    // Full page reload restores "Click to inspect ↗" and hides ART label again.
+    // Full page reload restores "Click to inspect ↗" and keeps art-wip hidden.
     await page.reload();
     await expect(canvas).toHaveAttribute('data-revealed-labels', '');
     await page.waitForTimeout(1500);

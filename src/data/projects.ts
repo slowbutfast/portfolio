@@ -1,4 +1,4 @@
-import type { ProjectData, TerminalDemo } from '../types/portfolio';
+import type { ParadigmTag, ProjectData, TerminalDemo } from '../types/portfolio';
 import openDungeonCapturedJson from './captured/open-dungeon.json';
 import resumeBuilderCapturedJson from './captured/agentic-resume-builder.json';
 import transcribePlusCapturedJson from './captured/transcribe-plus.json';
@@ -168,7 +168,7 @@ export const projects = [
     shortTitle: 'art',
     summary: 'WIP',
     classification: 'ART & VISUAL EXPERIMENTS // WIP',
-    tags: [],
+    tags: ['art'],
     liveUrl: '/art/',
     rainbowOnInteract: true,
     omitIndex: true,
@@ -177,6 +177,13 @@ export const projects = [
     previews: [],
   },
 ] satisfies ProjectData[];
+
+/** Tags kept latent in graph topology and hidden from UI tag chips. */
+export const HIDDEN_TAGS: ReadonlySet<ParadigmTag> = new Set<ParadigmTag>(['art']);
+
+export function getVisibleTags(tags: readonly ParadigmTag[]): ParadigmTag[] {
+  return tags.filter((tag) => !HIDDEN_TAGS.has(tag));
+}
 
 export function getProjectById(id: string): ProjectData | undefined {
   return projects.find((p) => p.id === id);

@@ -1,5 +1,6 @@
 import { MonitorPlay, Terminal, Image as ImageIcon, ExternalLink } from 'lucide-react';
 import type { Preview, ProjectData } from '../types/portfolio';
+import { getVisibleTags } from '../data/projects';
 import { formatIndex } from '../utils/drafting';
 
 interface ListViewProps {
@@ -135,7 +136,7 @@ export function ListView({ projects, dimmedIds, onSelect }: ListViewProps) {
                 </div>
 
                 <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-[var(--color-divider)] pt-3">
-                  {project.tags.map((tag) => (
+                  {getVisibleTags(project.tags).map((tag) => (
                     <span key={tag} className="fluid-pill">
                       {tag}
                     </span>

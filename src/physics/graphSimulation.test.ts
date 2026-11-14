@@ -547,6 +547,24 @@ describe('proximity pairs never create force links', () => {
     expect(sim.sim.force('proximity')).toBeUndefined();
     sim.destroy();
   });
+
+  it('connectLink adds a real forceLink spring and clears on resetLayout', () => {
+    const sim = fullSim();
+    expect(sim.connectLink('art-wip', 'open-dungeon')).toBe(true);
+    expect(sim.links).toHaveLength(14);
+    expect(sim.linkStates).toHaveLength(14);
+    expect(sim.findLink('art-wip', 'open-dungeon')).toBeDefined();
+    // Duplicate connectLink is ignored.
+    expect(sim.connectLink('art-wip', 'open-dungeon')).toBe(false);
+    expect(sim.links).toHaveLength(14);
+
+    // Resetting layout clears dynamic links back to the 13 permanent edges.
+    sim.resetLayout();
+    expect(sim.links).toHaveLength(13);
+    expect(sim.linkStates).toHaveLength(13);
+    expect(sim.findLink('art-wip', 'open-dungeon')).toBeUndefined();
+    sim.destroy();
+  });
 });
 
 describe('mobile snap reachability', () => {

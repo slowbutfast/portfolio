@@ -28,7 +28,14 @@
 - `npm run typecheck`: exit 0
 - `npm run build`: exit 0 (`dist/index.html` + assets built)
 - `npm run test:unit`: `Test Files 20 passed (20)`, `Tests 214 passed (214)` (includes `PATCH-01` catalog assertions in `src/data/projects.test.ts` and `gravityWeight` neighbor pull test in `src/physics/graphSimulation.test.ts`)
-- `CI=1 npx playwright test --config=./playwright.config.ts`: `111 passed`, `37 skipped` (platform-gated desktop/mobile/preview skips), `0 failed` (covers `200ms` hover dwell, `ART`/`WIP` metadata, omitted `09`/`Overview`, and `data-revealed-labels` persisting across `Reset layout` and resetting on reload)
+- `CI=1 npx playwright test --config=./playwright.config.ts`: `111 passed`, `37 skipped` (platform-gated desktop/mobile/preview skips), `0 failed`
+
+### `PATCH-04` Verification (2026-11-14)
+- `npm run typecheck`: exit `0`
+- `npm run build`: exit `0`
+- `npm run test:unit`: `Test Files 20 passed (20)`, `Tests 214 passed (214)`
+- `CI=1 npx playwright test --config=./playwright.config.ts`: `111 passed`, `37 skipped` (platform-gated desktop/mobile/preview skips), `0 failed`
+- `npx openspec validate "art-wip-rainbow-node" --strict`: `Change 'art-wip-rainbow-node' is valid` (covers `200ms` hover dwell, `ART`/`WIP` metadata, omitted `09`/`Overview`, and `data-revealed-labels` persisting across `Reset layout` and resetting on reload)
 
 
 ## `PATCH-02` Verification Logs
@@ -36,7 +43,14 @@
 - `npm run typecheck`: exit 0
 - `npm run build`: exit 0 (`dist/index.html` + assets built)
 - `npm run test:unit`: `Test Files 20 passed (20)`, `Tests 213 passed (213)` (equal-mass physics restored, `art-wip` `title` & `shortTitle` verified as `'art'`)
-- `CI=1 npx playwright test --config=./playwright.config.ts`: `111 passed`, `37 skipped` (platform-gated desktop/mobile/preview skips), `0 failed` (verifies `art` title in drawer + equal-mass physics behavior)
+- `CI=1 npx playwright test --config=./playwright.config.ts`: `111 passed`, `37 skipped` (platform-gated desktop/mobile/preview skips), `0 failed`
+
+### `PATCH-04` Verification (2026-11-14)
+- `npm run typecheck`: exit `0`
+- `npm run build`: exit `0`
+- `npm run test:unit`: `Test Files 20 passed (20)`, `Tests 214 passed (214)`
+- `CI=1 npx playwright test --config=./playwright.config.ts`: `111 passed`, `37 skipped` (platform-gated desktop/mobile/preview skips), `0 failed`
+- `npx openspec validate "art-wip-rainbow-node" --strict`: `Change 'art-wip-rainbow-node' is valid` (verifies `art` title in drawer + equal-mass physics behavior)
 
 
 ## `PATCH-03` Verification Logs
@@ -45,3 +59,10 @@
 - `npm run build`: exit 0 (`dist/index.html` + assets built)
 - `npm run test:unit`: `Test Files 20 passed (20)`, `Tests 213 passed (213)` (13 permanent edges, 0 crossings across 1440×900, 393×852, 1920×1080, 320×900, 300 ticks, and `resetLayout`)
 - `CI=1 npx playwright test --config=./playwright.config.ts`: `111 passed`, `37 skipped` (platform-gated desktop/mobile/preview skips), `0 failed`
+
+### `PATCH-04` Verification (2026-11-14)
+- `npm run typecheck`: exit `0`
+- `npm run build`: exit `0`
+- `npm run test:unit`: `Test Files 20 passed (20)`, `Tests 214 passed (214)`
+- `CI=1 npx playwright test --config=./playwright.config.ts`: `111 passed`, `37 skipped` (platform-gated desktop/mobile/preview skips), `0 failed`
+- `npx openspec validate "art-wip-rainbow-node" --strict`: `Change 'art-wip-rainbow-node' is valid`

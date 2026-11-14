@@ -1,6 +1,7 @@
 import { ExternalLink, GitBranch } from 'lucide-react';
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { Preview, ProjectData } from '../types/portfolio';
+import { getVisibleTags } from '../data/projects';
 import {
   chooseBestPopoverPosition,
   type PopoverObstacles,
@@ -142,7 +143,7 @@ export function NodeHoverCard({
       </p>
 
       <div className="mt-2 flex flex-wrap gap-1.5">
-        {project.tags.map((tag) => (
+        {getVisibleTags(project.tags).map((tag) => (
           <span
             key={tag}
             className="rounded-full border border-[var(--color-outline)] px-2 py-0.5 font-secondary text-[9px] font-light uppercase tracking-[0.12em] text-[var(--color-muted)]"

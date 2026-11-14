@@ -6,6 +6,7 @@
 | `PATCH-01` | 2026-11-14 | User Review Feedback on PR #16 | `src/types/portfolio.ts`, `src/data/projects.ts`, `src/utils/rainbowPulse.ts`, `src/physics/graphSimulation.ts`, `src/components/GraphCanvas.tsx`, `src/App.tsx`, `src/components/ProjectDrawer.tsx`, `src/components/ListView.tsx`, `src/data/projects.test.ts`, `src/physics/graphSimulation.test.ts`, `e2e/portfolio.spec.ts` | APPLIED |
 | `PATCH-02` | 2026-11-14 | User Review Follow-up on PR #16 | `src/types/portfolio.ts`, `src/data/projects.ts`, `src/physics/graphSimulation.ts`, `src/components/GraphCanvas.tsx`, `src/data/projects.test.ts`, `src/physics/graphSimulation.test.ts`, `e2e/portfolio.spec.ts` | APPLIED |
 | `PATCH-03` | 2026-11-14 | User Review Follow-up on PR #16 | `src/types/portfolio.ts`, `src/data/projects.ts`, `src/data/graphSeeds.ts`, `src/utils/graphTopology.ts`, `src/components/GraphCanvas.tsx`, `src/utils/graphPlanarity.test.ts`, `src/data/projects.test.ts`, `src/physics/graphSimulation.test.ts`, `e2e/portfolio.spec.ts` | APPLIED |
+| `PATCH-04` | 2026-11-14 | User Review Follow-up on PR #16 | `src/data/projects.ts`, `src/utils/graphTopology.ts`, `src/components/NodeHoverCard.tsx`, `src/components/ProjectDrawer.tsx`, `src/components/ListView.tsx`, `src/App.tsx`, `src/physics/graphSimulation.ts`, `src/components/GraphCanvas.tsx`, `src/data/projects.test.ts`, `src/physics/graphSimulation.test.ts`, `e2e/portfolio.spec.ts` | APPLIED |
 
 ---
 
@@ -46,6 +47,22 @@
 
 ---
 
+### [PATCH-04] Hidden `'art'` Tag, Progressive `forceLink` Latching (`1 -> 2 -> 3 -> 4`), Rainbow Gradient Bridges & Resettable Reveal
+- **Date**: 2026-11-14 08:13:00 UTC
+- **Feedback Source**: User Review Follow-up (PR #16)
+- **Reported Issue**:
+  1. Restore cycling rainbow RGB connection gradients on `art-wip` bridges.
+  2. Replace zero-force visual-only proximity lines with real `d3-force` link springs (`connectLink`) so `art-wip` is pulled into normal spring equilibrium instead of being repelled by `chargeForce`/`collideForce`, growing its connection limit `1 -> 2 -> 3 -> 4` as it connects to each new `'art'`-tagged node.
+  3. Give `art-wip` `tags: ['art']` and centralize `HIDDEN_TAGS` / `getVisibleTags(...)` so `'art'` is invisible in hover cards, the inspector panel, list view, and `deriveEdges()`.
+  4. Reset `inspectedIds` (`revealedIds`) inside `resetAll()` so the `art` node reveal resets on both page reloads and canvas resets (`Reset layout`).
+- **Root Cause**: `PATCH-03`'s separate zero-force `artProximityIds` render path omitted `d3-force` springs and `LinearGradient` fills, and `resetAll()` did not clear `inspectedIds`.
+- **Target Files**: `src/data/projects.ts`, `src/utils/graphTopology.ts`, `src/components/NodeHoverCard.tsx`, `src/components/ProjectDrawer.tsx`, `src/components/ListView.tsx`, `src/App.tsx`, `src/physics/graphSimulation.ts`, `src/components/GraphCanvas.tsx`, `src/data/projects.test.ts`, `src/physics/graphSimulation.test.ts`, `e2e/portfolio.spec.ts`.
+- **Verification Command**: `npm run typecheck && npm run build && npm run test:unit && CI=1 npx playwright test --config=./playwright.config.ts && npx openspec validate "art-wip-rainbow-node" --strict`
+- **Status**: APPLIED
+
+
+---
+
 ### [PATCH-03] Top-Left Isolated `art` Node & Post-Click Proximity Connections
 - **Date**: 2026-11-14 07:50:00 UTC
 - **Feedback Source**: User Review Follow-up (PR #16)
@@ -55,5 +72,21 @@
   3. Once `art-wip` is clicked (`revealedRef.current.has('art-wip')`), dragging it within `180px` of any of those 4 `'art'`-tagged projects draws a proximity fluid bridge (`data-art-proximity-links`) with no tag pill on the connection.
 - **Root Cause**: Avoid $K_5$ non-planarity while giving `art-wip` a playful mystery discovery mechanic.
 - **Target Files**: `src/types/portfolio.ts`, `src/data/projects.ts`, `src/data/graphSeeds.ts`, `src/utils/graphTopology.ts`, `src/components/GraphCanvas.tsx`, `src/utils/graphPlanarity.test.ts`, `src/data/projects.test.ts`, `src/physics/graphSimulation.test.ts`, `e2e/portfolio.spec.ts`.
+- **Verification Command**: `npm run typecheck && npm run build && npm run test:unit && CI=1 npx playwright test --config=./playwright.config.ts && npx openspec validate "art-wip-rainbow-node" --strict`
+- **Status**: APPLIED
+
+
+---
+
+### [PATCH-04] Hidden `'art'` Tag, Progressive `forceLink` Latching (`1 -> 2 -> 3 -> 4`), Rainbow Gradient Bridges & Resettable Reveal
+- **Date**: 2026-11-14 08:13:00 UTC
+- **Feedback Source**: User Review Follow-up (PR #16)
+- **Reported Issue**:
+  1. Restore cycling rainbow RGB connection gradients on `art-wip` bridges.
+  2. Replace zero-force visual-only proximity lines with real `d3-force` link springs (`connectLink`) so `art-wip` is pulled into normal spring equilibrium instead of being repelled by `chargeForce`/`collideForce`, growing its connection limit `1 -> 2 -> 3 -> 4` as it connects to each new `'art'`-tagged node.
+  3. Give `art-wip` `tags: ['art']` and centralize `HIDDEN_TAGS` / `getVisibleTags(...)` so `'art'` is invisible in hover cards, the inspector panel, list view, and `deriveEdges()`.
+  4. Reset `inspectedIds` (`revealedIds`) inside `resetAll()` so the `art` node reveal resets on both page reloads and canvas resets (`Reset layout`).
+- **Root Cause**: `PATCH-03`'s separate zero-force `artProximityIds` render path omitted `d3-force` springs and `LinearGradient` fills, and `resetAll()` did not clear `inspectedIds`.
+- **Target Files**: `src/data/projects.ts`, `src/utils/graphTopology.ts`, `src/components/NodeHoverCard.tsx`, `src/components/ProjectDrawer.tsx`, `src/components/ListView.tsx`, `src/App.tsx`, `src/physics/graphSimulation.ts`, `src/components/GraphCanvas.tsx`, `src/data/projects.test.ts`, `src/physics/graphSimulation.test.ts`, `e2e/portfolio.spec.ts`.
 - **Verification Command**: `npm run typecheck && npm run build && npm run test:unit && CI=1 npx playwright test --config=./playwright.config.ts && npx openspec validate "art-wip-rainbow-node" --strict`
 - **Status**: APPLIED

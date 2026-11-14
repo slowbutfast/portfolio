@@ -321,6 +321,8 @@ export function GraphCanvas({
   const emptyRevealedRef = useRef<Set<string>>(new Set());
   const revealedRef = useRef(revealedIds ?? emptyRevealedRef.current);
   revealedRef.current = revealedIds ?? emptyRevealedRef.current;
+  const artConnectedIdsRef = useRef<Set<string>>(new Set());
+  const artMaxConnectionsRef = useRef<number>(1);
   const onHoverNodeRef = useRef(onHoverNode);
   onHoverNodeRef.current = onHoverNode;
   const onCanvasDragStartRef = useRef(onCanvasDragStart);
@@ -578,15 +580,41 @@ export function GraphCanvas({
         return tokens.nodeUnvisited;
       };
 
+      // Latch progressive `d3-force` links when revealed `art-wip` enters
+      // proximity of `'art'`-tagged projects, growing its cap 1 -> 2 -> 3 -> 4.
+      if (revealedRef.current.has('art-wip')) {
+        const artPos = active.get('art-wip');
+        if (artPos) {
+          for (const otherId of sortedNodeIds) {
+            if (otherId === 'art-wip') continue;
+            if (artConnectedIdsRef.current.has(otherId)) continue;
+            if (artConnectedIdsRef.current.size >= artMaxConnectionsRef.current) break;
+            if (!getProjectById(otherId)?.tags.includes('art')) continue;
+            const otherPos = active.get(otherId);
+            if (!otherPos) continue;
+            const distance = Math.hypot(artPos[0] - otherPos[0], artPos[1] - otherPos[1]);
+            if (distance < ART_PROXIMITY_MAX_DIST && sim.connectLink('art-wip', otherId)) {
+              artConnectedIdsRef.current.add(otherId);
+              artMaxConnectionsRef.current = Math.min(4, artMaxConnectionsRef.current + 1);
+            }
+          }
+        }
+      }
+
       // Zero-force proximity-only webbing for non-edge pairs. This pass paints
       // beneath permanent bridges and nodes, in deterministic sorted-pair order,
-      // and skips every permanent edge so a detached bridge never duplicates.
-      const artProximityIds = new Set<string>();
+      // and skips every active edge so a detached bridge never duplicates.
       for (let i = 0; i < sortedNodeIds.length; i += 1) {
         for (let j = i + 1; j < sortedNodeIds.length; j += 1) {
           const sourceId = sortedNodeIds[i];
           const targetId = sortedNodeIds[j];
           if (permanentEdgeKeys.has(edgeKey(sourceId, targetId))) continue;
+          if (
+            (sourceId === 'art-wip' && artConnectedIdsRef.current.has(targetId)) ||
+            (targetId === 'art-wip' && artConnectedIdsRef.current.has(sourceId))
+          ) {
+            continue;
+          }
           const a = active.get(sourceId);
           const b = active.get(targetId);
           if (!a || !b) continue;
@@ -594,31 +622,6 @@ export function GraphCanvas({
           const ra = nodesById.get(sourceId)?.radius ?? 22;
           const rb = nodesById.get(targetId)?.radius ?? 22;
           const contactDistance = ra + rb;
-
-          if (sourceId === 'art-wip' || targetId === 'art-wip') {
-            const otherId = sourceId === 'art-wip' ? targetId : sourceId;
-            if (
-              !revealedRef.current.has('art-wip') ||
-              !getProjectById(otherId)?.tags.includes('art') ||
-              distance >= ART_PROXIMITY_MAX_DIST
-            ) {
-              continue;
-            }
-            const taper = smoothstep01((ART_PROXIMITY_MAX_DIST - distance) / 40);
-            if (taper <= 0) continue;
-            artProximityIds.add(otherId);
-            drawFluidBridge(
-              ctx,
-              { x: a[0], y: a[1] },
-              { x: b[0], y: b[1] },
-              ra,
-              rb,
-              tokens.connection,
-              0.85 * taper,
-              { restDistance: distance, sharedTagCount: 1, sag: 0 },
-            );
-            continue;
-          }
 
           if (distance <= contactDistance || distance >= PROXIMITY_MAX_DIST) continue;
           const fadeIn = smoothstep01((distance - contactDistance) / 12);
@@ -636,15 +639,37 @@ export function GraphCanvas({
           );
         }
       }
-      const artProximityValue = [...artProximityIds].sort().join(',');
+      const artPosForAttr = active.get('art-wip');
+      const artPosValue = artPosForAttr
+        ? `${Math.round(artPosForAttr[0])},${Math.round(artPosForAttr[1])}`
+        : '';
+      if (canvas.dataset.artNodePos !== artPosValue) {
+        canvas.dataset.artNodePos = artPosValue;
+      }
+      const artProximityValue = [...artConnectedIdsRef.current].sort().join(',');
       if (canvas.dataset.artProximityLinks !== artProximityValue) {
         canvas.dataset.artProximityLinks = artProximityValue;
+      }
+      const artMaxValue = String(artMaxConnectionsRef.current);
+      if (canvas.dataset.artMaxConnections !== artMaxValue) {
+        canvas.dataset.artMaxConnections = artMaxValue;
       }
 
       // Pure binary connections. No grayscale, no alpha fade on live edges;
       // only filtered-out pairs recede to 0.12. Bridge fills blend the endpoint
       // node colors along the center-to-center axis through `connection`.
-      for (const edge of edges) {
+      const renderEdges: GraphEdge[] =
+        artConnectedIdsRef.current.size === 0
+          ? edges
+          : [
+              ...edges,
+              ...[...artConnectedIdsRef.current].sort().map((otherId) => ({
+                source: 'art-wip',
+                target: otherId,
+                tags: [],
+              })),
+            ];
+      for (const edge of renderEdges) {
         const a = active.get(edge.source);
         const b = active.get(edge.target);
         if (!a || !b) continue;
@@ -1213,6 +1238,8 @@ export function GraphCanvas({
 
   useEffect(() => {
     if (layoutResetVersion <= 0) return;
+    artConnectedIdsRef.current.clear();
+    artMaxConnectionsRef.current = 1;
     simRef.current?.resetLayout();
     renderRef.current();
     wakeRef.current();

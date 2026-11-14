@@ -8,7 +8,7 @@ import {
 } from 'react';
 import { ExternalLink, GitBranch, X } from 'lucide-react';
 import type { Preview, ProjectData } from '../types/portfolio';
-import { projects } from '../data/projects';
+import { getVisibleTags, projects } from '../data/projects';
 import { formatIndex } from '../utils/drafting';
 import {
   chooseBestPopoverPosition,
@@ -690,7 +690,7 @@ export function ProjectDrawer({
             </div>
           )}
           <div className="flex flex-wrap gap-2">
-            {project.tags.map((tag) => (
+            {getVisibleTags(project.tags).map((tag) => (
               <span
                 key={tag}
                 className="fluid-pill border-[var(--color-outline)]/40 font-light text-[var(--color-muted)]"

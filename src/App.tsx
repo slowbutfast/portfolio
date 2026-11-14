@@ -296,6 +296,7 @@ export default function App() {
     setSearch('');
     setLayoutResetVersion((version) => version + 1);
     setVisitedIds(new Set());
+    setInspectedIds(new Set());
     setStickyFocalId(null);
     setHoverObstacles(undefined);
     setDrawerObstacles(undefined);

@@ -52,3 +52,8 @@
 - [x] 8.1 Add `'art'` to `ParadigmTag`, set `art-wip` `tags: []`, add `'art'` to `open-dungeon`, `transcribe-plus`, `sandwave-sim`, `kintsugi-fracture`, and exclude `'art'` from `deriveEdges`.
 - [x] 8.2 Place `art-wip` in the top-left empty space (`{ x: 0.16, y: 0.22 }`) and draw proximity bridges (`ART_PROXIMITY_MAX_DIST = 180`, `data-art-proximity-links`) to `'art'`-tagged nodes only after `art-wip` is clicked (`revealedRef`).
 - [x] 8.3 Update unit & E2E tests and OpenSpec docs (`patch.md`, `specs/`, `verification.md`).
+
+## 9. `PATCH-04` — Hidden `'art'` Tag, Progressive `forceLink` Latching & Resettable Reveal
+- [x] 9.1 Centralize `HIDDEN_TAGS` / `getVisibleTags` in `src/data/projects.ts`, assign `tags: ['art']` to `art-wip`, and filter hidden tags out of `deriveEdges`, `NodeHoverCard`, `ProjectDrawer`, and `ListView`.
+- [x] 9.2 Add `connectLink(sourceId, targetId)` and dynamic link cleanup on `resetLayout()` in `src/physics/graphSimulation.ts`; latch `1 -> 2 -> 3 -> 4` progressive `art-wip` links through the unified `LinearGradient` bridge loop in `GraphCanvas.tsx`; reset `inspectedIds` in `App.tsx` `resetAll()`.
+- [x] 9.3 Update unit & E2E tests (`projects.test.ts`, `graphSimulation.test.ts`, `e2e/portfolio.spec.ts`) and OpenSpec docs (`patch.md`, `specs/`, `verification.md`).
