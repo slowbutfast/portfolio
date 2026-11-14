@@ -393,6 +393,28 @@ describe('parameter modulation', () => {
     synth.dispose();
   });
 
+  it('re-arms the swell when the inspector opens during an active hover plateau', () => {
+    vi.useFakeTimers();
+    const { ctx, synth } = setup();
+    synth.setSoundEnabled(true);
+    const hoverGain = findHoverGain(ctx);
+
+    synth.onNodeHover(true);
+    vi.advanceTimersByTime(1200);
+    expect(hoverGain.gain.value).toBeCloseTo(HOVER_SWELL_GAIN * HOVER_SWELL_PLATEAU, 6);
+
+    // A plain repeat from hover/drag sync remains a no-op.
+    synth.onNodeHover(true);
+    expect(hoverGain.gain.value).toBeCloseTo(HOVER_SWELL_GAIN * HOVER_SWELL_PLATEAU, 6);
+
+    // Inspector activation retriggers a fresh full swell and plateau window.
+    synth.onNodeHover(true, true);
+    expect(hoverGain.gain.value).toBe(HOVER_SWELL_GAIN);
+    vi.advanceTimersByTime(1200);
+    expect(hoverGain.gain.value).toBeCloseTo(HOVER_SWELL_GAIN * HOVER_SWELL_PLATEAU, 6);
+    synth.dispose();
+  });
+
   it('clears the plateau timer on dispose without further ramps', () => {
     vi.useFakeTimers();
     const { ctx, synth } = setup();

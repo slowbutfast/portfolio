@@ -284,7 +284,7 @@ test.describe('portfolio graph SPA', () => {
     expect(errors).toEqual([]);
   });
 
-  test('canvas mirrors inspect and drag audio swell state', async ({ page }) => {
+  test('canvas mirrors inspect and drag audio swell state', async ({ page }, testInfo) => {
     const errors = trackErrors(page);
     await page.goto('/#/p/open-dungeon');
     await expect(page.getByTestId('project-drawer')).toBeVisible();
@@ -292,6 +292,13 @@ test.describe('portfolio graph SPA', () => {
 
     // Inspect (including a deep link) keeps the bandpass swell active.
     await expect(canvas).toHaveAttribute('data-audio-swell', 'true');
+
+    // Desktop hover must hand off into inspect instead of dropping when the
+    // pointer leaves the canvas for the anchored drawer.
+    if (!isMobile(testInfo)) {
+      await page.mouse.move(20, 20);
+      await expect(canvas).toHaveAttribute('data-audio-swell', 'true');
+    }
 
     await page.getByTestId('drawer-close').click();
     await expect(page.getByTestId('project-drawer')).toHaveCount(0);

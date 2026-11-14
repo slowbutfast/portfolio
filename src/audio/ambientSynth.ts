@@ -449,12 +449,14 @@ export class AmbientSynth {
     );
   }
 
-  onNodeHover(isHovered: boolean): void {
+  onNodeHover(isHovered: boolean, retrigger = false): void {
     if (!this.ctx || !this.nodes) return;
     if (isHovered) {
       // Repeated syncs from React effects must not re-open the swell or reset
-      // the plateau timer while inspection/drag is already active.
-      if (this.swellActive) return;
+      // the plateau timer while inspection/drag is already active. Opening the
+      // inspector opts into one explicit retrigger so desktop hears a fresh
+      // cue even after hover has already settled to the plateau.
+      if (this.swellActive && !retrigger) return;
       this.swellActive = true;
       const ctx = this.ctx;
       ramp(this.nodes.hoverGain.gain, HOVER_SWELL_GAIN, ctx);

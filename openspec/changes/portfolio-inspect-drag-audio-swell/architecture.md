@@ -34,7 +34,8 @@ flowchart LR
 
 1. **Idempotent `onNodeHover(true)` + `1.2 s` plateau timer in `AmbientSynth`**:
    - *Choice*: Track `private swellActive = false` and `private swellPlateauTimer`. When `onNodeHover(true)` is called while `!this.swellActive`, ramp to `HOVER_SWELL_GAIN` (`1.0`) and schedule a `1200 ms` timeout to ramp to `HOVER_SWELL_GAIN * 0.35`; repeated `onNodeHover(true)` calls while `swellActive` is already `true` are no-ops so `syncSynthSwell()` never resets the plateau. `onNodeHover(false)` clears the timer, sets `swellActive = false`, and ramps to `0`.
-   - *Alternative*: Re-ramping to `1.0` on every `syncSynthSwell()` call. Rejected because transitioning from drag to inspect would re-spike the volume.
+   - *Inspect retrigger*: `syncSynthSwell()` passes a one-shot `retrigger` flag derived by `deriveSwellRetrigger(selected, wasSelected)` only on the selection false→true transition. `onNodeHover(true, true)` re-arms the full `1.0 -> 0.35` envelope once, so desktop inspect matches the fresh swell a mobile tap produces even when hover had already reached the plateau. Repeated hover/drag syncs still pass `retrigger = false`.
+   - *Alternative*: Re-ramping to `1.0` on every `syncSynthSwell()` call. Rejected because it would re-spike continuously during hover/drag; the one-shot selection transition is the only retrigger.
 2. **Graph vs. Grid view coverage**:
    - *Choice*: `GraphCanvas.tsx` handles `deriveSwellActive(hovered, selected, dragging)` while mounted; `App.tsx` runs a `useEffect` when `view === 'list'` calling `synth.onNodeHover(selectedId !== null)`.
 

@@ -2,7 +2,7 @@
 
 ## Executive Summary & Environment
 
-- **Status**: All automated specs verified passing. `typecheck`, production build, unit suite, and the full desktop + mobile Playwright suite are green; `openspec validate --strict` reports zero issues. The user also confirmed on-device sound quality manually (`"the sound looks good on my end"`, 2026-11-13) and requested that the 3-dot settings glyph itself carry the sound-active accent instead of a separate dot. `PATCH-02` also adds the missing live demo URLs so the Transcribe Plus and Sandwave Sim inspectors render `Visit ↗` actions.
+- **Status**: All automated specs verified passing. `typecheck`, production build, unit suite, and the full desktop + mobile Playwright suite are green; `openspec validate --strict` reports zero issues. The user also confirmed on-device sound quality manually (`"the sound looks good on my end"`, 2026-11-13) and requested that the 3-dot settings glyph itself carry the sound-active accent instead of a separate dot. `PATCH-02` also adds the missing live demo URLs so the Transcribe Plus and Sandwave Sim inspectors render `Visit ↗` actions. `PATCH-03` unifies desktop inspector audio with mobile by re-arming the full swell once when `ProjectDrawer` opens, even if hover had already reached the plateau.
 - **Date**: 2026-11-13
 - **Branch**: `feat/portfolio-inspect-drag-audio-swell` (branched from `ca2a15d`)
 - **Environment**:
@@ -18,10 +18,10 @@ Delta capability: `ambient-audio` → `### Requirement: Node hover harmonic reso
 
 | Capability | Requirement & Scenario | Verification Method / Test | Status |
 | :--- | :--- | :--- | :--- |
-| `ambient-audio` | **Requirement: Node hover harmonic resonance swell** — non-clipping `HOVER_SWELL_GAIN = 1.0`, `50ms` ramps, `35%` plateau after `1.2s`, active on hover/drag/Graph+Grid inspect | `src/audio/audioConstants.ts:14-17`; `src/audio/ambientSynth.ts:452-479`; `src/utils/audioSwell.ts`; `src/audio/ambientSynth.test.ts` (18 tests); `src/utils/audioSwell.test.ts` (9 tests) | **PASS** |
+| `ambient-audio` | **Requirement: Node hover harmonic resonance swell** — non-clipping `HOVER_SWELL_GAIN = 1.0`, `50ms` ramps, `35%` plateau after `1.2s`, one-shot re-arm on inspector open, active on hover/drag/Graph+Grid inspect | `src/audio/audioConstants.ts:14-17`; `src/audio/ambientSynth.ts:452-481`; `src/utils/audioSwell.ts:6-24`; `src/audio/ambientSynth.test.ts` (19 tests); `src/utils/audioSwell.test.ts` (13 tests) | **PASS** |
 | `ambient-audio` | **Scenario: Pointer hovers over a canvas node** — opens to `1.0` with a `50ms` time constant, no clipping | `src/audio/ambientSynth.test.ts:347` `swells the hover bandpass gain to HOVER_SWELL_GAIN and returns to zero`; `src/audio/ambientSynth.test.ts:280` `uses setTargetAtTime for every parameter ramp` (asserts `RAMP_TIME_CONSTANT = 0.05`); `src/audio/ambientSynth.test.ts:184` `HOVER_SWELL_GAIN` is `1.0` | **PASS** |
 | `ambient-audio` | **Scenario: Pointer leaves a canvas node** — gain decays to zero when no drag/inspect remains | `src/audio/ambientSynth.test.ts:347` (asserts `hoverGain.gain.value === 0` after `onNodeHover(false)`); `src/utils/audioSwell.test.ts` (8-combination truth table, all-false → `false`); `e2e/portfolio.spec.ts:287` (canvas returns to `data-audio-swell="false"` after release/close) | **PASS** |
-| `ambient-audio` | **Scenario: User drags a node or inspects a project** — `pointerdown` on a node through release, or `ProjectDrawer` open from Graph or Grid view, settles to `0.35` if held | `e2e/portfolio.spec.ts:287` `canvas mirrors inspect and drag audio swell state` (deep-link inspect → `"true"`, close → `"false"`, drag → `"true"`, release → `"false"`); `src/components/GraphCanvas.tsx:355-367` (`syncSynthSwell` covers hover/select/drag); `src/App.tsx:303-308` (Grid-view inspect while `GraphCanvas` is unmounted); `src/audio/ambientSynth.test.ts:357` (plateau at `1199ms` vs `1200ms`), `:377` (idempotent repeats), `:396` (dispose clears timer) | **PASS** |
+| `ambient-audio` | **Scenario: User drags a node or inspects a project** — `pointerdown` on a node through release, or `ProjectDrawer` open from Graph or Grid view; inspector open re-arms a fresh `1.0` swell before settling to `0.35` | `e2e/portfolio.spec.ts:287` `canvas mirrors inspect and drag audio swell state` (deep-link inspect → `"true"`, desktop pointer-leave handoff, close → `"false"`, drag → `"true"`, release → `"false"`); `src/components/GraphCanvas.tsx:355-367` (`syncSynthSwell` + one-shot `deriveSwellRetrigger`); `src/App.tsx:303-308` (Grid-view inspect while `GraphCanvas` is unmounted); `src/audio/ambientSynth.test.ts:357` (plateau at `1199ms` vs `1200ms`), `:377` (idempotent repeats), `:396` (re-arm after plateau), `:418` (dispose clears timer); `src/utils/audioSwell.test.ts:28-40` (retrigger transition table) | **PASS** |
 | `portfolio-controls` | **Requirement: Top-right header navigation sequence and theme toggle** — sound-active state is carried by the 3-dot `Filters & Layout` glyph itself, not a separate dot | `src/components/ControlsOverlay.tsx` (`data-sound-active`, accent class on `controls-dropdown-icon`); `openspec/specs/portfolio-controls/spec.md`; E2E desktop + mobile assertions | **PASS** |
 | `portfolio-controls` | **Scenario: Desktop visitor views top-right header options** — 3-dot glyph renders in `--color-accent` while sound is enabled | `e2e/portfolio.spec.ts` `Sound toggle persists the user preference across reloads` (asserts `data-sound-active="true"` and glyph accent, then reverts after disabling) | **PASS** |
 | `portfolio-controls` | **Scenario: Mobile visitor views top-right header options** — 3-dot glyph renders in `--color-accent`, no `controls-sound-indicator` dot | `e2e/portfolio.spec.ts` `mobile 3-dot menu hosts Sound, volume, and a reachable Reset` (asserts `data-sound-active`, glyph accent, and dot count `0`) | **PASS** |
@@ -43,8 +43,10 @@ Delta capability: `ambient-audio` → `### Requirement: Node hover harmonic reso
 
 | Glossary Term | Final Code Identifier | Location / File | Verified Compliant? |
 | :--- | :--- | :--- | :--- |
-| Resonance swell | `AmbientSynth.onNodeHover(isHovered)` / `nodes.hoverGain` | `src/audio/ambientSynth.ts:452-479` | Yes |
-| Derived swell (`hovered \|\| selected \|\| dragging`) | `deriveSwellActive(hovered, selected, dragging)` | `src/utils/audioSwell.ts` | Yes |
+| Resonance swell | `AmbientSynth.onNodeHover(isHovered, retrigger)` / `nodes.hoverGain` | `src/audio/ambientSynth.ts:452-481` | Yes |
+| Derived swell (`hovered \|\| selected \|\| dragging`) | `deriveSwellActive(hovered, selected, dragging)` | `src/utils/audioSwell.ts:6-13` | Yes |
+| Inspect retrigger transition | `deriveSwellRetrigger(selected, wasSelected)` | `src/utils/audioSwell.ts:20-24` | Yes |
+| Inspector activation edge | `selectedActiveRef` | `src/components/GraphCanvas.tsx:325,361-362` | Yes |
 | Non-clipping swell gain | `HOVER_SWELL_GAIN` | `src/audio/audioConstants.ts:14` | Yes |
 | Sustained plateau | `HOVER_SWELL_PLATEAU` (`0.35`) | `src/audio/audioConstants.ts:16` | Yes |
 | Plateau delay | `HOVER_SWELL_PLATEAU_DELAY_MS` (`1200`) | `src/audio/audioConstants.ts:17` | Yes |
@@ -57,8 +59,9 @@ Delta capability: `ambient-audio` → `### Requirement: Node hover harmonic reso
 
 | Adopted Pattern / Package | Implementation File(s) | Verification Command / Suite |
 | :--- | :--- | :--- |
-| Pure state helper mirroring `stickyFocal.ts` | `src/utils/audioSwell.ts`, `src/utils/audioSwell.test.ts` | `npm run test:unit` (`audioSwell.test.ts`, 9 tests) |
-| Idempotent envelope + plateau timer | `src/audio/ambientSynth.ts:452-479`; constants in `src/audio/audioConstants.ts:14-17` | `npm run test:unit` (`ambientSynth.test.ts`, 18 tests) |
+| Pure state helper mirroring `stickyFocal.ts` | `src/utils/audioSwell.ts`, `src/utils/audioSwell.test.ts` | `npm run test:unit` (`audioSwell.test.ts`, 13 tests) |
+| Idempotent envelope + plateau timer | `src/audio/ambientSynth.ts:452-481`; constants in `src/audio/audioConstants.ts:14-17` | `npm run test:unit` (`ambientSynth.test.ts`, 19 tests) |
+| One-shot inspect re-arm | `src/utils/audioSwell.ts` (`deriveSwellRetrigger`); `src/components/GraphCanvas.tsx:361-362`; `src/audio/ambientSynth.ts:452-467` | `npx vitest run src/audio/ambientSynth.test.ts src/utils/audioSwell.test.ts`; desktop E2E pointer-leave handoff |
 | DOM observability mirroring `data-sim-state` | `src/components/GraphCanvas.tsx:355-367` (`canvas.dataset.audioSwell`) | `npm run test:e2e` (`canvas mirrors inspect and drag audio swell state`) |
 | Glyph-as-indicator (no badge/dot) | `src/components/ControlsOverlay.tsx` (`data-sound-active`, accent class on `controls-dropdown-icon`); `src/styles.css` (unused `.sound-indicator` removed) | `npm run test:e2e` (`Sound toggle persists…`, `mobile 3-dot menu hosts Sound…`) |
 | Catalog live-demo metadata | `src/data/projects.ts` (`liveUrl` on `transcribe-plus` and `sandwave-sim`); `src/components/ProjectDrawer.tsx` existing `drawer-visit` render | `npx vitest run src/data/projects.test.ts`; `npx playwright test -g "Transcribe Plus and Sandwave Sim drawers expose"` |
@@ -120,10 +123,10 @@ $ npm test
 ✓ src/utils/audioSwell.test.ts (9 tests)
 ...
 Test Files  19 passed (19)
-     Tests  201 passed (201)
+     Tests  206 passed (206)
 ```
 
-Exit code: `0`. On a tree without `dist/`, the same command reports `199 passed | 2 skipped (201)`; both skipped cases are the build-output guards.
+Exit code: `0`. On a tree without `dist/`, the same command reports `204 passed | 2 skipped (206)`; both skipped cases are the build-output guards.
 
 ### Full E2E suite (Playwright, desktop + mobile)
 
@@ -240,6 +243,39 @@ Running 2 tests using 1 worker
 
 Exit code: `0`.
 
+### PATCH-03 targeted verification (desktop inspect re-arm)
+
+Initial red state before the retrigger:
+
+```bash
+$ npx vitest run src/audio/ambientSynth.test.ts
+FAIL  src/audio/ambientSynth.test.ts > parameter modulation > re-arms the swell when the inspector opens during an active hover plateau
+AssertionError: expected 0.35 to be 1
+Test Files  1 failed (1)
+     Tests  1 failed | 18 passed (19)
+```
+
+After implementing `deriveSwellRetrigger` + the one-shot `onNodeHover(true, true)`:
+
+```bash
+$ npx vitest run src/audio/ambientSynth.test.ts src/utils/audioSwell.test.ts
+✓ src/utils/audioSwell.test.ts (13 tests)
+✓ src/audio/ambientSynth.test.ts (19 tests)
+Test Files  2 passed (2)
+     Tests  32 passed (32)
+```
+
+Desktop instrumented probe (`AudioParam.setTargetAtTime` targets around opening the drawer after the hover had already plateaued):
+
+```text
+BEFORE_OPEN  [..., {"target":1,"at":3996}, {"target":0.35,"at":5196}]
+AFTER_OPEN   [..., {"target":1,"at":5399}, {"target":0.35,"at":6606}]
+```
+
+The fresh `1.0` after selection and the subsequent `0.35` confirm the desktop inspect now re-arms the same envelope a mobile tap produces. The E2E `canvas mirrors inspect and drag audio swell state` also moves the desktop pointer off the canvas while the drawer is open and keeps `data-audio-swell="true"`. The final full run passed with `206` unit tests and `108` E2E tests.
+
+Exit code: `0`.
+
 ### Metrics & Data Invariants
 
 | Metric / Count | Before | After | Delta / Observation |
@@ -255,6 +291,8 @@ Exit code: `0`.
 | Catalog `liveUrl` entries | `3` (open-dungeon, kintsugi, ivy) | `5` | +`transcribe-plus`, +`sandwave-sim` |
 | Transcribe/Sandwave inspector `Visit ↗` actions | `0` | `1` each | New `drawer-visit` hrefs match the live demos |
 | New live-link E2E scenarios | `0` | `2` | Desktop + mobile href assertions |
+| Desktop inspect onset | Hover plateau `0.35` (no re-arm) | Re-arm to `1.0`, then `0.35` after `1.2s` | Matches a fresh mobile tap |
+| Inspector retrigger tests | `0` | `5` | +4 `deriveSwellRetrigger` transitions, +1 synth envelope test |
 | Persistent data / storage schema | — | — | No storage or catalog schema changes; no data-loss surface |
 
 ## Quick Re-Verification (60-Second Audit)
@@ -269,7 +307,7 @@ Expected output:
 > tsc --noEmit
 ...
 Test Files  19 passed (19)
-     Tests  201 passed (201)   # 199 passed | 2 skipped when dist/ is absent
+     Tests  206 passed (206)   # 204 passed | 2 skipped when dist/ is absent
 ...
 Change 'portfolio-inspect-drag-audio-swell' is valid
 ```

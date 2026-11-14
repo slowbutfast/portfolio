@@ -23,3 +23,10 @@
 - [x] P02.2 Add `liveUrl: 'https://transcribe-plus-frontend.vercel.app/',` and `liveUrl: 'https://sandwave-sim.vercel.app/',` in `src/data/projects.ts`
 - [x] P02.3 Verify tests pass (`npm run typecheck && npm run build && npm test`)
 - [x] P02.4 Update `verification.md` and mark `PATCH-02` resolved in `patch.md`
+
+## Patch 03: Unify desktop inspector swell with mobile by re-arming on open
+
+- [x] P03.1 Add failing unit tests for the one-shot inspector retrigger (`deriveSwellRetrigger` and `onNodeHover(true, true)`) and a desktop move-away E2E assertion
+- [x] P03.2 Implement `deriveSwellRetrigger(selected, wasSelected)` and pass the one-shot retrigger through `GraphCanvas.syncSynthSwell()` so desktop inspect starts a fresh `1.0` swell before settling to `0.35`
+- [x] P03.3 Update the `ambient-audio` delta/main specs and `architecture.md` to document the selection-transition retrigger
+- [x] P03.4 Verify the full suite and OpenSpec strict validation; update `tests.md`, `verification.md`, and mark `PATCH-03` resolved in `patch.md`

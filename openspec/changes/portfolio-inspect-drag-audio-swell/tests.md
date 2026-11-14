@@ -3,9 +3,9 @@
 - `npm run typecheck`: Verifies TypeScript types across `audioConstants`, `ambientSynth`, `audioSwell`, `GraphCanvas`, and `App`.
 - `npm run build`: Verifies production bundle builds cleanly.
 - `npm run test:unit`: Runs Vitest unit suites:
-  - `src/utils/audioSwell.test.ts`: Verifies `deriveSwellActive(hovered, selected, dragging)` truth table across all 8 combinations.
-  - `src/audio/ambientSynth.test.ts`: Verifies `onNodeHover(true)` ramps to `HOVER_SWELL_GAIN` (`1.0`), settles to `0.35` after `1.2 s`, ignores duplicate `onNodeHover(true)` while active, and ramps to `0` on `onNodeHover(false)`.
-- `npm run test:e2e`: Runs Playwright desktop and mobile E2E suites, verifying `data-audio-swell="true"` on `graph-canvas` while `ProjectDrawer` is open or during node drag, and `data-audio-swell="false"` after closing/releasing. The same suites verify the `controls-dropdown-trigger` 3-dot glyph becomes `--color-accent` when sound is enabled and reverts when disabled, with no `controls-sound-indicator` dot anywhere. They also verify the `transcribe-plus` and `sandwave-sim` drawers render `drawer-visit` with their live demo URLs.
+  - `src/utils/audioSwell.test.ts`: Verifies `deriveSwellActive(hovered, selected, dragging)` truth table across all 8 combinations, plus the `deriveSwellRetrigger(selected, wasSelected)` transition table.
+  - `src/audio/ambientSynth.test.ts`: Verifies `onNodeHover(true)` ramps to `HOVER_SWELL_GAIN` (`1.0`), settles to `0.35` after `1.2 s`, ignores duplicate `onNodeHover(true)` while active, re-arms the full swell once when the inspector opens (`onNodeHover(true, true)`) even after the hover plateau, and ramps to `0` on `onNodeHover(false)`.
+- `npm run test:e2e`: Runs Playwright desktop and mobile E2E suites, verifying `data-audio-swell="true"` on `graph-canvas` while `ProjectDrawer` is open or during node drag, and `data-audio-swell="false"` after closing/releasing. The same suites verify the `controls-dropdown-trigger` 3-dot glyph becomes `--color-accent` when sound is enabled and reverts when disabled, with no `controls-sound-indicator` dot anywhere. They also verify the `transcribe-plus` and `sandwave-sim` drawers render `drawer-visit` with their live demo URLs, and that desktop inspect keeps `data-audio-swell="true"` after the pointer leaves the canvas for the drawer.
 
 ## Manual Verification
 

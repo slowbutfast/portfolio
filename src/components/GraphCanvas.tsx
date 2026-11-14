@@ -17,7 +17,7 @@ import {
 } from '../physics/graphSimulation';
 import type { PopoverObstacles } from '../utils/popoverPlacement';
 import { shouldClearStickyFocalOnTap } from '../utils/stickyFocal';
-import { deriveSwellActive } from '../utils/audioSwell';
+import { deriveSwellActive, deriveSwellRetrigger } from '../utils/audioSwell';
 import type { AmbientSynth } from '../audio/ambientSynth';
 
 interface GraphCanvasProps {
@@ -322,6 +322,7 @@ export function GraphCanvas({
   onCanvasCenterChangeRef.current = onCanvasCenterChange;
   const selectedIdRef = useRef<string | null>(initialSelectedId ?? null);
   selectedIdRef.current = initialSelectedId ?? null;
+  const selectedActiveRef = useRef(false);
   const stickyFocalRef = useRef<string | null>(stickyFocalId);
   stickyFocalRef.current = stickyFocalId;
   const onClearFocalRef = useRef(onClearFocal);
@@ -353,12 +354,18 @@ export function GraphCanvas({
    * and the canvas mirrors the derived state for E2E observability.
    */
   const syncSynthSwell = useCallback(() => {
+    const selected = selectedIdRef.current !== null;
+    // Opening the inspector is a new activation source: re-arm the envelope
+    // once so desktop inspect gets the same full swell as a mobile tap, even
+    // when hover had already settled to the 35% plateau.
+    const retrigger = deriveSwellRetrigger(selected, selectedActiveRef.current);
+    selectedActiveRef.current = selected;
     const active = deriveSwellActive(
       hoveredProjectIdRef.current !== null,
-      selectedIdRef.current !== null,
+      selected,
       draggingNodeRef.current,
     );
-    synthRef.current?.onNodeHover(active);
+    synthRef.current?.onNodeHover(active, retrigger);
     const canvas = canvasRef.current;
     if (canvas) canvas.dataset.audioSwell = String(active);
   }, []);
