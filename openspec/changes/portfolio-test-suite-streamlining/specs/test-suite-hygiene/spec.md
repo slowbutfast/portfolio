@@ -1,7 +1,11 @@
 ## ADDED Requirements
 
 ### Requirement: Clean baseline before refactor
-The test suite SHALL be run to a classified baseline on `master` before any test is moved, merged, gated, or deleted, and every failure in that baseline SHALL be recorded as a flake, an environment fault, or a real regression with the evidence that settled it.
+The test suite SHALL be run to a classified baseline on `master` before any test is moved, merged, gated, or deleted, and every failure in that baseline SHALL be recorded as a flake, an environment fault, or a real regression with the evidence that settled it. When `master` advances with test changes mid-change (as PR #16 did), the branch SHALL be rebased and a fresh baseline recorded before further refactoring.
+
+#### Scenario: master advances during the change
+- **WHEN** `master` gains test or catalog changes that conflict with the branch
+- **THEN** the branch is rebased, the baseline is re-recorded on the new base, and earlier numbers are kept in `verification.md` as history and not reused as the baseline.
 
 #### Scenario: Baseline contains unexplained failures
 - **WHEN** a full `npm run test:unit` and `npm run test:e2e` run on `master` reports any failing test
@@ -45,7 +49,7 @@ Browser tests SHALL verify that every catalog project appears in the list view a
 E2E specs whose assertions do not depend on layout, touch input, or viewport size SHALL run on the `desktop` project only and SHALL be skipped on `mobile` with a stated reason using `test.skip(...)`. Layout-, touch-, and sheet-dependent specs SHALL continue to run on `mobile`.
 
 #### Scenario: Viewport-independent spec on mobile
-- **WHEN** Playwright runs the default Light theme, theme-init, document metadata, theme persistence, deep link, unknown slug, Escape-closes-drawer, visited-set, About, `#/about`, and GitHub-link specs on the `mobile` project
+- **WHEN** Playwright runs the default Light theme, theme-init, document metadata, theme persistence, deep link, unknown slug, Escape-closes-drawer, visited-set, About, `#/about`, GitHub-link, and `/art/` endpoint specs on the `mobile` project
 - **THEN** each is reported as skipped with a reason, and each still executes on `desktop`.
 
 #### Scenario: Mobile layout coverage is retained
@@ -77,6 +81,47 @@ E2E refactoring SHALL reuse shared setup helpers instead of merging unrelated in
 #### Scenario: CI unit run without a build
 - **WHEN** `npm run test:unit` runs with `REQUIRE_DIST=1` and no `dist/assets`
 - **THEN** the build-output guard fails with a message to run `npm run build`.
+
+#### Scenario: Built `/art/` page is guarded
+- **WHEN** `dist/assets` exists
+- **THEN** the build-output guard asserts `dist/art/index.html` exists, and when `dist/` is absent that assertion is skipped without `REQUIRE_DIST=1` and fails with it.
+
+### Requirement: Multi-phase E2E scenarios are split by phase
+An E2E scenario that walks several independent behaviors of one feature SHALL be split into separately titled tests that share setup through a helper, so a failure names the phase that broke. A single test SHALL NOT assert more than one of: the locked state, the unlock transition, post-unlock inspector contents, and reset behavior.
+
+#### Scenario: art-wip locked state fails on its own
+- **WHEN** the locked-state behavior of `art-wip` regresses (for example hovering it shows a card before it is connected)
+- **THEN** only the locked-state test fails, and the unlock and reset tests still report independently.
+
+#### Scenario: art-wip unlock and reset are separate tests
+- **WHEN** the E2E suite runs on `desktop`
+- **THEN** one test covers the drag that unlocks colour, label, hover card, and inspector with the `/art/` Visit link and hidden `art` tag, and another covers that one Reset keeps the unlock while a second consecutive Reset relocks.
+
+#### Scenario: Persistence is owned by the unit layer
+- **WHEN** art discovery persistence is tested
+- **THEN** `src/utils/artDiscovery.test.ts` owns the storage round-trip and malformed-JSON recovery, and exactly one E2E assertion checks that the unlocked state survives a page reload.
+
+### Requirement: Condition-based waits where a signal already exists
+Specs SHALL wait on an existing observable signal instead of a fixed `waitForTimeout` when the application already exposes that signal. The art specs SHALL wait on `data-art-node-pos` and `data-art-unlocked`. Hover-dwell specs SHALL derive their intermediate wait from the dwell constant and keep a margin of at least half the dwell. The 1500 ms and 1600 ms camera sleeps are out of scope until an app-side camera-settled signal exists.
+
+#### Scenario: Art spec waits on node position
+- **WHEN** an art spec needs the `art-wip` node to be placed before dragging it
+- **THEN** it waits until `data-art-node-pos` is populated, with no fixed 800 ms or 350 ms sleep.
+
+#### Scenario: Hover dwell margin
+- **WHEN** the hover-dwell spec asserts the card is still absent partway through the dwell
+- **THEN** that check happens no later than half the current `HOVER_DWELL_MS` after the pointer enters, so a loaded machine does not flip the assertion.
+
+#### Scenario: Camera sleeps are deferred
+- **WHEN** a spec uses the 1500 ms or 1600 ms camera sleep
+- **THEN** this change leaves it unchanged and records it in the camera-settled follow-up note.
+
+### Requirement: Mobile coverage gaps are recorded, not implied
+Verification SHALL list known mobile coverage gaps separately from redundancy findings, so a spec kept on mobile is not read as full mobile coverage of its feature.
+
+#### Scenario: art-wip on mobile
+- **WHEN** `verification.md` is written
+- **THEN** it states that the mobile project only asserts the locked state of `art-wip` and that touch-drag unlock on mobile is untested.
 
 ### Requirement: Honest suite accounting
 Verification SHALL report test cases, project executions, and skips as three separate numbers, before and after the change, and SHALL NOT present a reduced test-case count as an improvement on its own.

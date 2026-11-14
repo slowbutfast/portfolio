@@ -33,6 +33,14 @@ Recorded as guidance the user chose to carry into this change. Each point below 
 | Deleting the `profile.test.ts` literal URL pins | Contact destinations are product behavior. Kept. |
 | Deleting constant-pin tests (1.6x, 1.25x, oscillator params, audio topology) | They are the only guard when behavioral tests derive inputs from the constants. Kept (may be folded, never weakened). |
 | Reshaping the `preview-headers.spec.ts` suite | Preview-only gate with its own CI job; out of scope. |
+| Touch-drag unlock of `art-wip` on mobile | A coverage gap, not redundancy: the mobile project only asserts the locked state. Recorded as a known gap, deferred to its own change. |
+| Replacing the 1500/1600 ms camera sleeps | Still needs the app-side camera-settled signal. Only sleeps that already have a signal (`data-art-node-pos`) move in this change. |
+
+### Update 2026-11-14 (after PR #16): reviewer follow-up
+
+> "can you update your e2e test suite suggestions with the new tests from PR#16"
+
+Then: "can you propose a new plan based on the feedback from this other agent", followed by "can you begin by updating the artifacts." The reviewer's text did not add new points beyond the PR #16 findings, so the plan changes below come from reading the PR #16 diff, not from new reviewer comments.
 
 ## Glossary
 
@@ -83,6 +91,14 @@ No failed lookups.
 | `buildOutput.test.ts` skip behavior | `it.skipIf(!hasDist)` on two tests; the third fails only when `REQUIRE_DIST=1` and `dist/assets` is absent | Read `src/utils/buildOutput.test.ts` | 2026-11-14 | stable |
 | Count pins in several layers | `toHaveLength(8)` in `projects.test.ts` (×3) and `graphPlanarity.test.ts`; `toHaveLength(13)` in `projects.test.ts:148`, `graphPlanarity.test.ts:62`, `graphSimulation.test.ts:322,332,545-546` | `grep` of the unit test files | 2026-11-14 | decays |
 | Existing skip count in specs | 26 `test.skip` references in `e2e/portfolio.spec.ts`, 2 in `preview-headers.spec.ts` | `grep -c` | 2026-11-14 | decays |
+| PR #16 merged to `master` | `a4cba9e`, "Add Art (WIP) rainbow node, /art/ endpoint, and 150ms hover dwell"; adds a 9th project `art-wip` | `gh pr view 16` (state `MERGED`, `mergedAt` 2026-11-14T09:00:30Z) | 2026-11-14 | stable |
+| PR #16 test changes | 3 new E2E specs (`/art/` endpoint, art-wip unlock lifecycle, art-wip compact mobile locked), 3 changed E2E specs (list/nav pins `8`→`9`, hover dwell `250ms`→`200ms`), new `artDiscovery.test.ts` and `rainbowPulse.test.ts`, plus edits to `projects.test.ts`, `graphSimulation.test.ts`, `graphPlanarity.test.ts` | `gh pr diff 16` read in full for the test files | 2026-11-14 | stable |
+| PR #16 conflicts with the streamlining branch | Conflicts in `e2e/portfolio.spec.ts`, `src/data/projects.test.ts`, `src/physics/graphSimulation.test.ts`, `src/utils/graphPlanarity.test.ts` | `git merge-tree --write-tree --name-only HEAD origin/master` | 2026-11-14 | decays |
+| Hover dwell on `master` | `HOVER_DWELL_MS = 200` (`src/components/GraphCanvas.tsx:107`); the PR #16 description says "150ms"; the E2E title says "200ms" | `git grep HOVER_DWELL_MS origin/master` | 2026-11-14 | stable |
+| Art specs use fixed sleeps with a signal available | `waitForTimeout(800)` ×2 and `(350)` ×2 in the new specs, while the canvas exposes `data-art-node-pos`, `data-art-unlocked`, `data-rainbow-nodes`, `data-revealed-labels`, `data-art-proximity-links` | `gh pr diff 16` | 2026-11-14 | stable |
+| `waitForTimeout` count on `master` after #16 | 50 (was 47) | `git show origin/master:e2e/portfolio.spec.ts \| grep -c waitForTimeout` | 2026-11-14 | decays |
+| art-wip unlock spec size and shape | One desktop-only test of about 80 lines asserting locked state, unlock, drawer contents, reset, reload and double reset | Read the test in the PR #16 diff | 2026-11-14 | stable |
+| PR #16 self-reported results | 20 unit files / 213 tests, E2E 111 passed / 37 skipped / 0 failed | PR description (not re-run here) | 2026-11-14 | decays |
 
 ## Unverified assumptions
 
@@ -91,6 +107,16 @@ No failed lookups.
 - **Merging near-duplicate unit constant tests loses no coverage.** True only if each folded test keeps the literal assertion. Checked per test during implementation, not in advance.
 
 ## Superseded claims
+
+| Earlier claim (2026-11-14, after pass 1) | Why it is out of date | Replacement |
+| :--- | :--- | :--- |
+| "Baseline: 72 spec titles, 108 executions, 36 skipped, 213 s" | Measured on the 8-project base `548a0b6`. PR #16 changed the catalog and added specs. | Pass-1 numbers are history; re-record the baseline after the rebase (task 6.2). |
+| "11 viewport-independent specs to gate" | Counted before PR #16 added `/art/ endpoint serves raw WIP HTML…`, a plain navigation that is also viewport-independent. | 12 specs plus 6 axe scans. |
+| "Keep E2E scenarios as they are; do not merge unrelated ones" (applied only to merging) | PR #16 added an ~80-line scenario that already merges ten phases of one feature. | Split it by phase (group 8). |
+| "Only the 1500/1600 ms camera sleeps need an app-side signal" | The new art specs sleep 800 ms and 350 ms although `data-art-node-pos` and `data-art-unlocked` already exist. | Those sleeps can use the existing signals now (task 9.1); only the camera sleeps stay deferred. |
+| "Literal count pins: `8` projects" | The catalog now has 9 projects; `master` re-pins `9` in three unit tests and two E2E specs. | The catalog-derived E2E ids absorb the new count; the unit pin is consolidated to one test at `9`. |
+
+### Earlier superseded claims (kept)
 
 | Earlier claim | Why it was wrong | Replacement |
 | :--- | :--- | :--- |

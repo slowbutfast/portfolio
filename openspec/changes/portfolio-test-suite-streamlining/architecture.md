@@ -72,7 +72,24 @@ flowchart LR
 
 8. **Baseline gate.** The refactor is only judged against a clean baseline: failures are re-run with `--repeat-each=3`, and `ERR_CONNECTION_REFUSED` is treated as an environment fault. If a real regression is found on `master`, it is fixed or quarantined in a separate commit, not hidden by the refactor.
 
+9. **Rebase and re-baseline when `master` moves (PR #16).** The branch was verified on the 8-project base. PR #16 added a 9th project, three E2E specs, and new unit tests, and conflicts in four test files. The branch is rebased and a new baseline recorded before more refactoring; pass-1 numbers stay in `verification.md` as history. Alternative of merging `master` into the branch rejected only on history grounds; either is acceptable if conflicts resolve the same way.
+
+10. **Split the art-wip scenario by phase, with a shared helper.** The unlock spec walks locked state, unlock, drawer contents, reset, reload, and double reset in one test, so one failure hides nine phases. Three tests (locked / unlock plus inspector / reset) share `dragArtToCenter`. This applies decision 7 in the other direction: share setup, split assertions. Alternative of leaving it alone rejected because the failure title would not name the phase.
+
+11. **Persistence is owned by the unit layer.** `artDiscovery.test.ts` covers the storage round-trip and malformed-JSON recovery. Exactly one E2E reload assertion remains as the wiring check. Alternative of deleting the E2E reload check rejected: it is the only test that the real page restores state.
+
+12. **Wait on existing signals, defer the rest.** The canvas already exposes `data-art-node-pos` and `data-art-unlocked`, so the art specs' 800 ms and 350 ms sleeps become condition waits now. The 1500/1600 ms camera sleeps have no signal and stay deferred to the camera-settled change. Alternative of doing both here rejected because the camera signal needs an app-side hook.
+
+13. **Hover-dwell spec derives its margin from the constant.** With `HOVER_DWELL_MS = 200` the spec's 100 ms check leaves 100 ms of slack. The intermediate wait should be tied to the constant and stay within half the dwell. Alternative of widening the dwell in the test rejected: it would stop testing the real value.
+
+14. **`/art/` is a viewport-independent spec and a build artifact.** The E2E spec is gated to desktop. A conditional `dist/art/index.html` assertion in `buildOutput.test.ts` guards the build output, skipped without `dist/` and failing under `REQUIRE_DIST=1`, preserving the tolerant local `test:unit` behavior.
+
 ## Risks / Trade-offs
+
+- **Rebase resolves a conflict the wrong way and drops a PR #16 assertion** → diff the post-rebase test files against `origin/master` and confirm every PR #16 test case still exists, apart from the intentional splits and consolidations.
+- **Splitting the unlock spec triples page loads and slows the art specs** → the helper keeps setup to one drag each; wait on signals, not sleeps; accept a small cost for named failures.
+- **Hiding a mobile gap by keeping a mobile spec** → record the touch-drag unlock gap explicitly in `verification.md`.
+- **`art-wip` is hidden until unlocked, so derived nav/list counts could mismatch** → verify the derived completeness checks against the real DOM in task 6.3 before trusting them.
 
 - **A gated spec stops catching a mobile-only regression** → gate only specs with layout- and input-independent assertions; keep the drawer axe scan and all sheet/header/menu/pointercancel/DPR/matrix specs on mobile; verify in `verification.md` that every spec still executes on at least one project.
 - **Folding a constant pin silently drops its literal assertion** → require an explicit literal assertion in every surviving test; reviewer checks the mapping table in `verification.md`.

@@ -18,6 +18,14 @@ The goal is a measured cleanup, not a lower test count: every invariant that is 
 - **Reduce duplicate E2E sticky-focal coverage.** Keep the unit test, the `pointercancel` + empty-canvas tap test, and `Reset clears the sticky inspected focus`; reassess `tapping the sticky-focal node clears highlights before reopening the drawer` (~8.8 s per project) for gating to one project rather than deletion.
 - **Share hover setup via helpers.** Reuse `hoverCenteredNode` / `focusNode` in the hover specs instead of re-implementing setup. No merging of unrelated scenarios; theme and axe tests stay independently diagnosable.
 - **Report counts honestly.** Verification reports test cases, project executions, and skips as three separate numbers.
+- **Absorb PR #16 (`art-wip`, 9th project), added after pass 1.** `master` advanced with new tests that conflict with this branch, so the plan now includes:
+  - **Rebase and re-baseline.** Rebase onto `a4cba9e`, resolve the four conflicting test files, and record a fresh baseline; pass-1 numbers become history.
+  - **Gate the `/art/` endpoint spec** to desktop (it is a plain navigation) and add a conditional `dist/art/index.html` assertion to `buildOutput.test.ts` (skipped without `dist/`, failing under `REQUIRE_DIST=1`).
+  - **Split the ~80-line art-wip unlock spec by phase** (locked / unlock plus inspector / reset), sharing a `dragArtToCenter` helper. Persistence stays owned by `artDiscovery.test.ts`, with one E2E reload check as wiring.
+  - **Replace sleeps that already have a signal.** The new art specs' 800 ms and 350 ms sleeps wait on `data-art-node-pos` / `data-art-unlocked` instead.
+  - **Harden the hover-dwell spec** against the 200 ms dwell (it leaves only 100 ms of margin) and reconcile the "150ms" in the PR #16 text with the code.
+  - **Re-consolidate unit count pins at 9 projects** and keep every new constant, contrast, and discovery test.
+  - **Record the mobile gap.** The mobile project only asserts the locked state of `art-wip`; touch-drag unlock is untested and is deferred, not treated as redundancy.
 - **Out of scope:** the condition-based camera-settled signal replacing `waitForTimeout(1500/1600)` (separate follow-up change, needs an app-side hook); making `buildOutput.test.ts` unconditional (CI sets `REQUIRE_DIST=1`, local `test:unit` stays tolerant); changing Playwright `workers`; `preview-headers.spec.ts`.
 
 No product behavior changes and nothing is **BREAKING** for users. The only contributor-visible change is that some specs no longer execute on the mobile project.
@@ -33,6 +41,7 @@ No product behavior changes and nothing is **BREAKING** for users. The only cont
 ## Impact
 
 - **Test files:** `e2e/portfolio.spec.ts` (gating, helper reuse, count-pin relaxation), `src/data/projects.test.ts`, `src/utils/graphPlanarity.test.ts`, `src/physics/graphSimulation.test.ts`, `src/audio/ambientSynth.test.ts`, `src/utils/bridgeOscillator.test.ts`, `src/utils/bridgeGeometry.test.ts`, `src/data/profile.test.ts`.
-- **Unchanged:** all application code under `src/` (non-test), `playwright.config.ts` (workers/projects), `src/utils/buildOutput.test.ts`, `e2e/preview-headers.spec.ts`, CI workflows.
+- **Also touched after PR #16:** `src/utils/buildOutput.test.ts` (one conditional `dist/art/index.html` assertion); `src/utils/artDiscovery.test.ts`, `src/utils/rainbowPulse.test.ts`, and the `connectLink` test are kept unchanged.
+- **Unchanged:** all application code under `src/` (non-test), `playwright.config.ts` (workers/projects), `e2e/preview-headers.spec.ts`, CI workflows. `buildOutput.test.ts` stays conditional on `REQUIRE_DIST`.
 - **Docs:** `README.md` testing section gets the gating convention and the three-number reporting format, if it describes test counts.
 - **Risk:** a gated spec stops catching a mobile-only regression. Mitigated by gating only specs whose assertions are layout- and input-independent, and by keeping one mobile axe scan.

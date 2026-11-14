@@ -1,5 +1,20 @@
 # Verification: portfolio-test-suite-streamlining
 
+> **Status note (2026-11-14):** Everything below is **pass 1**, verified on the 8-project base `548a0b6`. PR #16 (`a4cba9e`, `art-wip`) landed afterward and conflicts with this branch. The artifacts now include groups 6–10 (rebase and re-baseline, `/art/` gating and build guard, art-wip spec split, condition waits and hover-dwell margin, unit re-consolidation at 9 projects). The post-#16 baseline, final run, and extended coverage map are **not yet recorded**; the pass-1 numbers must not be used as the final result.
+
+## Pending for groups 6–10
+
+| Item | Status |
+| :--- | :--- |
+| Rebase onto `origin/master` and resolve four conflicts | not started |
+| Post-#16 baseline (cases / executions / skips / wall time) | not started |
+| `/art/` spec gated to desktop; `dist/art/index.html` build guard | not started |
+| art-wip unlock spec split into three tests | not started |
+| Art sleeps replaced by `data-art-node-pos` / `data-art-unlocked` waits | not started |
+| Hover-dwell margin and PR #16 "150ms" vs code `200` reconciliation | not started |
+| Unit pins re-consolidated at 9 projects | not started |
+| Known gap recorded: touch-drag unlock of `art-wip` on mobile is untested | to record |
+
 ## Executive Summary & Environment
 
 - **Status**: Clean baseline established, refactor applied, final run green. Typecheck, production build, `REQUIRE_DIST=1` unit suite, and the full desktop + mobile Playwright suite pass with 0 failures and 0 flaky. `openspec validate --strict` is valid.
