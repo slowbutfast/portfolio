@@ -26,10 +26,10 @@
   /* 3.96:1 on #eae9e5, satisfying non-text UI boundaries (WCAG 1.4.11). */
   --color-outline: #71717a;
   --color-divider: #c7c7cc;
-  --color-accent: #003399;
+  --color-accent: #2563eb;
   --color-brand: #003399;
   --color-node-unvisited: #0a0a0c;
-  --color-node-visited: #003399;
+  --color-node-visited: #2563eb;
   --color-connection: #000000;
   --color-success: #15803d;
   --color-error: #b91c1c;

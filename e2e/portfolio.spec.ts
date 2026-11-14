@@ -268,6 +268,7 @@ test.describe('portfolio graph SPA', () => {
     await expect(toggle).toHaveAccessibleName('Sound');
     await expect(settingsTrigger).toHaveAttribute('data-sound-active', 'true');
     await expect(settingsIcon).toHaveClass(/text-\[var\(--color-accent\)\]/);
+    await expect(settingsIcon).toHaveCSS('color', 'rgb(37, 99, 235)');
     expect(
       await page.evaluate(() => localStorage.getItem('portfolio_sound_enabled')),
     ).toBe('true');
@@ -665,6 +666,7 @@ test.describe('portfolio graph SPA', () => {
     await expect(toggle).toHaveAttribute('aria-pressed', 'true');
     await expect(trigger).toHaveAttribute('data-sound-active', 'true');
     await expect(triggerIcon).toHaveClass(/text-\[var\(--color-accent\)\]/);
+    await expect(triggerIcon).toHaveCSS('color', 'rgb(37, 99, 235)');
     await expect(page.getByTestId('controls-sound-indicator')).toHaveCount(0);
 
     await slider.evaluate((element, next) => {
