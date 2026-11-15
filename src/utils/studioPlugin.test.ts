@@ -194,6 +194,33 @@ describe('studio dev plugin', () => {
     expect(result.status).toBe(409);
   });
 
+  it('rejects malformed catalogs without crashing the middleware', async () => {
+    const result = await invoke(middleware, {
+      method: 'PUT',
+      headers: { host: 'localhost:5199', 'x-studio-token': TOKEN },
+      body: JSON.stringify({ expectedRevision: revisionOf(catalogText), catalog: {} }),
+    });
+    expect(result.status).toBe(400);
+
+    // The server still serves state after the malformed payload.
+    const after = await invoke(middleware, { method: 'GET' });
+    expect(after.status).toBe(200);
+  });
+
+  it('does not treat prototype keys as present seeds', async () => {
+    const shadow = structuredClone(catalog);
+    const originalId = shadow.projects[0].id;
+    shadow.projects[0].id = 'constructor';
+    delete shadow.seeds[originalId];
+
+    const result = await invoke(middleware, {
+      method: 'PUT',
+      headers: { host: 'localhost:5199', 'x-studio-token': TOKEN },
+      body: JSON.stringify({ expectedRevision: revisionOf(catalogText), catalog: shadow }),
+    });
+    expect(result.status).toBe(400);
+  });
+
   it('rejects invalid IDs, unsafe URLs, reserved-entity removal, and non-planar seeds', async () => {
     const put = (payload: ProjectCatalog) =>
       invoke(middleware, {

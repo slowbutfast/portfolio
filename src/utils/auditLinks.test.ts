@@ -11,6 +11,7 @@ import {
   extractUniqueUrls,
   extractUrlsFromSource,
   isValidEmail,
+  preferIpv4Addresses,
 } from '../../scripts/audit-links.mjs';
 
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
@@ -245,6 +246,22 @@ describe('DNS pinning', () => {
     expect(httpTarget.options.port).toBe('8080');
     expect(httpTarget.options.headers.Host).toBe('example.com:8080');
     expect(httpTarget.options.servername).toBeUndefined();
+  });
+
+  it('prefers IPv4 addresses but preserves IPv6 as a fallback', () => {
+    expect(
+      preferIpv4Addresses([
+        '2001:db8::1',
+        '93.184.216.34',
+        '2606:2800:220:1:248:1893:25c8:1946',
+        '1.1.1.1',
+      ]),
+    ).toEqual([
+      '93.184.216.34',
+      '1.1.1.1',
+      '2001:db8::1',
+      '2606:2800:220:1:248:1893:25c8:1946',
+    ]);
   });
 });
 

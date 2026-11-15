@@ -275,7 +275,7 @@ export function validateCatalog(input: unknown, registries: CatalogRegistries = 
       }
     }
     for (const id of projectIds) {
-      if (!(id in seeds)) errors.push(`seeds is missing project id "${id}"`);
+      if (!Object.hasOwn(seeds, id)) errors.push(`seeds is missing project id "${id}"`);
     }
     if (errors.length === 0 && Array.isArray(projects)) {
       // Every shape invariant passed above, so the cast is safe; reuse the

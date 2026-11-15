@@ -10,14 +10,14 @@
 | Command | Result |
 |---|---|
 | `npm run typecheck` | exit `0`, no diagnostics |
-| `npm run test:unit` | exit `0`; 22 files, **237 passed**, 0 skipped (237 total) |
-| `npm run build` | exit `0`; 1968 modules, single JS chunk `dist/assets/index-CWaHaIYb.js` (358.68 kB) |
+| `npm run test:unit` | exit `0`; 22 files, **240 passed**, 0 skipped (240 total) |
+| `npm run build` | exit `0`; 1968 modules, single JS chunk `dist/assets/index-B725jZfv.js` (358.69 kB) |
 | `grep -rl "StudioApp\|__studio/api\|#/studio" dist/` | **no matches** (zero Studio symbols in `dist/`) |
 | `CI=1 npx playwright test --config=./e2e/playwright.studio.config.ts` | exit `0`; **5 passed** (5 test cases / 6 assertions, desktop-only, isolated port `5299`) |
 | `CI=1 npx playwright test --config=./playwright.config.ts` | exit `0`; **112 passed**, 38 skipped (skips are pre-existing preview/CPU-throttle gates) |
 | `npm run test:links` | **runs on plain Node `22.23.2`** (no TS stripping); 16 URLs: 13 pass, 1 warning (LinkedIn `999`), 2 pre-existing `404`s (`sandwave-sim`, `transcribe-plus` GitHub repos); exit `1` from those 404s |
 
-> These results include `PATCH-01` (PUT race, canonical catalog/`ALL_TAGS`, ESM audit CLI, CSPRNG token, edge deduplication, DNS pinning).
+> These results include `PATCH-01` (PUT race, canonical catalog/`ALL_TAGS`, ESM audit CLI, CSPRNG token, edge deduplication, DNS pinning) and `PATCH-02` (serialize-after-validate, IPv4-first audit fallback, prototype-safe seed parity, spec/architecture sync).
 
 ## Golden Equivalence
 - Pre-refactor fixture: `src/data/__fixtures__/projects.pre-refactor.json`, captured from the
@@ -49,5 +49,11 @@ runs desktop-only. The suite has 5 test cases plus an `afterAll` byte-identity a
 - `GET /__studio/api/state` intentionally issues the same per-server token for the middleware
   lifetime (single local session); `PUT`/`POST` require it and Origin/Host/Sec-Fetch-Site guards.
 - Link audit resolves DNS before each hop, re-validates manual redirects, and pins the validated IP on
-  default Node `http`/`https` sockets while preserving `Host` and TLS `servername`. Injected
-  `fetchImpl` test transports keep the hostname (tests never touch the network).
+  default Node `http`/`https` sockets while preserving `Host` and TLS `servername`. Validated addresses
+  are attempted IPv4-first with IPv6 fallback, so an AAAA-first resolution without an IPv6 route does
+  not fail a healthy link. Injected `fetchImpl` test transports keep the hostname (tests never touch
+  the network).
+- `PUT` validates the catalog before serializing it; malformed payloads return `400` from inside the
+  write queue without throwing out of the middleware.
+- Two catalog `repo` links (`slowbutfast/sandwave-sim`, `slowbutfast/transcribe-plus`) are private and
+  return `404`; the catalog URLs were intentionally left unchanged pending a product decision.

@@ -17,6 +17,7 @@ import {
   extractUniqueUrls,
   extractUrlsFromSource,
   isValidEmail,
+  preferIpv4Addresses,
   URL_PATTERN,
 } from '../src/utils/linkAudit.mjs';
 
@@ -31,6 +32,7 @@ export {
   extractUniqueUrls,
   extractUrlsFromSource,
   isValidEmail,
+  preferIpv4Addresses,
   URL_PATTERN,
 };
 

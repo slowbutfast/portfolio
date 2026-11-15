@@ -55,6 +55,7 @@ export function extractUniqueUrls(sources: string[]): string[];
 export function classifyStatus(status: number): LinkOutcome;
 export function isValidEmail(value: string): boolean;
 export function isBlockedAddress(address: string): boolean;
+export function preferIpv4Addresses(addresses: readonly string[]): string[];
 export function buildPinnedRequestOptions(url: string | URL, address: string): PinnedRequest;
 export function checkUrl(url: string, options?: CheckUrlOptions): Promise<CheckUrlResult>;
 export function loadSourceUrls(root?: string): Promise<string[]>;

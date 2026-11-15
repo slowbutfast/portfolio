@@ -1,5 +1,24 @@
 # Patch Log: `project-studio`
 
+### [PATCH-02] PR #18 Follow-up Review (Malformed PUT Crash, IPv6-First Audit Fallback, Prototype-Safe Seeds, Spec Sync)
+- **Date**: 2026-11-15 14:10:00 UTC
+- **Feedback Source**: Code Review (PR #18 `e262aeb`)
+- **Reported Issue**:
+  1. **Malformed PUT can crash the dev server**: `serializeCatalog(payload.catalog)` ran before `writeQueue` and before validation. A payload such as `{ "expectedRevision": "x", "catalog": {} }` reached `[...catalog.tags]` and threw an unhandled `TypeError`, which Node 22 treats as fatal.
+  2. **IPv6-first DNS resolution**: `resolveSafeTarget` pinned only `addresses[0]` from a `verbatim: true` lookup. Hosts returning AAAA first but lacking an IPv6 route could fail a healthy link.
+  3. **Prototype-key seed check**: `!(id in seeds)` treated inherited keys such as `constructor` as present seeds.
+  4. **Spec/architecture drift**: the spec still said “per-session” token and neither artifact documented IP pinning.
+  5. **Untyped ESM implementation (deferred)**: `linkAudit.mjs` sits behind `.d.mts` with no `// @ts-check`/JSDoc coverage.
+  6. **Private repos 404 (decision pending)**: `slowbutfast/sandwave-sim` and `slowbutfast/transcribe-plus` are private, so their catalog `repo` links return 404.
+- **Root Cause**:
+  - Serialization moved outside the queue while validation moved inside it, leaving an unvalidated code path before any error handling.
+  - Pinned transport used a single DNS record instead of iterating validated records.
+  - `in` checks the prototype chain; `Object.hasOwn` checks the seed map itself.
+- **Target Files**: `vite-studio-plugin.ts`, `src/utils/studioPlugin.test.ts`, `src/utils/linkAudit.mjs`, `src/utils/linkAudit.d.mts`, `scripts/audit-links.mjs`, `scripts/audit-links.d.mts`, `src/utils/auditLinks.test.ts`, `src/data/catalogSchema.ts`, `openspec/changes/project-studio/specs/project-studio/spec.md`, `openspec/changes/project-studio/architecture.md`, `verification.md`
+- **Expected Resolution**: malformed catalogs return `400` and the server keeps serving; validated addresses are attempted IPv4-first with IPv6 fallback; seed parity uses `Object.hasOwn`; specs/architecture describe per-dev-server tokens and IP pinning.
+- **Status**: RESOLVED (items 1–4). DEFERRED: item 5 (`@ts-check`/JSDoc). PENDING DECISION: item 6 (repo links).
+- **Resolution**: `serializeCatalog` + revision computation now run inside `writeQueue` after validation; added malformed-catalog and `constructor` seed tests; `linkAudit.mjs` exports `preferIpv4Addresses`, tries validated addresses in order, and falls back across them; `Object.hasOwn` guards seed parity; spec/architecture updated.
+
 ### [PATCH-01] PR #18 Review Fixes (PUT Race, Canonical Catalog & ALL_TAGS, Node 22 Audit, CSPRNG Token, Edge Deduplication, DNS Pinning, Verification Count)
 - **Date**: 2026-11-14 19:18:00 UTC
 - **Feedback Source**: Code Review (PR #18 `3160146`, Agent 1 & Agent 2)

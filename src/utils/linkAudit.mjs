@@ -113,6 +113,19 @@ export function isBlockedAddress(address) {
   return /^\d+$/.test(normalized) || /^0x[0-9a-f]+$/i.test(normalized);
 }
 
+/**
+ * Prefer IPv4 addresses while preserving relative order. Some environments
+ * resolve AAAA first without an IPv6 route; trying IPv4 first avoids reporting
+ * a healthy link as failed, with IPv6 still available as a fallback.
+ */
+export function preferIpv4Addresses(addresses) {
+  return [...addresses].sort((left, right) => {
+    const leftV4 = isIP(left) === 4 ? 0 : 1;
+    const rightV4 = isIP(right) === 4 ? 0 : 1;
+    return leftV4 - rightV4;
+  });
+}
+
 async function defaultResolve(hostname) {
   const records = await lookup(hostname, { all: true, verbatim: true });
   return records.map((record) => record.address);
@@ -135,14 +148,14 @@ async function resolveSafeTarget(url, resolveImpl) {
   const literalFamily = isIP(hostname);
   if (literalFamily) {
     if (isBlockedAddress(hostname)) throw new Error(`blocked private address ${hostname}`);
-    return { address: hostname, family: literalFamily };
+    return { addresses: [hostname] };
   }
   const addresses = await resolveImpl(hostname);
   if (addresses.length === 0) throw new Error(`could not resolve ${hostname}`);
   for (const address of addresses) {
     if (isBlockedAddress(address)) throw new Error(`blocked private address ${address}`);
   }
-  return { address: addresses[0], family: isIP(addresses[0]) || 4 };
+  return { addresses: preferIpv4Addresses(addresses) };
 }
 
 /**
@@ -271,10 +284,21 @@ export async function checkUrl(
       for (let hop = 0; hop <= maxRedirects; hop += 1) {
         const parsed = new URL(current);
         const target = await resolveSafeTarget(parsed, resolveImpl);
-        const request = (method) =>
-          fetchImpl
-            ? fetchWithTimeout(fetchImpl, current, method, timeoutMs, userAgent)
-            : requestPinned(method, current, target.address, timeoutMs, userAgent);
+        const request = async (method) => {
+          if (fetchImpl) {
+            return fetchWithTimeout(fetchImpl, current, method, timeoutMs, userAgent);
+          }
+          let lastError = null;
+          for (const address of target.addresses) {
+            try {
+              return await requestPinned(method, current, address, timeoutMs, userAgent);
+            } catch (error) {
+              lastError = error;
+              if (error instanceof Error && error.name === 'AbortError') throw error;
+            }
+          }
+          throw lastError ?? new Error('no address to connect');
+        };
 
         let response = await request('HEAD');
         if (response.status === 405 || response.status === 403) {

@@ -226,13 +226,12 @@ export function createStudioMiddleware(options: StudioPluginOptions = {}) {
         return;
       }
 
-      const serialized = serializeCatalog(payload.catalog);
-      const revision = revisionOf(serialized);
       type PutOutcome = { status: number; payload: Record<string, unknown> };
       const outcomeBox: { value: PutOutcome | null } = { value: null };
 
       // Read, revision-check, validate, serialize, and write all execute inside
-      // the serialized queue so concurrent PUTs cannot both pass the stale check.
+      // the serialized queue so concurrent PUTs cannot both pass the stale check,
+      // and malformed catalogs are validated before any serializer touches them.
       writeQueue = writeQueue
         .catch(() => {
           // A failed write must not poison subsequent attempts.
@@ -249,6 +248,8 @@ export function createStudioMiddleware(options: StudioPluginOptions = {}) {
             outcomeBox.value = { status: 400, payload: { error: errors.join('; '), errors } };
             return;
           }
+          const serialized = serializeCatalog(payload.catalog);
+          const revision = revisionOf(serialized);
           await mkdir(dirname(resolved.catalogPath), { recursive: true });
           const tempPath = `${resolved.catalogPath}.tmp`;
           await writeFile(tempPath, serialized, 'utf8');

@@ -12,7 +12,7 @@ The system SHALL expose `StudioApp` at `/#/studio` exclusively when `import.meta
 ### Requirement: Hardened local Studio API for atomic catalog CRUD
 The Vite dev-server plugin (`vite-studio-plugin.ts`, active only inside `configureServer`) SHALL expose `GET /__studio/api/state` and `PUT /__studio/api/state` targeting only the configured canonical JSON path (`src/data/projects.catalog.json`), enforcing:
 1. `Host` and `Origin` matching against the dev server origin (allowing omitted `Origin` on `GET` only when `Sec-Fetch-Site` is `'same-origin'`, `'none'`, or absent in local non-browser test calls) and emitting zero CORS headers.
-2. Per-session `X-Studio-Token` validation on `PUT` requests and a `256KB` maximum request body limit (`413` on overflow).
+2. Per-dev-server `X-Studio-Token` validation on `PUT`/`POST` requests and a `256KB` maximum request body limit (`413` on overflow).
 3. Strict runtime schema validation: unique project `id` matching `/^[a-z0-9-]+$/`, reserved `'art-wip'` project and `'art'` tag (`hiddenTags`) preserved, `seeds` key parity with `projects` and finite coordinates in `[0, 1]`, valid declared tags, `https:` or site-relative `/` URLs for `repo`/`liveUrl`, valid asset/captured keys, and `countSeedCrossings === 0`.
 4. Revision conflict detection (`expectedRevision` SHA-256 of canonical JSON returning `409 Conflict` on mismatch).
 5. Deterministic canonical JSON formatting (sorted `tags`/`hiddenTags`/`seeds` keys, 2-space indent, trailing newline) written atomically via temp file and `rename` under a write mutex.
@@ -56,7 +56,7 @@ The Vite dev-server plugin (`vite-studio-plugin.ts`, active only inside `configu
 - **THEN** delete, rename, and unhide controls for `'art'` are disabled.
 
 ### Requirement: SSRF-safe server-side link health auditing
-`POST /__studio/api/audit-links` SHALL audit only absolute `http(s)` URLs extracted server-side from `src/data/projects.catalog.json` and `src/data/profile.ts` (ignoring any client-supplied URL list and skipping site-relative paths such as `/art/`), manually resolving DNS and following redirects (`redirect: 'manual'`) to reject loopback, private, link-local, and reserved IPv4/IPv6 addresses (including IPv4-mapped IPv6 and decimal/integer hosts) on every hop, enforcing `X-Studio-Token` and `Origin` checks, and returning structured `{ url, status, classification, latencyMs }` entries using `classifyStatus` (`401`/`403`/`429`/`999` as `'warning'`).
+`POST /__studio/api/audit-links` SHALL audit only absolute `http(s)` URLs extracted server-side from `src/data/projects.catalog.json` and `src/data/profile.ts` (ignoring any client-supplied URL list and skipping site-relative paths such as `/art/`), manually resolving DNS and following redirects (`redirect: 'manual'`) to reject loopback, private, link-local, and reserved IPv4/IPv6 addresses (including IPv4-mapped IPv6 and decimal/integer hosts) on every hop, pinning the validated IP on default Node `http`/`https` sockets while preserving the `Host` header and TLS `servername`, enforcing `X-Studio-Token` and `Origin` checks, and returning structured `{ url, status, classification, latencyMs }` entries using `classifyStatus` (`401`/`403`/`429`/`999` as `'warning'`).
 
 #### Scenario: Link check reports live status and warnings in the Studio UI
 - **WHEN** the user clicks **"Check Links"** in `StudioApp`

@@ -34,3 +34,13 @@
 - [x] P01.3 Fix `src/data/tagRegistry.ts`, `src/data/catalogSchema.ts`, and `src/data/projects.catalog.json`: derive `ALL_TAGS` in project-appearance order matching pre-refactor `App.tsx`, deduplicate edge derivation via `deriveEdges` from `../utils/graphTopology`, and commit `projects.catalog.json` in exact `serializeCatalog` canonical form.
 - [x] P01.4 Fix Node `22.x` compatibility & DNS-rebinding pinning in `scripts/audit-links.mjs` / `src/utils/linkAudit.*`: ensure `node scripts/audit-links.mjs` imports pure `.mjs`/`.js` without requiring experimental TS stripping, and pin the validated IP when making default Node `http`/`https` requests (preserving `Host` and TLS `servername`).
 - [x] P01.5 Verify reproduction tests pass, run `npm run typecheck && npm run test:unit && npm run build && npm run test:links` + Playwright suites, reconcile the E2E count in `verification.md`, and mark `PATCH-01` `RESOLVED` in `patch.md`.
+
+## Patch 02: PR #18 Follow-up Review (Malformed PUT, IPv6-First Audit, Prototype-Safe Seeds, Spec Sync)
+
+- [x] P02.1 Add a reproducing test that PUTs `{ expectedRevision: <current>, catalog: {} }` and asserts `400`, then confirm `GET /__studio/api/state` still returns `200`.
+- [x] P02.2 Move `serializeCatalog` and revision computation inside `writeQueue` **after** validation, so malformed payloads cannot throw outside the queue's error handling.
+- [x] P02.3 Add an IPv4-first, IPv6-fallback address strategy in `src/utils/linkAudit.mjs` and a unit test for the ordering helper.
+- [x] P02.4 Replace the `in` seed-parity check with `Object.hasOwn` and add a regression test for a `constructor` project id.
+- [x] P02.5 Reconcile `spec.md`/`architecture.md` with the per-dev-server token and validated-IP pinning behavior, then record results in `verification.md` and mark `PATCH-02` in `patch.md`.
+- [ ] P02.6 (Deferred) Add `// @ts-check`/JSDoc coverage for `src/utils/linkAudit.mjs`.
+- [ ] P02.7 (Decision pending) Make `slowbutfast/sandwave-sim` and `slowbutfast/transcribe-plus` public, or remove `repo` from those catalog entries.

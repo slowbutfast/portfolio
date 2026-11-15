@@ -87,7 +87,7 @@ flowchart LR
 
 ## Hardening & Validation Rules (`vite-studio-plugin.ts`)
 1. **Origin, Host & Fetch-Metadata Guard**: Reject requests whose `Host` or `Origin` does not match the dev server's `http://localhost:<port>` / `http://127.0.0.1:<port>`. For `GET /__studio/api/state` when `Origin` is omitted by the browser, allow only if `Sec-Fetch-Site` is `'same-origin'` or `'none'` (or absent in local Node/test calls with matching `Host`). Never emit `Access-Control-Allow-Origin` or other CORS headers.
-2. **Per-Session Token & Body Cap**: `GET /__studio/api/state` issues an in-memory random `X-Studio-Token`; `PUT`/`POST` must supply the matching header (`403` otherwise). Reject `PUT` payloads exceeding `256KB` (`413 Payload Too Large`).
+2. **Per-Dev-Server Token & Body Cap**: `GET /__studio/api/state` exposes the in-memory CSPRNG token (`randomBytes(32)`) for the dev-server middleware lifetime; `PUT`/`POST` must supply the matching header (`403` otherwise). Reject `PUT` payloads exceeding `256KB` (`413 Payload Too Large`).
 3. **Strict Input & Reserved-Entity Validation**:
    - Project `id`: must match `/^[a-z0-9-]+$/` (blocks `__proto__`, `constructor`, whitespace, path characters) and be unique.
    - Reserved entities: `'art-wip'` must remain in `projects` and `seeds`; `'art'` must remain in `tags` and `hiddenTags`.
@@ -96,7 +96,7 @@ flowchart LR
    - `repo` / `liveUrl`: optional; if present, must be `https:` URL or site-relative `/` path (reject `javascript:`, `data:`, `file:`, etc.).
    - `previews` / `terminalDemo`: `assetKey` and `capturedKey` must exist in the workspace's asset/captured registries.
 4. **Revision Conflict & Atomic Writes**: `PUT` requires `expectedRevision` (`409 Conflict` on mismatch), serializes concurrent writes via a promise mutex, writes canonical bytes to `.projects.catalog.json.tmp`, and `rename`s atomically.
-5. **SSRF-Safe Link Audit (`POST /__studio/api/audit-links`)**: Ignores any client-supplied URLs; extracts only `http(s)` URLs from the saved `projects.catalog.json` and `src/data/profile.ts` (skipping relative paths like `/art/`). Resolves DNS manually before connecting and traverses redirects manually (`redirect: 'manual'`, max hops bounded, re-validating every redirect target), blocking loopback, private, link-local, carrier-grade NAT, and reserved IPv4/IPv6 ranges—including IPv4-mapped IPv6 (`::ffff:127.0.0.1`) and decimal/integer host notations. Uses `classifyStatus` (`401`/`403`/`429`/`999` → `'warning'`).
+5. **SSRF-Safe Link Audit (`POST /__studio/api/audit-links`)**: Ignores any client-supplied URLs; extracts only `http(s)` URLs from the saved `projects.catalog.json` and `src/data/profile.ts` (skipping relative paths like `/art/`). Resolves DNS manually before connecting and traverses redirects manually (`redirect: 'manual'`, max hops bounded, re-validating every redirect target), blocking loopback, private, link-local, carrier-grade NAT, and reserved IPv4/IPv6 ranges—including IPv4-mapped IPv6 (`::ffff:127.0.0.1`) and decimal/integer host notations. Pins the validated IP on default Node `http`/`https` sockets (IPv4 preferred, IPv6 fallback) while preserving the `Host` header and TLS `servername`, eliminating the DNS-rebinding window. Uses `classifyStatus` (`401`/`403`/`429`/`999` → `'warning'`).
 
 ## Risks & Migration / Rollback
 - **Risks**: Accidental deletion of `art-wip` or `'art'` breaking canvas easter eggs (mitigated by validator + disabled UI controls); `portfolio-test-suite-streamlining` count pins drifting (mitigated by documenting invariant shift).
