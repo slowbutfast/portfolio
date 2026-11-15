@@ -77,7 +77,7 @@ export function TagManager({
               {editing === tag ? (
                 <input
                   aria-label={`Rename ${tag}`}
-                  className="min-w-0 flex-1 bg-transparent font-mono outline-none"
+                  className="min-h-11 min-w-0 flex-1 bg-transparent font-mono text-base outline-none sm:min-h-0 sm:text-sm"
                   value={draftName}
                   autoFocus
                   onChange={(event) => setDraftName(event.target.value)}
@@ -101,7 +101,7 @@ export function TagManager({
                 type="button"
                 aria-label={`Toggle hidden ${tag}`}
                 title={reserved ? "'art' must remain hidden" : 'Toggle hidden tag'}
-                className="font-mono text-xs disabled:opacity-40"
+                className="min-h-11 min-w-11 rounded px-1 font-mono text-xs disabled:opacity-40 sm:min-h-0 sm:min-w-0"
                 disabled={reserved}
                 onClick={() => onToggleHidden(tag)}
               >
@@ -110,7 +110,7 @@ export function TagManager({
               <button
                 type="button"
                 aria-label={`Rename tag ${tag}`}
-                className="font-mono text-xs disabled:opacity-40"
+                className="min-h-11 min-w-11 rounded px-1 font-mono text-xs disabled:opacity-40 sm:min-h-0 sm:min-w-0"
                 disabled={reserved}
                 onClick={() => {
                   setEditing(tag);
@@ -122,7 +122,7 @@ export function TagManager({
               <button
                 type="button"
                 aria-label={`Delete tag ${tag}`}
-                className="font-mono text-xs text-[#e5484d] disabled:opacity-40"
+                className="min-h-11 min-w-11 rounded px-1 font-mono text-xs text-[#e5484d] disabled:opacity-40 sm:min-h-0 sm:min-w-0"
                 disabled={reserved}
                 onClick={() => onDelete(tag)}
               >
@@ -143,13 +143,13 @@ export function TagManager({
         <input
           aria-label="New tag"
           placeholder="new-tag"
-          className="min-w-0 flex-1 rounded border border-[var(--color-divider)] bg-transparent px-2 py-1 font-mono text-sm outline-none focus:border-[var(--color-accent)]"
+          className="min-h-11 min-w-0 flex-1 rounded border border-[var(--color-divider)] bg-transparent px-2 py-1 font-mono text-base outline-none focus:border-[var(--color-accent)] sm:min-h-0 sm:text-sm"
           value={newTag}
           onChange={(event) => setNewTag(event.target.value)}
         />
         <button
           type="submit"
-          className="rounded border border-[var(--color-divider)] px-2 py-1 font-mono text-xs"
+          className="min-h-11 rounded border border-[var(--color-divider)] px-2 py-1 font-mono text-xs sm:min-h-0"
         >
           Add tag
         </button>

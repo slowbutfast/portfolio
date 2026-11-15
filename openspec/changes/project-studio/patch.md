@@ -1,5 +1,19 @@
 # Patch Log: `project-studio`
 
+### [PATCH-03] Mobile-Friendly Responsive Project Studio UI & Touch Controls
+- **Date**: 2026-11-15 14:53:00 UTC
+- **Feedback Source**: Manual Playtest & Design Review (Agent 1 & Agent 2)
+- **Reported Issue**:
+  - `StudioApp.tsx:413` uses a hardcoded 3-column grid (`grid-cols-[minmax(180px,220px)_minmax(0,1fr)_minmax(240px,340px)]`) and fixed `grid-cols-2` / `grid-cols-[110px_1fr_1fr_auto]` inner grids, crushing or overflowing mobile viewports (`< 1024px`).
+  - Inputs use `text-sm` (`14px`), triggering iOS Safari auto-zoom, and buttons/tag pills are `< 44px` tall.
+  - `SeedMiniMap` node circles (`r=2.4–3.2`) are obscured by a finger on touch screens with no numeric `x`/`y` or nudge fallback.
+  - `e2e/playwright.studio.config.ts` only runs `desktop`, with no mobile viewport overflow/tab/touch checks.
+- **Root Cause**: Initial `StudioApp` layout was built desktop-only without responsive breakpoints, mobile tab navigation, `16px` mobile input sizing, `44px` touch targets, or numeric seed coordinate controls. Localhost-only `vite-studio-plugin.ts` security remains unchanged (remote LAN/tunnel access is explicitly out of scope).
+- **Target Files**: `src/studio/StudioApp.tsx`, `src/studio/SeedMiniMap.tsx`, `src/studio/TagManager.tsx`, `e2e/playwright.studio.config.ts`, `e2e/studio.spec.ts`, `openspec/changes/project-studio/verification.md`
+- **Expected Resolution**: Below `lg`, Studio renders a 3-tab segmented control (`Projects | Edit | Map & Tags`), stacks form/preview grids (`grid-cols-1 sm:grid-cols-2`), keeps `Check Links`/`Discard`/`Save` reachable in a sticky mobile bottom bar, prevents iOS zoom (`text-base sm:text-sm`), enforces `>= 44px` touch targets, adds hit-area circles + numeric `x`/`y` / nudge controls to `SeedMiniMap`, and passes a `mobile` (`Pixel 7`) Playwright smoke test with zero horizontal overflow.
+- **Status**: RESOLVED (2026-11-15 15:00 UTC)
+- **Resolution**: Studio is single-pane tabbed below `lg` (`Projects | Edit | Map & Tags` with crossing badge and auto-switch to Edit on project tap); inner form/preview grids stack at `sm`; a fixed mobile action bar exposes `Check Links`/`Discard`/`Save`; inputs are `text-base sm:text-sm` and primary controls are `min-h-11` on mobile. `SeedMiniMap` has `r=7` transparent hit circles, `max-w-[360px]`, and toggleable numeric `x`/`y` + `±0.02` nudge controls. `TagManager` controls meet 44px mobile targets. Studio E2E now runs desktop + `Pixel 7` mobile (6 passed, 6 expected skips), and the plugin/localhost-only boundary is untouched.
+
 ### [PATCH-02] PR #18 Follow-up Review (Malformed PUT Crash, IPv6-First Audit Fallback, Prototype-Safe Seeds, Spec Sync)
 - **Date**: 2026-11-15 14:10:00 UTC
 - **Feedback Source**: Code Review (PR #18 `e262aeb`)

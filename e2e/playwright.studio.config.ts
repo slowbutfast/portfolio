@@ -30,7 +30,10 @@ export default defineConfig({
     baseURL: process.env.PREVIEW_URL ?? 'http://localhost:5299',
     trace: 'on-first-retry',
   },
-  projects: [{ name: 'desktop', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
+    { name: 'mobile', use: { ...devices['Pixel 7'] } },
+  ],
   ...(isPreview
     ? {}
     : {

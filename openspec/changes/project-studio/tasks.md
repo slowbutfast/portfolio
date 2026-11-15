@@ -44,3 +44,10 @@
 - [x] P02.5 Reconcile `spec.md`/`architecture.md` with the per-dev-server token and validated-IP pinning behavior, then record results in `verification.md` and mark `PATCH-02` in `patch.md`.
 - [ ] P02.6 (Deferred) Add `// @ts-check`/JSDoc coverage for `src/utils/linkAudit.mjs`.
 - [ ] P02.7 (Decision pending) Make `slowbutfast/sandwave-sim` and `slowbutfast/transcribe-plus` public, or remove `repo` from those catalog entries.
+
+## Patch 03: Mobile-Friendly Responsive Project Studio UI & Touch Controls
+
+- [x] P03.1 Add a `mobile` (`Pixel 7`) project to `e2e/playwright.studio.config.ts` and a failing mobile E2E test in `e2e/studio.spec.ts` asserting `Projects | Edit | Map & Tags` tab switching, zero horizontal overflow (`scrollWidth <= innerWidth`), `>= 44px` touch targets on primary actions, and numeric seed coordinate editing.
+- [x] P03.2 Update `src/studio/StudioApp.tsx` for responsive `< lg` layout: 3-tab segmented control (`Projects | Edit | Map & Tags` with crossing badge and auto-switch to `Edit` on project tap), `grid-cols-1 sm:grid-cols-2` and `grid-cols-1 sm:grid-cols-[110px_1fr_1fr_auto]` form/preview grids, sticky mobile bottom action bar (`Check Links`, `Discard`, `Save`), `text-base sm:text-sm` inputs, and `>= 44px` (`min-h-11`) mobile touch targets.
+- [x] P03.3 Update `src/studio/SeedMiniMap.tsx` and `src/studio/TagManager.tsx`: add transparent `r=7` touch hit circles on nodes, constrain mobile mini-map (`max-w-[360px] mx-auto`), add toggleable numeric `x`/`y` + nudge (`±0.02`) controls for the selected seed, and ensure `44px` mobile touch targets and `text-base sm:text-sm` inputs in `TagManager`.
+- [x] P03.4 Re-run `npm run typecheck && npm run test:unit && npm run build` and `CI=1 npx playwright test --config=./e2e/playwright.studio.config.ts`, record results in `verification.md`, and mark `PATCH-03` `RESOLVED` in `patch.md`.

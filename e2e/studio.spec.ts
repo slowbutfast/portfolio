@@ -23,6 +23,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('creates, renames, saves, and deletes a project with its seed', async ({ page }) => {
+  test.skip(test.info().project.name === 'mobile', 'Desktop layout');
   await page.getByTestId('studio-add-project').click();
   await expect(page.getByTestId('studio-project-id')).toHaveValue('project-10');
   await expect(page.getByTestId('studio-dirty')).toHaveText('Unsaved changes');
@@ -50,6 +51,7 @@ test('creates, renames, saves, and deletes a project with its seed', async ({ pa
 });
 
 test('manages tags, protects art, and previews live edge changes', async ({ page }) => {
+  test.skip(test.info().project.name === 'mobile', 'Desktop layout');
   const tagManager = page.getByRole('region', { name: 'Tag manager' });
   await expect(page.getByRole('button', { name: 'Delete tag art' })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Rename tag art' })).toBeDisabled();
@@ -77,6 +79,7 @@ test('manages tags, protects art, and previews live edge changes', async ({ page
 });
 
 test('blocks saving when a dragged seed creates a crossing', async ({ page }) => {
+  test.skip(test.info().project.name === 'mobile', 'Desktop layout');
   const minimap = page.getByTestId('seed-minimap');
   const mapBox = (await minimap.boundingBox())!;
   const node = page.getByTestId('seed-attention-max');
@@ -97,6 +100,7 @@ test('blocks saving when a dragged seed creates a crossing', async ({ page }) =>
 });
 
 test('runs Check Links and renders inline status with latency', async ({ page }) => {
+  test.skip(test.info().project.name === 'mobile', 'Desktop layout');
   await page.route('**/__studio/api/audit-links', async (route) => {
     await route.fulfill({
       status: 200,
@@ -117,8 +121,53 @@ test('runs Check Links and renders inline status with latency', async ({ page })
 });
 
 test('shows the Studio only in dev mode', async ({ page }) => {
+  test.skip(test.info().project.name === 'mobile', 'Desktop layout');
   await page.goto('/#/studio');
   await expect(page.getByTestId('studio-app')).toBeVisible();
   await page.getByRole('button', { name: '← Portfolio' }).click();
   await expect(page.getByTestId('studio-app')).toHaveCount(0);
+});
+
+test('mobile: tabs, zero overflow, 44px targets, and numeric seed editing', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile', 'Mobile-only layout');
+
+  await expect(page.getByTestId('studio-tab-projects')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('studio-tab-edit')).toHaveAttribute('aria-selected', 'false');
+
+  // Tapping a project auto-switches to Edit and keeps the draft selected.
+  await page.getByTestId('studio-project-open-dungeon').click();
+  await expect(page.getByTestId('studio-tab-edit')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('studio-title')).toBeVisible();
+
+  const noOverflow = () =>
+    page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+  expect(await noOverflow()).toBe(true);
+
+  const saveBox = await page.getByTestId('studio-save-mobile').boundingBox();
+  expect(saveBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+  const tabBox = await page.getByTestId('studio-tab-map').boundingBox();
+  expect(tabBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+
+  await page.getByTestId('studio-tab-map').click();
+  await expect(page.getByTestId('seed-minimap')).toBeVisible();
+  expect(await noOverflow()).toBe(true);
+
+  await page.getByTestId('seed-coordinate-toggle').click();
+  await expect(page.getByTestId('seed-coordinates')).toBeVisible();
+  await page.getByTestId('seed-x').fill('0.42');
+  await expect
+    .poll(async () => Number(await page.getByTestId('seed-open-dungeon').getAttribute('cx')))
+    .toBeCloseTo(42, 0);
+
+  await page.getByTestId('seed-nudge-x-up').click();
+  await expect
+    .poll(async () => Number(await page.getByTestId('seed-open-dungeon').getAttribute('cx')))
+    .toBeCloseTo(44, 0);
+
+  // Switching back to Edit preserves the same draft and selection.
+  await page.getByTestId('studio-tab-edit').click();
+  await expect(page.getByTestId('studio-title')).toBeVisible();
+  expect(await noOverflow()).toBe(true);
 });

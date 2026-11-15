@@ -39,10 +39,18 @@ interface StudioAppProps {
 const RESERVED_PROJECT = 'art-wip';
 const RESERVED_TAG = 'art';
 
+type MobileTab = 'projects' | 'edit' | 'map';
+
+const MOBILE_TABS: ReadonlyArray<{ id: MobileTab; label: string }> = [
+  { id: 'projects', label: 'Projects' },
+  { id: 'edit', label: 'Edit' },
+  { id: 'map', label: 'Map & Tags' },
+];
+
 const inputClass =
-  'w-full rounded border border-[var(--color-divider)] bg-transparent px-2 py-1 font-mono text-sm outline-none focus:border-[var(--color-accent)]';
+  'min-h-11 w-full rounded border border-[var(--color-divider)] bg-transparent px-2 py-1 font-mono text-base outline-none focus:border-[var(--color-accent)] sm:min-h-0 sm:text-sm';
 const buttonClass =
-  'rounded border border-[var(--color-divider)] px-2 py-1 font-mono text-xs transition-colors hover:border-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-40';
+  'min-h-11 min-w-11 rounded border border-[var(--color-divider)] px-2 py-1 font-mono text-xs transition-colors hover:border-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-0 sm:min-w-0';
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, init);
@@ -121,6 +129,7 @@ export default function StudioApp({ onExit }: StudioAppProps) {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [mobileTab, setMobileTab] = useState<MobileTab>('projects');
 
   const load = useCallback(async () => {
     const next = await api<StudioStateResponse>('/__studio/api/state');
@@ -230,6 +239,12 @@ export default function StudioApp({ onExit }: StudioAppProps) {
       seeds: { ...draft.seeds, [id]: seed },
     });
     setSelectedId(id);
+    setMobileTab('edit');
+  };
+
+  const selectProject = (id: string) => {
+    setSelectedId(id);
+    setMobileTab('edit');
   };
 
   const deleteProject = (id: string) => {
@@ -362,7 +377,7 @@ export default function StudioApp({ onExit }: StudioAppProps) {
         <span className="font-mono text-[10px] text-[var(--color-muted)]">
           rev {revision.slice(0, 8)}
         </span>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
+        <div className="ml-auto hidden flex-wrap items-center gap-2 sm:flex">
           <button
             type="button"
             className={buttonClass}
@@ -410,8 +425,45 @@ export default function StudioApp({ onExit }: StudioAppProps) {
         </div>
       )}
 
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(180px,220px)_minmax(0,1fr)_minmax(240px,340px)]">
-        <aside className="flex min-h-0 flex-col border-r border-[var(--color-divider)]">
+      <div className="flex min-h-0 flex-1 flex-col pb-20 sm:pb-0 lg:grid lg:grid-cols-[minmax(180px,220px)_minmax(0,1fr)_minmax(240px,340px)]">
+        <nav
+          role="tablist"
+          aria-label="Studio sections"
+          className="flex shrink-0 gap-1 border-b border-[var(--color-divider)] p-2 lg:hidden"
+        >
+          {MOBILE_TABS.map((tab) => {
+            const active = mobileTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                data-testid={`studio-tab-${tab.id}`}
+                className={`min-h-11 flex-1 rounded border px-2 py-1 font-mono text-xs ${
+                  active
+                    ? 'border-[var(--color-accent)] text-[var(--color-accent)]'
+                    : 'border-[var(--color-divider)] text-[var(--color-muted)]'
+                }`}
+                onClick={() => setMobileTab(tab.id)}
+              >
+                {tab.label}
+                {tab.id === 'map' && crossings > 0 && (
+                  <span
+                    data-testid="studio-crossing-badge"
+                    className="ml-1 rounded-full bg-[var(--color-error)] px-1.5 py-0.5 text-[10px] text-white"
+                  >
+                    {crossings}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+
+        <aside
+          className={`${mobileTab === 'projects' ? 'flex' : 'hidden'} min-h-0 flex-col border-r border-[var(--color-divider)] lg:flex`}
+        >
           <div className="flex items-center justify-between px-3 py-2">
             <h2 className="font-mono text-xs uppercase tracking-[0.16em] text-[var(--color-muted)]">
               Projects
@@ -436,7 +488,7 @@ export default function StudioApp({ onExit }: StudioAppProps) {
                       ? 'bg-[var(--color-surface-container)] text-[var(--color-text)]'
                       : 'text-[var(--color-muted)]'
                   }`}
-                  onClick={() => setSelectedId(project.id)}
+                  onClick={() => selectProject(project.id)}
                 >
                   <span className="min-w-0 flex-1 truncate font-mono text-xs">
                     {project.id}
@@ -452,10 +504,12 @@ export default function StudioApp({ onExit }: StudioAppProps) {
           </ul>
         </aside>
 
-        <main className="min-h-0 overflow-y-auto px-5 py-4">
+        <main
+          className={`${mobileTab === 'edit' ? 'block' : 'hidden'} min-h-0 overflow-y-auto px-4 py-4 sm:px-5 lg:block`}
+        >
           {selected ? (
             <div className="flex flex-col gap-5">
-              <section className="grid grid-cols-2 gap-3">
+              <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="ID">
                   <input
                     className={inputClass}
@@ -507,7 +561,7 @@ export default function StudioApp({ onExit }: StudioAppProps) {
                 </div>
               </section>
 
-              <section className="grid grid-cols-2 gap-3">
+              <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Repository">
                   <input
                     className={inputClass}
@@ -630,7 +684,7 @@ export default function StudioApp({ onExit }: StudioAppProps) {
                 {selected.previews.map((preview, index) => (
                   <div
                     key={`${preview.kind}-${index}`}
-                    className="grid grid-cols-[110px_1fr_1fr_auto] items-end gap-2 rounded border border-[var(--color-divider)] p-2"
+                    className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[110px_1fr_1fr_auto] rounded border border-[var(--color-divider)] p-2"
                   >
                     <Field label="Kind">
                       <select
@@ -773,7 +827,7 @@ export default function StudioApp({ onExit }: StudioAppProps) {
                   </button>
                 </div>
                 {selected.terminalDemo && (
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <Field label="Captured demo">
                       <select
                         className={inputClass}
@@ -831,7 +885,9 @@ export default function StudioApp({ onExit }: StudioAppProps) {
           )}
         </main>
 
-        <aside className="flex min-h-0 flex-col gap-4 overflow-y-auto border-l border-[var(--color-divider)] p-3">
+        <aside
+          className={`${mobileTab === 'map' ? 'flex' : 'hidden'} min-h-0 flex-col gap-4 overflow-y-auto border-l border-[var(--color-divider)] p-3 lg:flex`}
+        >
           <section>
             <h2 className="mb-2 font-mono text-xs uppercase tracking-[0.16em] text-[var(--color-muted)]">
               Planar seeds
@@ -866,6 +922,40 @@ export default function StudioApp({ onExit }: StudioAppProps) {
             onToggleHidden={toggleHiddenTag}
           />
         </aside>
+      </div>
+
+      <div className="fixed inset-x-0 bottom-0 z-20 flex items-center gap-2 border-t border-[var(--color-divider)] bg-[var(--color-surface)] p-2 pb-[env(safe-area-inset-bottom)] sm:hidden">
+        <button
+          type="button"
+          className={`${buttonClass} flex-1`}
+          data-testid="studio-check-links-mobile"
+          disabled={checking}
+          onClick={checkLinks}
+        >
+          {checking ? 'Checking…' : 'Check Links'}
+        </button>
+        <button
+          type="button"
+          className={`${buttonClass} flex-1`}
+          data-testid="studio-discard-mobile"
+          disabled={!dirty}
+          onClick={() => {
+            if (data) setDraft(data.catalog);
+            setNotice('Changes discarded');
+          }}
+        >
+          Discard
+        </button>
+        <button
+          type="button"
+          className={`${buttonClass} flex-1`}
+          data-testid="studio-save-mobile"
+          disabled={saveBlocked}
+          title={saveReason}
+          onClick={save}
+        >
+          {saving ? 'Saving…' : 'Save'}
+        </button>
       </div>
     </div>
   );
