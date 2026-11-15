@@ -1,0 +1,16 @@
+{
+  "assetKeys": [
+    "clip.mp4",
+    "screenshots/attention-max.png",
+    "screenshots/open-dungeon.png",
+    "screenshots/pict-climate-risk-viz-chatbot.png",
+    "screenshots/sandwave-sim.png"
+  ],
+  "capturedKeys": [
+    "agentic-resume-builder",
+    "attention-max",
+    "open-dungeon",
+    "sandwave-sim",
+    "transcribe-plus"
+  ]
+}

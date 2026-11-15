@@ -120,12 +120,48 @@ test('runs Check Links and renders inline status with latency', async ({ page })
   await expect(page.getByText(/pass · 200 · 12ms/)).toBeVisible();
 });
 
-test('shows the Studio only in dev mode', async ({ page }) => {
+test('opens and exits the Studio route', async ({ page }) => {
   test.skip(test.info().project.name === 'mobile', 'Desktop layout');
   await page.goto('/#/studio');
   await expect(page.getByTestId('studio-app')).toBeVisible();
   await page.getByRole('button', { name: '← Portfolio' }).click();
   await expect(page.getByTestId('studio-app')).toHaveCount(0);
+});
+
+test('restores a sessionStorage draft and warns when the base revision drifted', async ({
+  page,
+}) => {
+  test.skip(test.info().project.name === 'mobile', 'Desktop layout');
+  await page.goto('/#/studio');
+  await expect(page.getByTestId('studio-app')).toBeVisible();
+  await expect(page.getByTestId('studio-dirty')).toHaveText('Synced');
+
+  await page.evaluate(async () => {
+    const response = await fetch('/__studio/api/state');
+    const state = (await response.json()) as {
+      revision: string;
+      catalog: { projects: Array<{ summary: string }> };
+    };
+    const draft = structuredClone(state.catalog);
+    draft.projects[0].summary = 'Restored sessionStorage draft';
+    sessionStorage.setItem(
+      'studio_pending_draft',
+      JSON.stringify({ draft, baseRevision: 'stale-revision' }),
+    );
+  });
+
+  await page.reload();
+  await expect(page.getByTestId('studio-draft-drift')).toBeVisible();
+  await expect(page.getByTestId('studio-dirty')).toHaveText('Unsaved changes');
+  await expect(page.getByTestId('studio-summary')).toHaveValue(
+    'Restored sessionStorage draft',
+  );
+  await expect
+    .poll(() => page.evaluate(() => sessionStorage.getItem('studio_pending_draft')))
+    .toBeNull();
+
+  await page.getByTestId('studio-discard').click();
+  await expect(page.getByTestId('studio-draft-drift')).toHaveCount(0);
 });
 
 test('mobile: tabs, zero overflow, 44px targets, and numeric seed editing', async ({
