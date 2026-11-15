@@ -195,10 +195,22 @@ function responseLike(status, headers) {
   };
 }
 
-function requestPinned(method, url, address, timeoutMs, userAgent) {
+function abortError(message = 'request aborted') {
+  const error = new Error(message);
+  error.name = 'AbortError';
+  return error;
+}
+
+function requestPinned(method, url, address, timeoutMs, userAgent, signal) {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(abortError());
+      return;
+    }
     const { module, options } = buildPinnedRequestOptions(url, address);
     const transport = module === 'https' ? https : http;
+    const cleanup = () => signal?.removeEventListener('abort', onAbort);
+    const onAbort = () => request.destroy(abortError());
     const request = transport.request(
       {
         ...options,
@@ -208,24 +220,31 @@ function requestPinned(method, url, address, timeoutMs, userAgent) {
       (response) => {
         response.resume();
         response.on('end', () => {
+          cleanup();
           resolve(responseLike(response.statusCode ?? 0, response.headers));
         });
       },
     );
+    signal?.addEventListener('abort', onAbort, { once: true });
+    if (signal?.aborted) request.destroy(abortError());
     request.setTimeout(timeoutMs, () => {
-      const error = new Error('request timeout');
-      // Preserve the retry path used for AbortController timeouts.
-      error.name = 'AbortError';
-      request.destroy(error);
+      // Preserve the retry path used for internal timeout controllers.
+      request.destroy(abortError('request timeout'));
     });
-    request.on('error', reject);
+    request.on('error', (error) => {
+      cleanup();
+      reject(error);
+    });
     request.end();
   });
 }
 
-async function fetchWithTimeout(fetchImpl, url, method, timeoutMs, userAgent) {
+async function fetchWithTimeout(fetchImpl, url, method, timeoutMs, userAgent, signal) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const onAbort = () => controller.abort();
+  if (signal?.aborted) controller.abort();
+  else signal?.addEventListener('abort', onAbort, { once: true });
   try {
     return await fetchImpl(url, {
       method,
@@ -235,6 +254,7 @@ async function fetchWithTimeout(fetchImpl, url, method, timeoutMs, userAgent) {
     });
   } finally {
     clearTimeout(timer);
+    signal?.removeEventListener('abort', onAbort);
   }
 }
 
@@ -264,6 +284,7 @@ export async function checkUrl(
     maxRedirects = 5,
     resolveImpl = defaultResolve,
     userAgent = DEFAULT_USER_AGENT,
+    signal,
   } = {},
 ) {
   const started = Date.now();
@@ -276,22 +297,34 @@ export async function checkUrl(
     ...partial,
   });
 
+  if (signal?.aborted) return result({ error: 'request aborted' });
+
   let lastError = null;
   const attempts = Math.max(1, retries + 1);
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    if (signal?.aborted) return result({ attempts: attempt, error: 'request aborted' });
     let current = url;
     try {
       for (let hop = 0; hop <= maxRedirects; hop += 1) {
+        if (signal?.aborted) throw abortError();
         const parsed = new URL(current);
         const target = await resolveSafeTarget(parsed, resolveImpl);
+        if (signal?.aborted) throw abortError();
         const request = async (method) => {
           if (fetchImpl) {
-            return fetchWithTimeout(fetchImpl, current, method, timeoutMs, userAgent);
+            return fetchWithTimeout(fetchImpl, current, method, timeoutMs, userAgent, signal);
           }
           let lastError = null;
           for (const address of target.addresses) {
             try {
-              return await requestPinned(method, current, address, timeoutMs, userAgent);
+              return await requestPinned(
+                method,
+                current,
+                address,
+                timeoutMs,
+                userAgent,
+                signal,
+              );
             } catch (error) {
               lastError = error;
               if (error instanceof Error && error.name === 'AbortError') throw error;
@@ -336,6 +369,9 @@ export async function checkUrl(
         lastError = `too many redirects (max ${maxRedirects})`;
       }
     } catch (error) {
+      if (signal?.aborted) {
+        return result({ attempts: attempt, error: 'request aborted' });
+      }
       const message = error instanceof Error ? error.message : String(error);
       if (message.startsWith('blocked ')) {
         return result({ attempts: attempt, blocked: true, error: message });

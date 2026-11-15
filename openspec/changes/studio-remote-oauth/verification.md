@@ -15,7 +15,7 @@ Node 22.x after `npm ci`.
 | Dynamic `default_branch` + blob-SHA target selection | `GitHubCatalogAdapter.resolveSource` compares catalog blob SHAs (not Compare status), so `ahead` and `diverged` targets both stay readable | PATCH-01 unit tests: ahead and diverged targets read/write `studio/catalog` without a reset; identical blob falls back to default |
 | Ref create/reset only when needed + concurrent `422 Reference already exists` | `resetTargetRef` PATCH → POST → PATCH retry; divergent targets commit directly with Contents `sha` | Unit test scripts `PATCH 404`, `POST 422`, `PATCH 200`; PATCH-01 tests assert zero ref mutation for ahead/diverged saves and target==default rejection |
 | Stale revision / SHA mismatch → `409 Conflict` | Revision checked against the source branch before mutation; base-commit file SHA pinned on reset | Unit tests: stale revision never touches refs; `409` and SHA `422` → `CatalogConflictError`; non-SHA `422` preserved |
-| Bounded auditing (`retries: 0`, 8s deadline, 50 URLs, concurrency 4) | `runBoundedAudit` charges adapter reads via `startedAt`, aborts timed-out checks, and `vercel.json` sets the function `maxDuration: 10` | Unit tests: 60 URLs → 50 checks, all `retries: 0`, peak concurrency ≤ 4, request-start deadline, hanging checks abort via `AbortSignal` |
+| Bounded auditing (`retries: 0`, 8s deadline, 50 URLs, concurrency 4) | `runBoundedAudit` charges adapter reads via `startedAt`; external `AbortSignal` cancels `checkUrl`/pinned requests; `auditLinks` aborts slow adapter reads; `vercel.json` sets `maxDuration: 10` | Unit tests: 60 URLs → 50 checks, all `retries: 0`, peak concurrency ≤ 4, request-start deadline, real `checkUrl` abort, slow-read abort |
 | Committed manifest, zero drift, no `scripts/` on Vercel | `api/studio/_lib/asset-manifest.json` + static `manifest.ts` import | Unit test walks `src/assets` + `src/data/captured` and compares; `.vercelignore` unchanged |
 | Pure server core | `src/utils/graphEdges.ts` | Unit test asserts zero `projects.catalog.json` / `tagRegistry` imports in `graphEdges.ts`, `catalogSchema.ts`, `catalogService.ts` |
 | `sessionStorage` draft restore + base-revision drift warning | `StudioApp` `studio_pending_draft` save/restore; pending draft consumed once via a ref to survive StrictMode | `e2e/studio.spec.ts` restores a draft, shows `studio-draft-drift`, keeps “Unsaved changes”, then clears on Discard |
@@ -151,6 +151,54 @@ valid: true, issues: []
 **Pending activation gates (unchanged):** `.vercel/output` inspection and the
 canonical-domain `PREVIEW_URL` OAuth E2E require the owner credentials from
 `tasks.md` §5.1; `tasks.md` `5.2`–`5.3` stay unchecked.
+
+## PATCH-02 Verification (2026-11-15 22:36:46 UTC)
+
+**Reproduction:** added three tests before implementing: a real `checkUrl` call
+with an external `AbortSignal` (no `checkImpl` mock), `auditLinks` with slow
+`readCatalog`/`readProfile`, and `GitHubApiError` identity from a standalone
+module. The first two failed/hung against the previous implementation (external
+signal ignored, adapter reads unbounded) and the target==default assertion saw
+`400` instead of `503`.
+
+**Applied fixes:**
+- `linkAudit.mjs` / `linkAudit.d.mts`: `checkUrl` accepts `signal`, passes it to
+  `requestPinned` (destroys the socket and cleans up the listener) and
+  `fetchWithTimeout` (aborts the internal controller), and returns
+  `request aborted` without retrying once the external signal fires.
+- `catalogService.ts`: `CatalogAdapter.readCatalog`/`readProfile` accept
+  `{ signal }`; `auditLinks` creates a deadline controller from
+  `startedAt + deadlineMs`, aborts slow reads (returning an empty audit), and
+  clears its timer in `finally`; the `as LinkCheckOptions` cast is gone.
+- `githubAdapter.ts`: forwards the signal through `resolveSource`,
+  `readContents`, `defaultBranch`, `refSha`, and `raw`; target==default now
+  raises `503`.
+- `errors.ts`: standalone `GitHubApiError`, re-exported by `githubAdapter.ts`;
+  `http.ts` imports it from `errors.ts` so `login`/`callback`/`ping` stay lean.
+  `sanitizeError` maps `GitHubApiError(503)` to a `503` response.
+
+```text
+$ npx vitest run src/utils/studioAuth.test.ts
+Test Files  1 passed (1)
+     Tests  38 passed (38)
+
+$ npm run typecheck
+(exit 0)
+
+$ npx vitest run
+Test Files  23 passed (23)
+     Tests  281 passed (281)
+
+$ npm run build
+✓ built in 4.50s
+index-BpdyaalS.js studio-app marker: false
+
+$ openspec validate studio-remote-oauth --strict --json
+valid: true, issues: []
+```
+
+**Pending activation gates (unchanged):** `tasks.md` `5.1`–`5.3` remain
+unchecked pending owner credentials and `.vercel/output` / live OAuth E2E.
 
 ## Outstanding Owner Actions
 

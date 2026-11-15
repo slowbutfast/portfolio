@@ -1,25 +1,19 @@
 import {
   CatalogConflictError,
   type CatalogAdapter,
+  type CatalogReadOptions,
   type CatalogReadResult,
   type CatalogRegistries,
   type CatalogWriteResult,
 } from '../../../src/studio/catalogService';
+import { GitHubApiError } from './errors';
 import { assetKeySet, capturedKeySet } from './manifest';
+
+export { GitHubApiError } from './errors';
 
 const CATALOG_PATH = 'src/data/projects.catalog.json';
 const PROFILE_PATH = 'src/data/profile.ts';
 const API_VERSION = '2022-11-28';
-
-export class GitHubApiError extends Error {
-  readonly status: number;
-
-  constructor(status: number, message: string) {
-    super(message);
-    this.name = 'GitHubApiError';
-    this.status = status;
-  }
-}
 
 export interface GitHubAdapterOptions {
   repo: string;
@@ -104,8 +98,10 @@ export class GitHubCatalogAdapter implements CatalogAdapter {
     return (await this.request(path, init)).json() as Promise<T>;
   }
 
-  private async raw(path: string): Promise<string> {
-    return (await this.request(path, {}, 'application/vnd.github.raw')).text();
+  private async raw(path: string, options?: CatalogReadOptions): Promise<string> {
+    return (
+      await this.request(path, { signal: options?.signal }, 'application/vnd.github.raw')
+    ).text();
   }
 
   private refPath(branch: string): string {
@@ -123,15 +119,20 @@ export class GitHubCatalogAdapter implements CatalogAdapter {
       .join('/')}?ref=${encodeURIComponent(ref)}`;
   }
 
-  private async defaultBranch(): Promise<string> {
-    const repo = await this.json<RepoResponse>('');
+  private async defaultBranch(options?: CatalogReadOptions): Promise<string> {
+    const repo = await this.json<RepoResponse>('', { signal: options?.signal });
     if (!repo.default_branch) throw new GitHubApiError(502, 'Missing default_branch');
     return repo.default_branch;
   }
 
-  private async refSha(branch: string): Promise<string | null> {
+  private async refSha(
+    branch: string,
+    options?: CatalogReadOptions,
+  ): Promise<string | null> {
     try {
-      const ref = await this.json<GitRef>(this.refPath(branch));
+      const ref = await this.json<GitRef>(this.refPath(branch), {
+        signal: options?.signal,
+      });
       return ref.object.sha;
     } catch (cause) {
       if (cause instanceof GitHubApiError && cause.status === 404) return null;
@@ -139,23 +140,23 @@ export class GitHubCatalogAdapter implements CatalogAdapter {
     }
   }
 
-  private async resolveSource(): Promise<{
+  private async resolveSource(options?: CatalogReadOptions): Promise<{
     defaultBranch: string;
     baseSha: string;
     ref: string;
     useTarget: boolean;
   }> {
-    const defaultBranch = await this.defaultBranch();
-    const baseSha = await this.refSha(defaultBranch);
+    const defaultBranch = await this.defaultBranch(options);
+    const baseSha = await this.refSha(defaultBranch, options);
     if (!baseSha) throw new GitHubApiError(502, 'Missing default branch ref');
     if (defaultBranch === this.targetBranch) {
       return { defaultBranch, baseSha, ref: defaultBranch, useTarget: false };
     }
-    const targetRefSha = await this.refSha(this.targetBranch);
+    const targetRefSha = await this.refSha(this.targetBranch, options);
     if (targetRefSha) {
       const [defaultFile, targetFile] = await Promise.all([
-        this.readContents(defaultBranch),
-        this.readContents(this.targetBranch),
+        this.readContents(defaultBranch, options),
+        this.readContents(this.targetBranch, options),
       ]);
       if (defaultFile.sha !== targetFile.sha) {
         return { defaultBranch, baseSha, ref: this.targetBranch, useTarget: true };
@@ -170,8 +171,12 @@ export class GitHubCatalogAdapter implements CatalogAdapter {
 
   private async readContents(
     ref: string,
+    options?: CatalogReadOptions,
   ): Promise<{ sha: string; bytes: string }> {
-    const contents = await this.json<ContentsResponse>(this.contentsPath(CATALOG_PATH, ref));
+    const contents = await this.json<ContentsResponse>(
+      this.contentsPath(CATALOG_PATH, ref),
+      { signal: options?.signal },
+    );
     if (typeof contents.content !== 'string') {
       throw new GitHubApiError(502, 'Missing catalog content');
     }
@@ -183,9 +188,9 @@ export class GitHubCatalogAdapter implements CatalogAdapter {
     return { sha: contents.sha, bytes };
   }
 
-  async readCatalog(): Promise<CatalogReadResult> {
-    const source = await this.resolveSource();
-    const contents = await this.readContents(source.ref);
+  async readCatalog(options?: CatalogReadOptions): Promise<CatalogReadResult> {
+    const source = await this.resolveSource(options);
+    const contents = await this.readContents(source.ref, options);
     return {
       revision: contents.sha,
       bytes: contents.bytes,
@@ -195,9 +200,12 @@ export class GitHubCatalogAdapter implements CatalogAdapter {
     };
   }
 
-  async readProfile(): Promise<string> {
+  async readProfile(options?: CatalogReadOptions): Promise<string> {
     try {
-      return await this.raw(this.contentsPath(PROFILE_PATH, await this.defaultBranch()));
+      return await this.raw(
+        this.contentsPath(PROFILE_PATH, await this.defaultBranch(options)),
+        options,
+      );
     } catch (cause) {
       if (cause instanceof GitHubApiError && cause.status === 404) return '';
       throw cause;
@@ -248,7 +256,7 @@ export class GitHubCatalogAdapter implements CatalogAdapter {
   async writeCatalog(expectedRevision: string, bytes: string): Promise<CatalogWriteResult> {
     const source = await this.resolveSource();
     if (source.defaultBranch === this.targetBranch) {
-      throw new GitHubApiError(400, 'STUDIO_TARGET_BRANCH must differ from default_branch');
+      throw new GitHubApiError(503, 'STUDIO_TARGET_BRANCH must differ from default_branch');
     }
 
     const current = await this.readContents(source.ref);

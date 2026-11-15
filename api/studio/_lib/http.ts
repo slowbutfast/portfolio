@@ -4,7 +4,7 @@ import {
   CatalogTooLargeError,
   CatalogValidationError,
 } from '../../../src/studio/catalogService';
-import { GitHubApiError } from './githubAdapter';
+import { GitHubApiError } from './errors';
 
 export class HttpError extends Error {
   readonly status: number;
@@ -130,6 +130,10 @@ export function sanitizeError(cause: unknown): ErrorResponse {
     return { status: 413, body: { error: cause.message } };
   }
   if (cause instanceof GitHubApiError) {
+    if (cause.status === 503) {
+      logFailure(cause, 503);
+      return { status: 503, body: { error: 'Studio is not configured' } };
+    }
     if (cause.status === 429) {
       logFailure(cause, 429);
       return { status: 429, body: { error: 'Rate limited' } };

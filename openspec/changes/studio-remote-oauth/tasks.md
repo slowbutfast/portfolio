@@ -43,3 +43,13 @@
 - [x] P01.2 Apply minimal targeted fixes in `api/studio/_lib/githubAdapter.ts`, `api/studio/_lib/auth.ts`, `api/studio/_lib/http.ts`, `api/studio/login.ts`, `api/studio/callback.ts`, `api/studio/audit-links.ts`, `api/studio/ping.ts`, `src/studio/catalogService.ts`, and `vercel.json`.
 - [x] P01.3 Verify `npx vitest run src/utils/studioAuth.test.ts` and full regression suite (`npm run typecheck && npm run test:unit && npm run build`) pass.
 - [x] P01.4 Update `openspec/changes/studio-remote-oauth/verification.md` and mark `PATCH-01` resolved in `openspec/changes/studio-remote-oauth/patch.md`.
+
+## Patch 02: Wire AbortSignal through checkUrl and adapter reads, and decouple GitHubApiError
+
+- [x] P02.1 Add failing tests in `src/utils/studioAuth.test.ts` exercising real `checkUrl` external `AbortSignal` cancellation (no `checkImpl` mock) and `auditLinks` aborting slow `adapter.readCatalog`/`readProfile` reads at the shared deadline.
+  - Added 3 tests (38 total in `studioAuth.test.ts`): real `checkUrl` abort with retry stop, slow adapter-read abort, and `GitHubApiError` module identity; reproduced failures before the fix.
+- [x] P02.2 Wire `signal?: AbortSignal` into `src/utils/linkAudit.d.mts`, `src/utils/linkAudit.mjs` (`checkUrl`, `requestPinned`, `fetchWithTimeout`), `src/studio/catalogService.ts` (`CatalogAdapter`, `auditLinks`, `runBoundedAudit`), and `api/studio/_lib/githubAdapter.ts`.
+- [x] P02.3 Extract `GitHubApiError` to `api/studio/_lib/errors.ts` (re-exporting from `githubAdapter.ts`), update `api/studio/_lib/http.ts` import, and map adapter target-equals-default config errors to `503`.
+  - `login`/`callback`/`ping` no longer import the adapter or asset manifest; `GitHubApiError(503)` maps to a `503` response.
+- [x] P02.4 Verify `npx vitest run src/utils/studioAuth.test.ts` and `npm run typecheck && npm run test:unit && npm run build && npx openspec validate "studio-remote-oauth" --strict --json`, update `verification.md`, and mark `PATCH-02` resolved in `patch.md`.
+  - 38 focused tests and 281 total unit tests pass; typecheck/build clean; strict OpenSpec validation valid with 0 issues.

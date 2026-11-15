@@ -19,3 +19,21 @@
   - `readAuthConfig()` rejects `master`/`main`/invalid branch names; `ping.ts` enforces `requireConfig()`; `sanitizeError` maps GitHub errors and logs redacted details; `studio_oauth_tx` checks `exp` and uses domain-separated HMACs.
   - `tasks.md` `5.2`–`5.3` reflect pending Vercel/OAuth deployment checks; unit tests, typecheck, and build pass.
 - **Status**: RESOLVED (2026-11-15 22:24:28 UTC)
+
+### [PATCH-02] Wire AbortSignal through checkUrl and adapter reads, and decouple GitHubApiError
+- **Date**: 2026-11-15 22:34:00 UTC
+- **Feedback Source**: Code Review Round 2 (PR #19, head `ba14ca8`)
+- **Reported Issue**:
+  1. `runBoundedAudit()` passes `signal` via `as LinkCheckOptions`, but `checkUrl()` in `src/utils/linkAudit.mjs` does not accept or honor an external `AbortSignal`, so real HTTP/HTTPS requests are not cancelled when the deadline fires.
+  2. `auditLinks()` awaits `adapter.readCatalog()` and `adapter.readProfile()` without a timeout or `AbortSignal`, so slow GitHub reads can still exceed `maxDuration = 10`.
+  3. `http.ts` imports `GitHubApiError` from `githubAdapter.ts`, pulling the adapter and `asset-manifest.json` into `login`, `callback`, and `ping`; and adapter target-equals-default errors surface as `400` instead of `503`.
+- **Root Cause**:
+  - `checkUrl()` / `requestPinned()` / `fetchWithTimeout()` only created internal timeout controllers and never wired an external `signal`.
+  - `CatalogAdapter.readCatalog` / `readProfile` had no `{ signal?: AbortSignal }` parameter.
+  - `GitHubApiError` was co-located in `githubAdapter.ts`.
+- **Target Files**: `src/utils/linkAudit.mjs, src/utils/linkAudit.d.mts, src/studio/catalogService.ts, api/studio/_lib/errors.ts, api/studio/_lib/githubAdapter.ts, api/studio/_lib/http.ts, src/utils/studioAuth.test.ts, openspec/changes/studio-remote-oauth/tasks.md, openspec/changes/studio-remote-oauth/verification.md`
+- **Expected Resolution**:
+  - `checkUrl()` honors external `signal` on both `requestPinned()` and `fetchWithTimeout()`, and `auditLinks()` bounds adapter reads with a shared deadline `AbortSignal`.
+  - Tests exercise real `checkUrl` cancellation and slow adapter read abortion.
+  - `GitHubApiError` lives in `api/studio/_lib/errors.ts` so `login`/`callback`/`ping` stay lean.
+- **Status**: RESOLVED (2026-11-15 22:36:46 UTC)

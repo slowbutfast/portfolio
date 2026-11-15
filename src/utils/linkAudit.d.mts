@@ -18,6 +18,7 @@ export interface LinkCheckOptions {
   maxRedirects?: number;
   resolveImpl?: (hostname: string) => Promise<string[]>;
   userAgent?: string;
+  signal?: AbortSignal;
 }
 
 export interface PinnedRequestOptions {

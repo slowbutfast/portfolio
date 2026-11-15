@@ -25,6 +25,10 @@ export interface CatalogRegistries {
   capturedKeys: ReadonlySet<string>;
 }
 
+export interface CatalogReadOptions {
+  signal?: AbortSignal;
+}
+
 export interface CatalogReadResult {
   revision: string;
   bytes: string;
@@ -45,9 +49,9 @@ export interface CatalogWriteResult {
  * plugin (`LocalFsCatalogAdapter`) and production (`GitHubCatalogAdapter`).
  */
 export interface CatalogAdapter {
-  readCatalog(): Promise<CatalogReadResult>;
+  readCatalog(options?: CatalogReadOptions): Promise<CatalogReadResult>;
   writeCatalog(expectedRevision: string, bytes: string): Promise<CatalogWriteResult>;
-  readProfile(): Promise<string>;
+  readProfile(options?: CatalogReadOptions): Promise<string>;
   loadRegistries(): Promise<CatalogRegistries>;
 }
 
@@ -147,7 +151,7 @@ export interface BoundedAuditOptions {
   now?: () => number;
   /** Wall-clock start used to charge adapter reads against the shared deadline. */
   startedAt?: number;
-  checkImpl?: (url: string, options: LinkCheckOptions & { signal?: AbortSignal }) => Promise<LinkCheckResult>;
+  checkImpl?: (url: string, options: LinkCheckOptions) => Promise<LinkCheckResult>;
 }
 
 /**
@@ -196,7 +200,7 @@ export async function runBoundedAudit(
           retries: 0,
           timeoutMs,
           signal: controller.signal,
-        } as LinkCheckOptions).catch((cause: unknown) => ({
+        }).catch((cause: unknown) => ({
           url,
           status: 0,
           outcome: 'fail' as const,
@@ -255,8 +259,31 @@ export async function auditLinks(
   adapter: CatalogAdapter,
   options: BoundedAuditOptions = {},
 ): Promise<AuditLinkResponse[]> {
-  const startedAt = options.startedAt ?? options.now?.() ?? Date.now();
-  const [catalog, profile] = await Promise.all([adapter.readCatalog(), adapter.readProfile()]);
+  const now = options.now ?? Date.now;
+  const deadlineMs = options.deadlineMs ?? AUDIT_DEADLINE_MS;
+  const startedAt = options.startedAt ?? now();
+  const controller = new AbortController();
+  const remaining = startedAt + deadlineMs - now();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  if (remaining <= 0) controller.abort();
+  else timer = setTimeout(() => controller.abort(), remaining);
+
+  let catalog: { revision: string; bytes: string };
+  let profile: string;
+  try {
+    [catalog, profile] = await Promise.all([
+      adapter.readCatalog({ signal: controller.signal }),
+      adapter.readProfile({ signal: controller.signal }),
+    ]);
+  } catch (cause) {
+    // A read that loses the shared deadline yields an empty audit rather than
+    // a 500 or a hanging function.
+    if (controller.signal.aborted) return [];
+    throw cause;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+
   const urls = extractUniqueUrls([catalog.bytes, profile]);
   const results = await runBoundedAudit(urls, { ...options, startedAt });
   return results.map((result) => ({
@@ -304,12 +331,12 @@ export class LocalFsCatalogAdapter implements CatalogAdapter {
     this.options = options;
   }
 
-  async readCatalog(): Promise<CatalogReadResult> {
+  async readCatalog(_options?: CatalogReadOptions): Promise<CatalogReadResult> {
     const bytes = await readFile(this.options.catalogPath, 'utf8');
     return { revision: revisionOf(bytes), bytes };
   }
 
-  async readProfile(): Promise<string> {
+  async readProfile(_options?: CatalogReadOptions): Promise<string> {
     return readFile(this.options.profilePath, 'utf8').catch(() => '');
   }
 

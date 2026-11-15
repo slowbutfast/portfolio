@@ -44,6 +44,7 @@ import {
   type CatalogAdapter,
 } from '../studio/catalogService';
 import { deriveEdgesPure } from './graphEdges';
+import { checkUrl } from './linkAudit.mjs';
 
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -770,8 +771,83 @@ describe('GitHubCatalogAdapter branch lifecycle', () => {
     });
     await expect(
       adapter.writeCatalog(revisionOf(CATALOG_BYTES), CATALOG_BYTES),
-    ).rejects.toBeInstanceOf(GitHubApiError);
+    ).rejects.toMatchObject({ status: 503 });
     expect(script.calls.some((call) => call.method === 'PATCH')).toBe(false);
+  });
+});
+
+describe('PATCH-02: external cancellation and error extraction', () => {
+  it('aborts a real checkUrl request and stops retries on the external signal', async () => {
+    const controller = new AbortController();
+    let seenSignal: AbortSignal | undefined;
+    const abortError = () => Object.assign(new Error('request aborted'), { name: 'AbortError' });
+    const fetchImpl = ((_url: RequestInfo | URL, init?: RequestInit) => {
+      seenSignal = init?.signal ?? undefined;
+      if (seenSignal?.aborted) return Promise.reject(abortError());
+      return new Promise((_resolve, reject) => {
+        seenSignal?.addEventListener('abort', () => reject(abortError()), { once: true });
+      });
+    }) as typeof fetch;
+
+    const pending = checkUrl('https://example.com', {
+      fetchImpl,
+      resolveImpl: async () => ['93.184.216.34'],
+      retries: 2,
+      timeoutMs: 500,
+      signal: controller.signal,
+    });
+    setTimeout(() => controller.abort(), 20);
+    const result = await pending;
+
+    expect(result.outcome).toBe('fail');
+    expect(result.error).toMatch(/abort/i);
+    expect(result.attempts).toBe(1);
+    expect(seenSignal?.aborted).toBe(true);
+  });
+
+  it('aborts slow adapter reads at the shared audit deadline', async () => {
+    const signals: Array<AbortSignal | undefined> = [];
+    const slowRead = (options?: { signal?: AbortSignal }) => {
+      signals.push(options?.signal);
+      return new Promise<string>((_resolve, reject) => {
+        const abort = () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+        if (!options?.signal) {
+          setTimeout(abort, 300);
+          return;
+        }
+        if (options.signal.aborted) abort();
+        else options.signal.addEventListener('abort', abort, { once: true });
+      });
+    };
+    const adapter: CatalogAdapter = {
+      readCatalog: async (options) => ({
+        revision: 'rev',
+        bytes: await slowRead(options),
+      }),
+      writeCatalog: async () => ({ revision: 'rev' }),
+      readProfile: (options) => slowRead(options),
+      loadRegistries: async () => ({ assetKeys: new Set(), capturedKeys: new Set() }),
+    };
+    const { auditLinks } = await import('../studio/catalogService');
+    const results = await auditLinks(adapter, {
+      deadlineMs: 30,
+      checkImpl: async (url) => ({
+        url,
+        status: 200,
+        outcome: 'pass',
+        attempts: 1,
+        latencyMs: 1,
+      }),
+    });
+
+    expect(results).toEqual([]);
+    expect(signals).toHaveLength(2);
+    expect(signals.every((signal) => signal?.aborted)).toBe(true);
+  });
+
+  it('exposes GitHubApiError from a standalone errors module', async () => {
+    const { GitHubApiError: Extracted } = await import('../../api/studio/_lib/errors');
+    expect(Extracted).toBe(GitHubApiError);
   });
 });
 
