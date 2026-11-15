@@ -4,6 +4,7 @@ import {
   CatalogTooLargeError,
   CatalogValidationError,
 } from '../../../src/studio/catalogService';
+import { GitHubApiError } from './githubAdapter';
 
 export class HttpError extends Error {
   readonly status: number;
@@ -113,18 +114,42 @@ export interface ErrorResponse {
  */
 export function sanitizeError(cause: unknown): ErrorResponse {
   if (cause instanceof HttpError) {
+    if (cause.status >= 500) logFailure(cause, cause.status);
     return { status: cause.status, body: { error: cause.message } };
   }
   if (cause instanceof CatalogConflictError) {
+    logFailure(cause, 409);
     return { status: 409, body: { error: 'Stale expectedRevision' } };
   }
   if (cause instanceof CatalogValidationError) {
+    logFailure(cause, 400);
     return { status: 400, body: { error: cause.message, errors: cause.errors } };
   }
   if (cause instanceof CatalogTooLargeError) {
+    logFailure(cause, 413);
     return { status: 413, body: { error: cause.message } };
   }
+  if (cause instanceof GitHubApiError) {
+    if (cause.status === 429) {
+      logFailure(cause, 429);
+      return { status: 429, body: { error: 'Rate limited' } };
+    }
+    if (cause.status === 400 || cause.status === 422) {
+      logFailure(cause, 400);
+      return { status: 400, body: { error: 'GitHub rejected the request' } };
+    }
+    logFailure(cause, 502);
+    return { status: 502, body: { error: 'Upstream GitHub error' } };
+  }
+  logFailure(cause, 500);
   return { status: 500, body: { error: 'Internal error' } };
+}
+
+/** Redacted server-side diagnostics: class + status only, never messages. */
+function logFailure(cause: unknown, status: number): void {
+  const name = cause instanceof Error ? cause.name : 'UnknownError';
+  const upstreamStatus = cause instanceof GitHubApiError ? cause.status : undefined;
+  console.error('[studio] request failed', { name, status, upstreamStatus });
 }
 
 /** Request origin derived from Vercel's forwarded headers, for diagnostics. */

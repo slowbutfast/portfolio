@@ -46,6 +46,32 @@ function value(env: StudioEnv, key: string): string {
 }
 
 /**
+ * Reject target branches that would clobber the deploy branch or that GitHub
+ * cannot accept as a ref name. `studio/catalog` remains the default.
+ */
+export function isValidTargetBranch(branch: string): boolean {
+  if (branch === '' || branch === 'master' || branch === 'main' || branch === 'HEAD') {
+    return false;
+  }
+  if (branch.length > 200) return false;
+  // Control chars and characters Git refs forbid.
+  if (/[\u0000-\u001f\u007f\s~^:?*\[\\]/.test(branch)) return false;
+  if (
+    branch.startsWith('-') ||
+    branch.startsWith('/') ||
+    branch.endsWith('/') ||
+    branch.endsWith('.') ||
+    branch.endsWith('.lock') ||
+    branch === '@' ||
+    branch.includes('..') ||
+    branch.includes('//')
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/**
  * Resolve OAuth/GitHub configuration. Returns `null` when any required secret
  * is absent or the owner id / redirect URI is malformed, which callers map to a
  * deterministic `503` (never a partial-auth `401`).
@@ -67,6 +93,8 @@ export function readAuthConfig(env: StudioEnv = process.env): AuthConfig | null 
   if (!redirect.pathname.endsWith('/api/studio/callback')) return null;
   if (redirect.protocol !== 'https:' && redirect.hostname !== 'localhost') return null;
   if (!/^[\w.-]+\/[\w.-]+$/.test(values.GITHUB_REPO)) return null;
+  const branch = value(env, 'STUDIO_TARGET_BRANCH') || 'studio/catalog';
+  if (!isValidTargetBranch(branch)) return null;
 
   return {
     clientId: values.GITHUB_CLIENT_ID,
@@ -77,7 +105,7 @@ export function readAuthConfig(env: StudioEnv = process.env): AuthConfig | null 
     sessionSecret: values.STUDIO_SESSION_SECRET,
     pat: values.GITHUB_PAT,
     repo: values.GITHUB_REPO,
-    branch: value(env, 'STUDIO_TARGET_BRANCH') || 'studio/catalog',
+    branch,
   };
 }
 
@@ -94,8 +122,10 @@ export function safeEqual(left: string, right: string): boolean {
   return timingSafeEqual(a, b);
 }
 
-function hmac(value: string, secret: string): string {
-  return createHmac('sha256', secret).update(value, 'utf8').digest('base64url');
+function hmac(value: string, secret: string, domain: 'session' | 'tx' | 'csrf'): string {
+  return createHmac('sha256', secret)
+    .update(`${domain}:${value}`, 'utf8')
+    .digest('base64url');
 }
 
 export interface PkcePair {
@@ -121,7 +151,7 @@ export function signSession(
   secret: string,
 ): string {
   const payload = Buffer.from(JSON.stringify(session), 'utf8').toString('base64url');
-  return `${payload}.${hmac(payload, secret)}`;
+  return `${payload}.${hmac(payload, secret, 'session')}`;
 }
 
 export function verifySession(
@@ -133,7 +163,7 @@ export function verifySession(
   if (separator <= 0) return null;
   const payload = token.slice(0, separator);
   const signature = token.slice(separator + 1);
-  if (!safeEqual(signature, hmac(payload, secret))) return null;
+  if (!safeEqual(signature, hmac(payload, secret, 'session'))) return null;
   try {
     const parsed = JSON.parse(
       Buffer.from(payload, 'base64url').toString('utf8'),
@@ -154,13 +184,13 @@ export function verifySession(
 }
 
 export function csrfToken(secret: string, sid: string): string {
-  return hmac(sid, secret);
+  return hmac(sid, secret, 'csrf');
 }
 
 /** Seal a short-lived OAuth transaction (state + PKCE verifier) into a cookie. */
 export function sealJson(value: unknown, secret: string): string {
   const payload = Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
-  return `${payload}.${hmac(payload, secret)}`;
+  return `${payload}.${hmac(payload, secret, 'tx')}`;
 }
 
 export function openJson<T>(token: string, secret: string): T | null {
@@ -168,7 +198,7 @@ export function openJson<T>(token: string, secret: string): T | null {
   if (separator <= 0) return null;
   const payload = token.slice(0, separator);
   const signature = token.slice(separator + 1);
-  if (!safeEqual(signature, hmac(payload, secret))) return null;
+  if (!safeEqual(signature, hmac(payload, secret, 'tx'))) return null;
   try {
     return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as T;
   } catch {
@@ -179,6 +209,7 @@ export function openJson<T>(token: string, secret: string): T | null {
 export interface OAuthTransaction {
   state: string;
   verifier: string;
+  exp: number;
 }
 
 const cookieBasics = (config: AuthConfig, path = '/') => ({

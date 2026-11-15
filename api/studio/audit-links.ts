@@ -27,6 +27,10 @@ export interface AuditHandlerDeps {
 const hits = new Map<string, number[]>();
 
 function rateLimited(sid: string, now: number): boolean {
+  // Evict stale session buckets so a long-lived instance cannot grow unbounded.
+  for (const [key, times] of hits) {
+    if (times.every((time) => now - time >= RATE_LIMIT_WINDOW_MS)) hits.delete(key);
+  }
   const recent = (hits.get(sid) ?? []).filter((time) => now - time < RATE_LIMIT_WINDOW_MS);
   if (recent.length >= RATE_LIMIT_MAX) {
     hits.set(sid, recent);
@@ -44,6 +48,7 @@ export function createAuditLinksHandler(deps: AuditHandlerDeps = {}) {
     req: IncomingMessage,
     res: ServerResponse,
   ): Promise<void> {
+    const startedAt = now();
     try {
       const config = requireConfig(deps.env);
       const session = requireMutation(req, config);
@@ -51,13 +56,13 @@ export function createAuditLinksHandler(deps: AuditHandlerDeps = {}) {
         res.setHeader('Allow', 'POST');
         throw new HttpError(405, 'Method not allowed');
       }
-      if (rateLimited(session.sid, now())) {
+      if (rateLimited(session.sid, startedAt)) {
         throw new HttpError(429, 'Too many audit requests');
       }
 
       const adapter = (deps.createAdapter ?? defaultAdapter)(config);
       // Client-supplied URLs are ignored by design.
-      sendJson(res, 200, await auditLinks(adapter));
+      sendJson(res, 200, await auditLinks(adapter, { startedAt }));
     } catch (cause) {
       const { status, body } = sanitizeError(cause);
       sendJson(res, status, body);

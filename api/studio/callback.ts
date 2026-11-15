@@ -71,10 +71,18 @@ export function createCallbackHandler(deps: CallbackHandlerDeps = {}) {
       const parsed = transaction
         ? openJson<OAuthTransaction>(transaction, config.sessionSecret)
         : null;
+      const nowSeconds = Math.floor(now() / 1000);
       const query = new URL(req.url ?? '/', config.canonicalOrigin).searchParams;
       const state = query.get('state') ?? '';
       const code = query.get('code') ?? '';
-      if (!parsed || !state || !safeEqual(state, parsed.state)) {
+      if (
+        !parsed ||
+        typeof parsed.exp !== 'number' ||
+        !Number.isFinite(parsed.exp) ||
+        parsed.exp <= nowSeconds ||
+        !state ||
+        !safeEqual(state, parsed.state)
+      ) {
         throw new HttpError(403, 'Invalid OAuth state');
       }
       if (!code) throw new HttpError(400, 'Missing OAuth code');

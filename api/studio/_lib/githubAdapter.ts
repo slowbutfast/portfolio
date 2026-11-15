@@ -43,10 +43,6 @@ interface ContentsWriteResponse {
   content: { sha: string };
 }
 
-interface CompareResponse {
-  status: 'ahead' | 'behind' | 'identical' | 'diverged';
-}
-
 interface RepoResponse {
   default_branch: string;
 }
@@ -54,11 +50,11 @@ interface RepoResponse {
 /**
  * GitHub Contents/Git-Refs adapter implementing the `studio/catalog` preview
  * branch lifecycle:
- * - `GET` reads `studio/catalog` only when it exists and is ahead of the
- *   repository's dynamic `default_branch`.
- * - `PUT` validates `expectedRevision` against the source it was read from,
- *   resets/creates `refs/heads/studio/catalog` to the default-branch head, then
- *   commits the new catalog with the Contents API.
+ * - `GET` reads `studio/catalog` whenever its catalog blob differs from the
+ *   default branch's blob (ahead *or* diverged), so pending edits stay visible.
+ * - `PUT` commits directly on top of an existing divergent target using the
+ *   Contents API `sha` guard, and only creates/resets the target ref when it is
+ *   absent or still points at the default branch's catalog blob.
  */
 export class GitHubCatalogAdapter implements CatalogAdapter {
   private readonly repo: string;
@@ -155,24 +151,14 @@ export class GitHubCatalogAdapter implements CatalogAdapter {
     if (defaultBranch === this.targetBranch) {
       return { defaultBranch, baseSha, ref: defaultBranch, useTarget: false };
     }
-    const targetSha = await this.refSha(this.targetBranch);
-    if (targetSha) {
-      try {
-        const compare = await this.json<CompareResponse>(
-          `/compare/${encodeURIComponent(defaultBranch)}...${encodeURIComponent(
-            this.targetBranch,
-          )}`,
-        );
-        if (compare.status === 'ahead') {
-          return {
-            defaultBranch,
-            baseSha,
-            ref: this.targetBranch,
-            useTarget: true,
-          };
-        }
-      } catch (cause) {
-        if (!(cause instanceof GitHubApiError && cause.status === 404)) throw cause;
+    const targetRefSha = await this.refSha(this.targetBranch);
+    if (targetRefSha) {
+      const [defaultFile, targetFile] = await Promise.all([
+        this.readContents(defaultBranch),
+        this.readContents(this.targetBranch),
+      ]);
+      if (defaultFile.sha !== targetFile.sha) {
+        return { defaultBranch, baseSha, ref: this.targetBranch, useTarget: true };
       }
     }
     return { defaultBranch, baseSha, ref: defaultBranch, useTarget: false };
@@ -261,21 +247,20 @@ export class GitHubCatalogAdapter implements CatalogAdapter {
 
   async writeCatalog(expectedRevision: string, bytes: string): Promise<CatalogWriteResult> {
     const source = await this.resolveSource();
+    if (source.defaultBranch === this.targetBranch) {
+      throw new GitHubApiError(400, 'STUDIO_TARGET_BRANCH must differ from default_branch');
+    }
+
     const current = await this.readContents(source.ref);
     if (current.sha !== expectedRevision) {
       throw new CatalogConflictError();
     }
 
-    let sha: string;
-    if (source.defaultBranch !== this.targetBranch) {
-      // Pin the immutable base-commit blob SHA before resetting. A concurrent
-      // writer that commits after the reset makes this SHA stale, so GitHub
-      // rejects the update and we map the 422 to 409.
-      const baseFile = await this.readContents(source.baseSha);
-      sha = baseFile.sha;
+    if (!source.useTarget) {
+      // Only an absent target, or one whose catalog blob still matches the
+      // default branch, is reset. A divergent target is committed on top of
+      // its existing head via the Contents API `sha` guard (no force push).
       await this.resetTargetRef(source.baseSha);
-    } else {
-      sha = expectedRevision;
     }
 
     let updated: ContentsWriteResponse;
@@ -288,7 +273,7 @@ export class GitHubCatalogAdapter implements CatalogAdapter {
             message: 'Studio: update project catalog',
             content: Buffer.from(bytes, 'utf8').toString('base64'),
             branch: this.targetBranch,
-            sha,
+            sha: expectedRevision,
           }),
         },
       );

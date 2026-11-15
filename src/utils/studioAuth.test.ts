@@ -39,6 +39,7 @@ import { HttpError } from '../../api/studio/_lib/http';
 import {
   CatalogConflictError,
   MAX_AUDIT_URLS,
+  revisionOf,
   runBoundedAudit,
   type CatalogAdapter,
 } from '../studio/catalogService';
@@ -262,6 +263,8 @@ describe('PKCE, session, and CSRF primitives', () => {
         STUDIO_OAUTH_REDIRECT_URI: 'https://studio.example.com/api/studio/*',
       }),
     ).toBeNull();
+    expect(readAuthConfig({ ...BASE_ENV, STUDIO_TARGET_BRANCH: 'master' })).toBeNull();
+    expect(readAuthConfig({ ...BASE_ENV, STUDIO_TARGET_BRANCH: 'main' })).toBeNull();
     expect(() => requireConfig(missing)).toThrowError(HttpError);
     try {
       requireConfig(missing);
@@ -319,6 +322,9 @@ describe('OAuth handlers', () => {
     expect(tx).toBeTruthy();
     expect(headersOf(response).join(';')).toMatch(/HttpOnly/);
     expect(headersOf(response).join(';')).toMatch(/Path=\/api\/studio/);
+    const parsedTx = openJson<OAuthTransaction & { exp?: number }>(tx!, SECRET)!;
+    expect(typeof parsedTx.exp).toBe('number');
+    expect(parsedTx.exp as number).toBeGreaterThan(Math.floor(Date.now() / 1000));
   });
 
   it('returns 503 when OAuth/GitHub env is missing', async () => {
@@ -379,7 +385,24 @@ describe('OAuth handlers', () => {
         url: '/api/studio/callback?state=wrong&code=oauth-code',
         headers: {
           cookie: `${TX_COOKIE}=${sealJson(
-            { state: 'expected', verifier: 'verifier' },
+            { state: 'expected', verifier: 'verifier', exp: Math.floor(Date.now() / 1000) + 600 },
+            SECRET,
+          )}`,
+        },
+      },
+    );
+    expect(response.statusCode).toBe(403);
+    expect(headersOf(response).join(';')).toMatch(new RegExp(`${TX_COOKIE}=;`));
+  });
+
+  it('rejects an expired studio_oauth_tx with 403 and clears the cookie', async () => {
+    const response = await invoke(
+      createCallbackHandler({ env: BASE_ENV, fetchImpl: (async () => textResponse('')) as typeof fetch }),
+      {
+        url: '/api/studio/callback?state=expected&code=oauth-code',
+        headers: {
+          cookie: `${TX_COOKIE}=${sealJson(
+            { state: 'expected', verifier: 'verifier', exp: Math.floor(Date.now() / 1000) - 1 },
             SECRET,
           )}`,
         },
@@ -446,6 +469,13 @@ describe('route enumeration and CSRF guards', () => {
   it('returns 503 when configuration is missing', async () => {
     for (const key of Object.keys(BASE_ENV)) vi.stubEnv(key, '');
     const response = await invoke(handlers[0][1].default);
+    expect(response.statusCode).toBe(503);
+  });
+
+  it('returns 503 for ping when unconfigured', async () => {
+    for (const key of Object.keys(BASE_ENV)) vi.stubEnv(key, '');
+    const ping = (await import('../../api/studio/ping')).default;
+    const response = await invoke(ping);
     expect(response.statusCode).toBe(503);
   });
 
@@ -544,9 +574,6 @@ function githubFetch(options: {
       if (options.targetExists === false) return textResponse('Not Found', 404);
       return jsonResponse({ object: { sha: 'target-sha' } });
     }
-    if (method === 'GET' && url.pathname.startsWith(`${repo}/compare/`)) {
-      return jsonResponse({ status: options.targetAhead ? 'ahead' : 'identical' });
-    }
     if (
       method === 'GET' &&
       url.pathname.startsWith(`${repo}/contents/src/data/projects.catalog.json`)
@@ -558,11 +585,9 @@ function githubFetch(options: {
       const bytes =
         ref === 'studio/catalog'
           ? options.targetBytes ?? options.catalogBytes
-          : ref === 'base-sha'
-            ? options.catalogBytes
-            : options.catalogBytes;
+          : options.catalogBytes;
       return jsonResponse({
-        sha: ref === 'base-sha' ? 'base-file-sha' : 'file-sha',
+        sha: revisionOf(bytes),
         content: Buffer.from(bytes, 'utf8').toString('base64'),
         encoding: 'base64',
       });
@@ -614,7 +639,7 @@ describe('GitHubCatalogAdapter branch lifecycle', () => {
     const result = await adapter.readCatalog();
     expect(result.branch).toBe('studio/catalog');
     expect(result.bytes).toBe('{"ahead":true}');
-    expect(result.revision).toBe('file-sha');
+    expect(result.revision).toBe(revisionOf('{"ahead":true}'));
     expect(ahead.calls.some((call) => call.path.endsWith('/git/ref/heads/main'))).toBe(true);
 
     const behind = githubFetch({
@@ -629,7 +654,7 @@ describe('GitHubCatalogAdapter branch lifecycle', () => {
     });
     const fallbackResult = await fallback.readCatalog();
     expect(fallbackResult.branch).toBe('trunk');
-    expect(fallbackResult.revision).toBe('file-sha');
+    expect(fallbackResult.revision).toBe(revisionOf(CATALOG_BYTES));
   });
 
   it('resets the preview ref to the base head then commits the catalog', async () => {
@@ -643,7 +668,7 @@ describe('GitHubCatalogAdapter branch lifecycle', () => {
       pat: 'pat',
       fetchImpl: script.fetchImpl,
     });
-    const result = await adapter.writeCatalog('file-sha', CATALOG_BYTES);
+    const result = await adapter.writeCatalog(revisionOf(CATALOG_BYTES), CATALOG_BYTES);
     expect(result).toMatchObject({ revision: 'new-file-sha', branch: 'studio/catalog' });
     const patch = script.calls.find(
       (call) => call.method === 'PATCH' && call.path.endsWith('/git/refs/heads/studio/catalog'),
@@ -652,7 +677,7 @@ describe('GitHubCatalogAdapter branch lifecycle', () => {
     expect(patch?.body).toContain('"force":true');
     const put = script.calls.find((call) => call.method === 'PUT');
     expect(put?.body).toContain(Buffer.from(CATALOG_BYTES).toString('base64'));
-    expect(put?.body).toContain('"sha":"base-file-sha"');
+    expect(put?.body).toContain(`"sha":"${revisionOf(CATALOG_BYTES)}"`);
     expect(put?.body).toContain('"branch":"studio/catalog"');
   });
 
@@ -670,7 +695,7 @@ describe('GitHubCatalogAdapter branch lifecycle', () => {
       fetchImpl: script.fetchImpl,
     });
     await expect(
-      adapter.writeCatalog('file-sha', CATALOG_BYTES),
+      adapter.writeCatalog(revisionOf(CATALOG_BYTES), CATALOG_BYTES),
     ).resolves.toMatchObject({ branch: 'studio/catalog' });
     expect(script.calls.filter((call) => call.method === 'PATCH')).toHaveLength(2);
     expect(script.calls.filter((call) => call.method === 'POST')).toHaveLength(1);
@@ -694,7 +719,7 @@ describe('GitHubCatalogAdapter branch lifecycle', () => {
         fetchImpl: script.fetchImpl,
       });
       await expect(
-        adapter.writeCatalog('file-sha', CATALOG_BYTES),
+        adapter.writeCatalog(revisionOf(CATALOG_BYTES), CATALOG_BYTES),
       ).rejects.toBeInstanceOf(CatalogConflictError);
     }
 
@@ -711,7 +736,7 @@ describe('GitHubCatalogAdapter branch lifecycle', () => {
       fetchImpl: validation.fetchImpl,
     });
     await expect(
-      adapter.writeCatalog('file-sha', CATALOG_BYTES),
+      adapter.writeCatalog(revisionOf(CATALOG_BYTES), CATALOG_BYTES),
     ).rejects.toBeInstanceOf(GitHubApiError);
   });
 
@@ -729,6 +754,23 @@ describe('GitHubCatalogAdapter branch lifecycle', () => {
     await expect(adapter.writeCatalog('stale', CATALOG_BYTES)).rejects.toBeInstanceOf(
       CatalogConflictError,
     );
+    expect(script.calls.some((call) => call.method === 'PATCH')).toBe(false);
+  });
+
+  it('refuses to write when STUDIO_TARGET_BRANCH equals the default branch', async () => {
+    const script = githubFetch({
+      defaultBranch: 'studio/catalog',
+      targetAhead: false,
+      catalogBytes: CATALOG_BYTES,
+    });
+    const adapter = new GitHubCatalogAdapter({
+      repo: 'slowbutfast/portfolio',
+      pat: 'pat',
+      fetchImpl: script.fetchImpl,
+    });
+    await expect(
+      adapter.writeCatalog(revisionOf(CATALOG_BYTES), CATALOG_BYTES),
+    ).rejects.toBeInstanceOf(GitHubApiError);
     expect(script.calls.some((call) => call.method === 'PATCH')).toBe(false);
   });
 });
@@ -784,6 +826,20 @@ describe('bounded link auditing', () => {
     expect(results[0].error).toBe('audit deadline exceeded');
   });
 
+  it('aborts timed-out checks with an AbortSignal', async () => {
+    let signal: AbortSignal | undefined;
+    const results = await runBoundedAudit(['https://example.com/slow'], {
+      deadlineMs: 30,
+      checkImpl: (_url, init) =>
+        new Promise((resolve) => {
+          signal = (init as { signal?: AbortSignal }).signal;
+          void resolve;
+        }),
+    });
+    expect(results[0].outcome).toBe('fail');
+    expect(signal?.aborted).toBe(true);
+  });
+
   it('audits the catalog and profile sources, ignoring client URLs', async () => {
     const adapter: CatalogAdapter = {
       readCatalog: async () => ({
@@ -803,5 +859,95 @@ describe('bounded link auditing', () => {
       'https://example.com/b',
       'https://example.com/c',
     ]);
+  });
+
+  it('starts the deadline before reading catalog/profile when startedAt is provided', async () => {
+    let clock = 0;
+    const adapter: CatalogAdapter = {
+      readCatalog: async () => {
+        clock += 7000;
+        return { revision: 'rev', bytes: 'https://example.com/a' };
+      },
+      writeCatalog: async () => ({ revision: 'rev' }),
+      readProfile: async () => {
+        clock += 2000;
+        return '';
+      },
+      loadRegistries: async () => ({ assetKeys: new Set(), capturedKeys: new Set() }),
+    };
+    const { auditLinks } = await import('../studio/catalogService');
+    const results = await auditLinks(adapter, {
+      startedAt: 0,
+      deadlineMs: 8000,
+      now: () => clock,
+      checkImpl: async (url) => fakeResult(url),
+    });
+    expect(results[0].classification).toBe('fail');
+    expect(results[0].error).toBe('audit deadline exceeded');
+  });
+});
+
+describe('PATCH-01: github adapter and error mapping', () => {
+  it('commits directly on top of an ahead target branch without force-reset', async () => {
+    const script = githubFetch({
+      defaultBranch: 'main',
+      targetAhead: true,
+      catalogBytes: CATALOG_BYTES,
+      targetBytes: '{"ahead":true}',
+    });
+    const adapter = new GitHubCatalogAdapter({
+      repo: 'slowbutfast/portfolio',
+      pat: 'pat',
+      fetchImpl: script.fetchImpl,
+    });
+    const result = await adapter.writeCatalog(revisionOf('{"ahead":true}'), CATALOG_BYTES);
+    expect(result).toMatchObject({ revision: 'new-file-sha', branch: 'studio/catalog' });
+    expect(script.calls.some((call) => call.method === 'PATCH' || call.method === 'POST')).toBe(false);
+    const put = script.calls.find((call) => call.method === 'PUT');
+    expect(put?.body).toContain(`"sha":"${revisionOf('{"ahead":true}')}"`);
+  });
+
+  it('commits directly on top of a diverged target branch when catalog blobs differ', async () => {
+    const calls: RecordedCall[] = [];
+    const fetchImpl = (async (input: RequestInfo | URL, init: RequestInit = {}) => {
+      const url = new URL(String(input));
+      const method = init.method ?? 'GET';
+      calls.push({ method, path: url.pathname, search: url.search, body: typeof init.body === 'string' ? init.body : '' });
+      const repo = `/repos/slowbutfast/portfolio`;
+      if (method === 'GET' && url.pathname === repo) return jsonResponse({ default_branch: 'main' });
+      if (method === 'GET' && url.pathname === `${repo}/git/ref/heads/main`) return jsonResponse({ object: { sha: 'base-sha' } });
+      if (method === 'GET' && url.pathname === `${repo}/git/ref/heads/studio/catalog`) return jsonResponse({ object: { sha: 'target-sha' } });
+      if (method === 'GET' && url.pathname.startsWith(`${repo}/contents/src/data/projects.catalog.json`)) {
+        const ref = url.searchParams.get('ref');
+        if (ref === 'main' || ref === 'base-sha') {
+          return jsonResponse({ sha: 'default-file-sha', content: Buffer.from(CATALOG_BYTES, 'utf8').toString('base64'), encoding: 'base64' });
+        }
+        if (ref === 'studio/catalog') {
+          return jsonResponse({ sha: 'target-file-sha', content: Buffer.from('{"diverged":true}', 'utf8').toString('base64'), encoding: 'base64' });
+        }
+      }
+      if (method === 'PUT' && url.pathname.startsWith(`${repo}/contents/src/data/projects.catalog.json`)) {
+        return jsonResponse({ content: { sha: 'new-file-sha' } }, 201);
+      }
+      return textResponse(`unhandled ${method} ${url.pathname}${url.search}`, 404);
+    }) as typeof fetch;
+    const adapter = new GitHubCatalogAdapter({ repo: 'slowbutfast/portfolio', pat: 'pat', fetchImpl });
+    const result = await adapter.writeCatalog('target-file-sha', CATALOG_BYTES);
+    expect(result).toMatchObject({ revision: 'new-file-sha', branch: 'studio/catalog' });
+    expect(calls.some((call) => call.method === 'PATCH' || call.method === 'POST')).toBe(false);
+    const put = calls.find((call) => call.method === 'PUT');
+    expect(put?.body).toContain('"sha":"target-file-sha"');
+  });
+
+  it('maps GitHubApiError statuses in sanitizeError and redacts upstream detail', async () => {
+    const { sanitizeError } = await import('../../api/studio/_lib/http');
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(sanitizeError(new GitHubApiError(429, 'rate limit body')).status).toBe(429);
+    expect(sanitizeError(new GitHubApiError(422, 'sha mismatch detail')).status).toBe(400);
+    expect(sanitizeError(new GitHubApiError(400, 'bad')).status).toBe(400);
+    const server = sanitizeError(new GitHubApiError(500, 'secret upstream'));
+    expect(server.status).toBe(502);
+    expect(JSON.stringify(server.body)).not.toContain('secret upstream');
+    errorSpy.mockRestore();
   });
 });

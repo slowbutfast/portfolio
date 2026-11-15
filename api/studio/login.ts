@@ -4,6 +4,7 @@ import {
   randomToken,
   requireConfig,
   txCookie,
+  TX_TTL_SECONDS,
   type StudioEnv,
 } from './_lib/auth';
 import { HttpError, redirect, sanitizeError, sendJson } from './_lib/http';
@@ -31,6 +32,7 @@ export function createLoginHandler(deps: LoginHandlerDeps = {}) {
 
       const { verifier, challenge } = createPkcePair();
       const state = randomToken(24);
+      const exp = Math.floor(Date.now() / 1000) + TX_TTL_SECONDS;
       const authorize = new URL('https://github.com/login/oauth/authorize');
       authorize.searchParams.set('client_id', config.clientId);
       authorize.searchParams.set('redirect_uri', config.redirectUri);
@@ -39,7 +41,7 @@ export function createLoginHandler(deps: LoginHandlerDeps = {}) {
       authorize.searchParams.set('code_challenge', challenge);
       authorize.searchParams.set('code_challenge_method', 'S256');
 
-      redirect(res, authorize.toString(), [txCookie(config, { state, verifier })]);
+      redirect(res, authorize.toString(), [txCookie(config, { state, verifier, exp })]);
     } catch (cause) {
       const { status, body } = sanitizeError(cause);
       sendJson(res, status, body);

@@ -145,7 +145,9 @@ export interface BoundedAuditOptions {
   concurrency?: number;
   maxUrls?: number;
   now?: () => number;
-  checkImpl?: (url: string, options: LinkCheckOptions) => Promise<LinkCheckResult>;
+  /** Wall-clock start used to charge adapter reads against the shared deadline. */
+  startedAt?: number;
+  checkImpl?: (url: string, options: LinkCheckOptions & { signal?: AbortSignal }) => Promise<LinkCheckResult>;
 }
 
 /**
@@ -164,7 +166,7 @@ export async function runBoundedAudit(
   const check = options.checkImpl ?? checkUrl;
 
   const targets = urls.slice(0, maxUrls);
-  const started = now();
+  const started = options.startedAt ?? now();
   const results: LinkCheckResult[] = new Array(targets.length);
   let cursor = 0;
 
@@ -187,23 +189,35 @@ export async function runBoundedAudit(
         continue;
       }
       const timeoutMs = Math.max(250, Math.min(4000, remaining));
+      const controller = new AbortController();
       let timer: ReturnType<typeof setTimeout> | undefined;
       try {
+        const pending = check(url, {
+          retries: 0,
+          timeoutMs,
+          signal: controller.signal,
+        } as LinkCheckOptions).catch((cause: unknown) => ({
+          url,
+          status: 0,
+          outcome: 'fail' as const,
+          attempts: 0,
+          latencyMs: Math.max(0, now() - started),
+          error: cause instanceof Error ? cause.message : String(cause),
+        }));
         results[index] = await Promise.race([
-          check(url, { retries: 0, timeoutMs }),
+          pending,
           new Promise<LinkCheckResult>((resolvePromise) => {
-            timer = setTimeout(
-              () =>
-                resolvePromise({
-                  url,
-                  status: 0,
-                  outcome: 'fail',
-                  attempts: 0,
-                  latencyMs: deadlineMs - (now() - started),
-                  error: 'audit deadline exceeded',
-                }),
-              remaining,
-            );
+            timer = setTimeout(() => {
+              controller.abort();
+              resolvePromise({
+                url,
+                status: 0,
+                outcome: 'fail',
+                attempts: 0,
+                latencyMs: Math.max(0, deadlineMs - (now() - started)),
+                error: 'audit deadline exceeded',
+              });
+            }, remaining);
           }),
         ]);
       } catch (cause) {
@@ -241,9 +255,10 @@ export async function auditLinks(
   adapter: CatalogAdapter,
   options: BoundedAuditOptions = {},
 ): Promise<AuditLinkResponse[]> {
+  const startedAt = options.startedAt ?? options.now?.() ?? Date.now();
   const [catalog, profile] = await Promise.all([adapter.readCatalog(), adapter.readProfile()]);
   const urls = extractUniqueUrls([catalog.bytes, profile]);
-  const results = await runBoundedAudit(urls, options);
+  const results = await runBoundedAudit(urls, { ...options, startedAt });
   return results.map((result) => ({
     url: result.url,
     status: result.status,
