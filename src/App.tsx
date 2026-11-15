@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { getProjectById, projects } from './data/projects';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { ALL_TAGS, getProjectById, projects } from './data/projects';
 import { deriveEdges } from './utils/graphTopology';
 import type {
   GraphNode,
@@ -21,7 +21,11 @@ import { clearArtDiscoveryState, loadArtDiscoveryState } from './utils/artDiscov
 type ViewMode = 'graph' | 'list';
 type CanvasAnchor = { x: number; y: number };
 
-const ALL_TAGS = Array.from(new Set<ParadigmTag>(projects.flatMap((p) => p.tags)));
+// The Studio chunk is referenced only inside a compile-time DEV branch, so
+// production Rollup builds drop both the component and its dynamic import.
+const StudioRoute = import.meta.env.DEV ? lazy(() => import('./studio/StudioApp')) : null;
+// Keep the literal out of production bundles as well.
+const STUDIO_HASH = import.meta.env.DEV ? '#/studio' : '';
 
 function readStoredTheme(): ThemeMode {
   try {
@@ -45,6 +49,9 @@ function readStoredVisited(): Set<string> {
 
 export default function App() {
   const [view, setView] = useState<ViewMode>('graph');
+  const [isStudio, setIsStudio] = useState(
+    () => Boolean(StudioRoute) && window.location.hash === STUDIO_HASH,
+  );
   const [activeTags, setActiveTags] = useState<Set<ParadigmTag>>(new Set());
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -260,6 +267,16 @@ export default function App() {
 
   useEffect(() => {
     const parseHash = () => {
+      const studio = Boolean(StudioRoute) && window.location.hash === STUDIO_HASH;
+      setIsStudio(studio);
+      if (studio) {
+        setIsAboutOpen(false);
+        setHoverState(null);
+        selectedIdRef.current = null;
+        setSelectedId(null);
+        setDrawerAnchor(null);
+        return;
+      }
       if (window.location.hash === '#/about') {
         setIsAboutOpen(true);
         setHoverState(null);
@@ -361,6 +378,25 @@ export default function App() {
     },
     [synth],
   );
+
+  if (isStudio && StudioRoute) {
+    return (
+      <Suspense
+        fallback={
+          <div className="flex h-full w-full items-center justify-center bg-[var(--color-bg)] text-[var(--color-text)]">
+            Loading Project Studio…
+          </div>
+        }
+      >
+        <StudioRoute
+          onExit={() => {
+            window.history.replaceState(null, '', window.location.pathname);
+            setIsStudio(false);
+          }}
+        />
+      </Suspense>
+    );
+  }
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-[var(--color-bg)] text-[var(--color-text)]">

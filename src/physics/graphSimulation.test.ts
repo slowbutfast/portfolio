@@ -19,6 +19,7 @@ import {
 import { projects } from '../data/projects';
 import { deriveEdges } from '../utils/graphTopology';
 import { PLANAR_NODE_SEEDS, scaleSeeds } from '../data/graphSeeds';
+import { countSeedCrossings } from '../utils/graphPlanarity';
 
 const PROJECT_IDS = projects.map((p) => p.id);
 
@@ -41,44 +42,6 @@ function ringPositions(width: number, height: number): Record<string, [number, n
     out[id] = [cx + radius * Math.cos(angle), cy + radius * Math.sin(angle)];
   });
   return out;
-}
-
-type SeedPoint = [number, number];
-
-function cross(origin: SeedPoint, a: SeedPoint, b: SeedPoint): number {
-  return (a[0] - origin[0]) * (b[1] - origin[1]) - (a[1] - origin[1]) * (b[0] - origin[0]);
-}
-
-function properIntersection(a: SeedPoint, b: SeedPoint, c: SeedPoint, d: SeedPoint): boolean {
-  const d1 = cross(c, d, a);
-  const d2 = cross(c, d, b);
-  const d3 = cross(a, b, c);
-  const d4 = cross(a, b, d);
-  return d1 * d2 < 0 && d3 * d4 < 0;
-}
-
-/** Count proper crossings in a position map without importing test helpers. */
-function countSeedCrossings(positions: Record<string, SeedPoint>): number {
-  const segments = LINKS.map((edge) => ({
-    ...edge,
-    a: positions[edge.source],
-    b: positions[edge.target],
-  }));
-  let crossings = 0;
-  for (let i = 0; i < segments.length; i += 1) {
-    for (let j = i + 1; j < segments.length; j += 1) {
-      const left = segments[i];
-      const right = segments[j];
-      const sharesEndpoint =
-        left.source === right.source ||
-        left.source === right.target ||
-        left.target === right.source ||
-        left.target === right.target;
-      if (sharesEndpoint) continue;
-      if (properIntersection(left.a, left.b, right.a, right.b)) crossings += 1;
-    }
-  }
-  return crossings;
 }
 
 function settle(width: number, height: number) {
@@ -534,7 +497,7 @@ describe('visual ambient drift', () => {
         const base = positions[id];
         displaced[id] = [base[0] + offset.x, base[1] + offset.y];
       }
-      expect(countSeedCrossings(displaced), `t=${time}ms`).toBe(0);
+      expect(countSeedCrossings(displaced, LINKS), `t=${time}ms`).toBe(0);
     }
   });
 });

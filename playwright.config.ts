@@ -9,6 +9,8 @@ const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim() || unde
 
 export default defineConfig({
   testDir: './e2e',
+  // Studio has an isolated dev-only config/port; never run it here.
+  testIgnore: ['studio.spec.ts'],
   timeout: 30_000,
   // A single worker avoids two simultaneous WebServer/dev-server handshakes
   // racing for port 5199 (ECONNREFUSED) across the desktop and mobile projects.

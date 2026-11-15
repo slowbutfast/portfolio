@@ -1,0 +1,65 @@
+# Verification: `project-studio`
+
+## Environment
+- Node `v22.23.2`, npm `10.9.8`
+- Base commit: `0d25b45` (planning artifacts; seeded from `master` `8a9090a`)
+- Dependencies: `npm install --no-audit --no-fund` → 130 packages added
+
+## Commands & Empirical Results
+
+| Command | Result |
+|---|---|
+| `npm run typecheck` | exit `0`, no diagnostics |
+| `npm run test:unit` | exit `0`; 22 files, **240 passed**, 0 skipped (240 total) |
+| `npm run build` | exit `0`; 1968 modules, single JS chunk `dist/assets/index-DBL2akFL.js` (358.69 kB) |
+| `grep -rl "StudioApp\|__studio/api\|#/studio" dist/` | **no matches** (zero Studio symbols in `dist/`) |
+| `CI=1 npx playwright test --config=./e2e/playwright.studio.config.ts` | exit `0`; **6 passed**, 6 expected skips (5 desktop + 1 mobile test; desktop tests skip on mobile and vice versa) |
+| `CI=1 npx playwright test --config=./playwright.config.ts` | exit `0`; **112 passed**, 38 skipped (skips are pre-existing preview/CPU-throttle gates) |
+| `npm run test:links` | **runs on plain Node `22.23.2`** (no TS stripping); 16 URLs: 13 pass, 1 warning (LinkedIn `999`), 2 pre-existing `404`s (`sandwave-sim`, `transcribe-plus` GitHub repos); exit `1` from those 404s |
+
+> These results include `PATCH-01` (PUT race, canonical catalog/`ALL_TAGS`, ESM audit CLI, CSPRNG token, edge deduplication, DNS pinning), `PATCH-02` (serialize-after-validate, IPv4-first audit fallback, prototype-safe seed parity, spec/architecture sync), and `PATCH-03` (responsive Studio tabs, mobile action bar, 44px touch targets, numeric seed controls).
+
+## Golden Equivalence
+- Pre-refactor fixture: `src/data/__fixtures__/projects.pre-refactor.json`, captured from the
+  TypeScript catalog before migration.
+- `src/data/projects.test.ts` asserts hydrated `projects` (including Vite-resolved asset URLs),
+  `PLANAR_NODE_SEEDS`, `HIDDEN_TAGS`, and per-project `getVisibleTags` are deeply equal to it.
+
+## Production Zero-Exposure
+- `npm run build` emits one application chunk and no Studio chunk; the dynamic import is inside the
+  compile-time `import.meta.env.DEV` branch, and the `#/studio` literal is dev-only.
+- `vite preview` on `:5199`:
+  - `GET /__studio/api/state` → SPA fallback HTML, **no** token, `catalog`, or `revision` payload.
+  - `GET /` serves the normal portfolio shell.
+- `vite-studio-plugin.ts` registers middleware only in `configureServer` and imports no `scripts/`
+  module, so Vercel builds (which `.vercelignore` excludes `scripts/`) are unaffected.
+
+## Isolated Studio E2E Coverage
+`e2e/playwright.studio.config.ts` copies `src/data/projects.catalog.json` to a temp directory, boots
+Vite on port `5299` with `PORTFOLIO_STUDIO_WRITE=1` and `PORTFOLIO_STUDIO_CATALOG_PATH=<temp>`, and
+runs `desktop` plus `mobile` (`Pixel 7`). The suite has 5 desktop test cases, 1 mobile test case, and
+an `afterAll` byte-identity assertion:
+1. Create → edit → rename `id` (seed key follows) → save → delete → save.
+2. Tag create/rename/hide with cascades and reserved `art` controls disabled.
+3. Dragging a seed into a crossing disables Save and shows the crossing alert.
+4. `Check Links` renders inline `pass` + `latencyMs`.
+5. Studio route mounts only in dev; `← Portfolio` exits.
+6. Mobile: `Projects | Edit | Map & Tags` tab switching, auto-switch to Edit on project tap, zero
+   horizontal overflow, `>= 44px` action/tab targets, numeric `x` seed editing + `±0.02` nudge.
+7. `afterAll` assertion (not a separate test) checks the real `src/data/projects.catalog.json` is byte-identical to its start state.
+
+## Notes / Deviations
+- `GET /__studio/api/state` intentionally issues the same per-server token for the middleware
+  lifetime (single local session); `PUT`/`POST` require it and Origin/Host/Sec-Fetch-Site guards.
+- Link audit resolves DNS before each hop, re-validates manual redirects, and pins the validated IP on
+  default Node `http`/`https` sockets while preserving `Host` and TLS `servername`. Validated addresses
+  are attempted IPv4-first with IPv6 fallback, so an AAAA-first resolution without an IPv6 route does
+  not fail a healthy link. Injected `fetchImpl` test transports keep the hostname (tests never touch
+  the network).
+- `PUT` validates the catalog before serializing it; malformed payloads return `400` from inside the
+  write queue without throwing out of the middleware.
+- Below `lg`, the Studio uses a single-pane `Projects | Edit | Map & Tags` layout with a fixed mobile
+  action bar; `vite-studio-plugin.ts` is unchanged, so the API remains localhost-only (remote
+  `Origin` is still rejected by `hostGuard`).
+- Two catalog `repo` links (`slowbutfast/sandwave-sim`, `slowbutfast/transcribe-plus`) are private and
+  return `404`; the catalog URLs were intentionally left unchanged pending a product decision.

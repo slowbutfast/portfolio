@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vitest/config';
 import { resolveCommitHash } from './src/utils/commitHash';
+import { studioDevPlugin } from './vite-studio-plugin';
 
 // Vercel's system variable first, then a local checkout, then `dev`. Git's
 // stderr is suppressed so builds without `.git` do not log a fatal error.
@@ -17,6 +18,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    studioDevPlugin(),
     {
       name: 'wip-art-dir-index',
       configureServer(server) {

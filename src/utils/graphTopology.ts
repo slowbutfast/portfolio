@@ -1,4 +1,4 @@
-import { getVisibleTags } from '../data/projects';
+import { getVisibleTags, HIDDEN_TAGS } from '../data/tagRegistry';
 import type { ParadigmTag } from '../types/portfolio';
 
 export interface GraphEdge {
@@ -11,16 +11,20 @@ type Tagged = { id: string; tags: ParadigmTag[] };
 
 /**
  * Derive an undirected edge between two projects if and only if they share at
- * least one controlled paradigm tag. Edge labels carry the shared tags.
- * Output is deterministically sorted for stable diffs and test assertions.
+ * least one visible controlled paradigm tag. Edge labels carry the shared tags.
+ * `hiddenTags` is injectable so Studio drafts can preview topology without
+ * mutating module state. Output is deterministically sorted.
  */
-export function deriveEdges(projects: Tagged[]): GraphEdge[] {
+export function deriveEdges(
+  projects: Tagged[],
+  hiddenTags: ReadonlySet<ParadigmTag> = HIDDEN_TAGS,
+): GraphEdge[] {
   const edges: GraphEdge[] = [];
   for (let i = 0; i < projects.length; i += 1) {
     for (let j = i + 1; j < projects.length; j += 1) {
       const a = projects[i];
       const b = projects[j];
-      const shared = getVisibleTags(a.tags).filter((t) => b.tags.includes(t)).sort();
+      const shared = getVisibleTags(a.tags, hiddenTags).filter((t) => b.tags.includes(t)).sort();
       if (shared.length > 0) {
         edges.push({ source: a.id, target: b.id, tags: shared });
       }
