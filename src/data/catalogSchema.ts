@@ -1,6 +1,6 @@
 import type { ParadigmTag } from '../types/portfolio';
-import { deriveEdgesPure } from '../utils/graphEdges';
-import { countSeedCrossings, type Positions } from '../utils/graphPlanarity';
+import { deriveEdgesPure } from '../utils/graphEdges.js';
+import { countSeedCrossings, type Positions } from '../utils/graphPlanarity.js';
 
 export const PROJECT_ID_PATTERN = /^[a-z0-9-]+$/;
 export const RESERVED_PROJECT_ID = 'art-wip';

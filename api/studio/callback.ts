@@ -12,14 +12,14 @@ import {
   type OAuthTransaction,
   type StudioEnv,
   type StudioSession,
-} from './_lib/auth';
+} from './_lib/auth.js';
 import {
   HttpError,
   readCookie,
   redirect,
   sanitizeError,
   sendJson,
-} from './_lib/http';
+} from './_lib/http.js';
 
 interface TokenResponse {
   access_token?: string;

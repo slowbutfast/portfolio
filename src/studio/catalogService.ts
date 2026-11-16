@@ -6,7 +6,7 @@ import {
   serializeCatalog,
   validateCatalog,
   type ProjectCatalog,
-} from '../data/catalogSchema';
+} from '../data/catalogSchema.js';
 import {
   checkUrl,
   extractUniqueUrls,
@@ -65,6 +65,13 @@ export interface CatalogState {
   branchUrl?: string;
 }
 
+export class AuditTimeoutError extends Error {
+  constructor() {
+    super('Link audit timed out');
+    this.name = 'AuditTimeoutError';
+  }
+}
+
 export class CatalogConflictError extends Error {
   constructor(message = 'Stale expectedRevision') {
     super(message);
@@ -80,6 +87,13 @@ export class CatalogValidationError extends Error {
     this.name = 'CatalogValidationError';
     this.errors = errors;
   }
+}
+
+function isAbortError(cause: unknown): boolean {
+  return (
+    cause instanceof Error &&
+    (cause.name === 'AbortError' || cause.name === 'TimeoutError')
+  );
 }
 
 export class CatalogTooLargeError extends Error {
@@ -276,9 +290,11 @@ export async function auditLinks(
       adapter.readProfile({ signal: controller.signal }),
     ]);
   } catch (cause) {
-    // A read that loses the shared deadline yields an empty audit rather than
-    // a 500 or a hanging function.
-    if (controller.signal.aborted) return [];
+    // A read that loses the shared deadline is an explicit timeout, not a
+    // successful empty audit. Non-abort failures (e.g. GitHub 5xx) propagate.
+    if (controller.signal.aborted && isAbortError(cause)) {
+      throw new AuditTimeoutError();
+    }
     throw cause;
   } finally {
     if (timer) clearTimeout(timer);

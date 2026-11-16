@@ -4,8 +4,8 @@ import {
   requireConfig,
   requireMutation,
   type StudioEnv,
-} from './_lib/auth';
-import { HttpError, sanitizeError, sendJson } from './_lib/http';
+} from './_lib/auth.js';
+import { HttpError, sanitizeError, sendJson } from './_lib/http.js';
 
 export interface LogoutHandlerDeps {
   env?: StudioEnv;

@@ -6,8 +6,8 @@ import {
   txCookie,
   TX_TTL_SECONDS,
   type StudioEnv,
-} from './_lib/auth';
-import { HttpError, redirect, sanitizeError, sendJson } from './_lib/http';
+} from './_lib/auth.js';
+import { HttpError, redirect, sanitizeError, sendJson } from './_lib/http.js';
 
 export interface LoginHandlerDeps {
   env?: StudioEnv;

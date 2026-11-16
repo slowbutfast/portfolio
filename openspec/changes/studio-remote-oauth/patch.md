@@ -37,3 +37,21 @@
   - Tests exercise real `checkUrl` cancellation and slow adapter read abortion.
   - `GitHubApiError` lives in `api/studio/_lib/errors.ts` so `login`/`callback`/`ping` stay lean.
 - **Status**: RESOLVED (2026-11-15 22:36:46 UTC)
+
+### [PATCH-03] Add explicit .js extensions and JSON import attributes for Vercel Node 22 ESM, and return 504 on timed-out audit reads
+- **Date**: 2026-11-16 00:08:00 UTC
+- **Feedback Source**: Vercel Preview Smoke Check (`/api/studio/ping` `500 FUNCTION_INVOCATION_FAILED`) + Code Review Round 3 (`3dcad7c`)
+- **Reported Issue**:
+  1. `Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/var/task/src/data/catalogSchema' imported from /var/task/api/studio/ping.js`
+  2. `auditLinks()` in `src/studio/catalogService.ts` returns `[]` with HTTP `200` when `readCatalog`/`readProfile` times out, causing `StudioApp.tsx` to display `"Checked 0 links"` as if the audit succeeded.
+  3. `requestPinned` in `src/utils/linkAudit.mjs` does not listen to `response` `aborted`/`error`/`close` events if aborted mid-body.
+- **Root Cause**:
+  1. `package.json` sets `"type": "module"`, and Vercel's `@vercel/node` compiles `api/**/*.ts` to unbundled Node 22 ESM `.js` files requiring explicit `.js`/`.mjs`/`.json` extensions and `with { type: 'json' }`.
+  2. `auditLinks()` caught abort errors and returned `[]` instead of throwing a timeout error mapped to `504`.
+- **Target Files**: `api/studio/ping.ts, api/studio/login.ts, api/studio/callback.ts, api/studio/logout.ts, api/studio/state.ts, api/studio/audit-links.ts, api/studio/_lib/auth.ts, api/studio/_lib/http.ts, api/studio/_lib/githubAdapter.ts, api/studio/_lib/manifest.ts, src/data/catalogSchema.ts, src/studio/catalogService.ts, src/utils/linkAudit.mjs, src/utils/studioAuth.test.ts, openspec/changes/studio-remote-oauth/tasks.md, openspec/changes/studio-remote-oauth/verification.md`
+- **Expected Resolution**:
+  - Every relative runtime import in `api/**/*.ts` and its shared `src/` dependencies uses `.js`/`.mjs`/`.json`, and JSON imports use `with { type: 'json' }`.
+  - Timed-out `auditLinks()` adapter reads throw `AuditTimeoutError`, mapped to HTTP `504` (`{ error: 'Link audit timed out' }`) so `StudioApp.tsx` displays an error.
+  - `requestPinned` rejects cleanly on mid-body `response` `aborted`/`error`/incomplete `close`.
+  - `/api/studio/ping` on Vercel preview returns JSON `503` instead of `500 FUNCTION_INVOCATION_FAILED`.
+- **Status**: RESOLVED (2026-11-16 00:11:02 UTC)

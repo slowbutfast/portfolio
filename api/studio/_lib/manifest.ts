@@ -1,4 +1,4 @@
-import manifest from './asset-manifest.json';
+import manifest from './asset-manifest.json' with { type: 'json' };
 
 export interface AssetManifest {
   assetKeys: string[];

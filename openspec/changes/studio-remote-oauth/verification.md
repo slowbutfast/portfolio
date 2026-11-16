@@ -15,7 +15,7 @@ Node 22.x after `npm ci`.
 | Dynamic `default_branch` + blob-SHA target selection | `GitHubCatalogAdapter.resolveSource` compares catalog blob SHAs (not Compare status), so `ahead` and `diverged` targets both stay readable | PATCH-01 unit tests: ahead and diverged targets read/write `studio/catalog` without a reset; identical blob falls back to default |
 | Ref create/reset only when needed + concurrent `422 Reference already exists` | `resetTargetRef` PATCH → POST → PATCH retry; divergent targets commit directly with Contents `sha` | Unit test scripts `PATCH 404`, `POST 422`, `PATCH 200`; PATCH-01 tests assert zero ref mutation for ahead/diverged saves and target==default rejection |
 | Stale revision / SHA mismatch → `409 Conflict` | Revision checked against the source branch before mutation; base-commit file SHA pinned on reset | Unit tests: stale revision never touches refs; `409` and SHA `422` → `CatalogConflictError`; non-SHA `422` preserved |
-| Bounded auditing (`retries: 0`, 8s deadline, 50 URLs, concurrency 4) | `runBoundedAudit` charges adapter reads via `startedAt`; external `AbortSignal` cancels `checkUrl`/pinned requests; `auditLinks` aborts slow adapter reads; `vercel.json` sets `maxDuration: 10` | Unit tests: 60 URLs → 50 checks, all `retries: 0`, peak concurrency ≤ 4, request-start deadline, real `checkUrl` abort, slow-read abort |
+| Bounded auditing (`retries: 0`, 8s deadline, 50 URLs, concurrency 4) | `runBoundedAudit` charges adapter reads via `startedAt`; external `AbortSignal` cancels `checkUrl`/pinned requests; timed-out adapter reads throw `AuditTimeoutError` → HTTP `504`; `vercel.json` sets `maxDuration: 10` | Unit tests: 60 URLs → 50 checks, all `retries: 0`, peak concurrency ≤ 4, request-start deadline, real `checkUrl` abort, slow-read abort, and handler `504` |
 | Committed manifest, zero drift, no `scripts/` on Vercel | `api/studio/_lib/asset-manifest.json` + static `manifest.ts` import | Unit test walks `src/assets` + `src/data/captured` and compares; `.vercelignore` unchanged |
 | Pure server core | `src/utils/graphEdges.ts` | Unit test asserts zero `projects.catalog.json` / `tagRegistry` imports in `graphEdges.ts`, `catalogSchema.ts`, `catalogService.ts` |
 | `sessionStorage` draft restore + base-revision drift warning | `StudioApp` `studio_pending_draft` save/restore; pending draft consumed once via a ref to survive StrictMode | `e2e/studio.spec.ts` restores a draft, shows `studio-draft-drift`, keeps “Unsaved changes”, then clears on Discard |
@@ -195,6 +195,51 @@ index-BpdyaalS.js studio-app marker: false
 
 $ openspec validate studio-remote-oauth --strict --json
 valid: true, issues: []
+```
+
+**Pending activation gates (unchanged):** `tasks.md` `5.1`–`5.3` remain
+unchecked pending owner credentials and `.vercel/output` / live OAuth E2E.
+
+## PATCH-03 Verification (2026-11-16 00:11:02 UTC)
+
+**Reproduction:** added an ESM specifier scan over `api/**/*.ts` plus the shared
+server modules, `AuditTimeoutError`/`504` tests, and updated the slow-read test
+to require a timeout rather than a successful empty audit. The scan reported
+extensionless imports and the timeout tests failed before the fix.
+
+**Applied fixes:**
+- Explicit `.js` specifiers throughout `api/**/*.ts`, `src/data/catalogSchema.ts`,
+  and `src/studio/catalogService.ts`; JSON imports (`ping` catalog,
+  `asset-manifest.json`) use `with { type: 'json' }`.
+- `AuditTimeoutError` is thrown only when the shared deadline aborted the
+  adapter read; non-abort GitHub failures still propagate. `http.ts` maps it to
+  `504 { error: 'Link audit timed out' }`.
+- `requestPinned()` now settles on response `error`/`aborted` and incomplete
+  `close`, so mid-body cancellation cannot leave the promise pending.
+
+```text
+$ npx vitest run src/utils/studioAuth.test.ts
+Test Files  1 passed (1)
+     Tests  42 passed (42)
+
+$ npm run typecheck
+(exit 0)
+
+$ npx vitest run
+Test Files  23 passed (23)
+     Tests  285 passed (285)
+
+$ npm run build
+✓ built in 5.03s
+index-BpdyaalS.js studio-app marker: false
+
+$ openspec validate studio-remote-oauth --strict --json
+valid: true, issues: []
+
+# Unbundled esbuild (Node 22 ESM) smoke:
+$ node --input-type=module -e "import('/tmp/esm-check/api/studio/ping.js')..."
+ping status 503 {"error":"Studio is not configured"}
+adapter loaded function
 ```
 
 **Pending activation gates (unchanged):** `tasks.md` `5.1`–`5.3` remain

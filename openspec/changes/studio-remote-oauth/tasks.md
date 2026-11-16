@@ -53,3 +53,12 @@
   - `login`/`callback`/`ping` no longer import the adapter or asset manifest; `GitHubApiError(503)` maps to a `503` response.
 - [x] P02.4 Verify `npx vitest run src/utils/studioAuth.test.ts` and `npm run typecheck && npm run test:unit && npm run build && npx openspec validate "studio-remote-oauth" --strict --json`, update `verification.md`, and mark `PATCH-02` resolved in `patch.md`.
   - 38 focused tests and 281 total unit tests pass; typecheck/build clean; strict OpenSpec validation valid with 0 issues.
+
+## Patch 03: Add explicit .js extensions, JSON import attributes, and 504 audit-timeout error
+
+- [x] P03.1 Add failing unit tests in `src/utils/studioAuth.test.ts` for: (a) Node-ESM `.js`/`.mjs`/`.json` extensions and `with { type: 'json' }` across `api/**/*.ts`, `src/data/catalogSchema.ts`, `src/utils/graphEdges.ts`, and `src/studio/catalogService.ts`; and (b) `auditLinks()` throwing `AuditTimeoutError` and `POST /api/studio/audit-links` returning HTTP `504` when adapter reads time out.
+  - Added 4 PATCH-03 tests (42 total in `studioAuth.test.ts`); the extension scan and 504 assertions failed before the fix.
+- [x] P03.2 Update relative imports to `.js` and JSON imports to `with { type: 'json' }` in `api/studio/*.ts`, `api/studio/_lib/*.ts`, `src/data/catalogSchema.ts`, and `src/studio/catalogService.ts`; throw `AuditTimeoutError` on aborted reads in `catalogService.ts` mapped to `504` in `http.ts`; handle `response` `aborted`/`error`/incomplete `close` in `linkAudit.mjs`.
+- [x] P03.3 Verify `npx vitest run src/utils/studioAuth.test.ts` and `npm run typecheck && npm run test:unit && npm run build && npx openspec validate "studio-remote-oauth" --strict --json` pass.
+  - 42 focused / 285 total tests pass; typecheck/build clean; strict validation valid with 0 issues. An unbundled esbuild → Node 22 ESM smoke loaded all API modules and returned ping `503` without `ERR_MODULE_NOT_FOUND`.
+- [x] P03.4 Update `openspec/changes/studio-remote-oauth/verification.md` and mark `PATCH-03` resolved in `openspec/changes/studio-remote-oauth/patch.md`.

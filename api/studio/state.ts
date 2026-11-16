@@ -1,20 +1,20 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { MAX_CATALOG_BYTES } from '../../src/data/catalogSchema';
+import { MAX_CATALOG_BYTES } from '../../src/data/catalogSchema.js';
 import {
   getState,
   isCatalogPayload,
   putState,
   type CatalogAdapter,
-} from '../../src/studio/catalogService';
+} from '../../src/studio/catalogService.js';
 import {
   requireConfig,
   requireMutation,
   requireOwner,
   type AuthConfig,
   type StudioEnv,
-} from './_lib/auth';
-import { GitHubCatalogAdapter } from './_lib/githubAdapter';
-import { HttpError, readJsonBody, sanitizeError, sendJson } from './_lib/http';
+} from './_lib/auth.js';
+import { GitHubCatalogAdapter } from './_lib/githubAdapter.js';
+import { HttpError, readJsonBody, sanitizeError, sendJson } from './_lib/http.js';
 
 export interface StateHandlerDeps {
   env?: StudioEnv;

@@ -39,6 +39,7 @@ import { HttpError } from '../../api/studio/_lib/http';
 import {
   CatalogConflictError,
   MAX_AUDIT_URLS,
+  AuditTimeoutError,
   revisionOf,
   runBoundedAudit,
   type CatalogAdapter,
@@ -199,7 +200,7 @@ describe('committed asset manifest', () => {
       expect(source, file).not.toMatch(/tagRegistry/);
     }
     expect(readFileSync(resolve(repoRoot, 'src/data/catalogSchema.ts'), 'utf8')).toMatch(
-      /from '\.\.\/utils\/graphEdges'/,
+      /from '\.\.\/utils\/graphEdges(?:\.js)?'/,
     );
   });
 
@@ -829,18 +830,19 @@ describe('PATCH-02: external cancellation and error extraction', () => {
       loadRegistries: async () => ({ assetKeys: new Set(), capturedKeys: new Set() }),
     };
     const { auditLinks } = await import('../studio/catalogService');
-    const results = await auditLinks(adapter, {
-      deadlineMs: 30,
-      checkImpl: async (url) => ({
-        url,
-        status: 200,
-        outcome: 'pass',
-        attempts: 1,
-        latencyMs: 1,
+    await expect(
+      auditLinks(adapter, {
+        deadlineMs: 30,
+        checkImpl: async (url) => ({
+          url,
+          status: 200,
+          outcome: 'pass',
+          attempts: 1,
+          latencyMs: 1,
+        }),
       }),
-    });
+    ).rejects.toBeInstanceOf(AuditTimeoutError);
 
-    expect(results).toEqual([]);
     expect(signals).toHaveLength(2);
     expect(signals.every((signal) => signal?.aborted)).toBe(true);
   });
@@ -1025,5 +1027,98 @@ describe('PATCH-01: github adapter and error mapping', () => {
     expect(server.status).toBe(502);
     expect(JSON.stringify(server.body)).not.toContain('secret upstream');
     errorSpy.mockRestore();
+  });
+});
+
+describe('PATCH-03: Vercel ESM specifiers and audit timeout status', () => {
+  it('uses explicit ESM extensions and JSON import attributes for server modules', () => {
+    const shared = [
+      'src/data/catalogSchema.ts',
+      'src/utils/graphEdges.ts',
+      'src/studio/catalogService.ts',
+    ];
+    const files = [
+      ...walk(resolve(repoRoot, 'api'))
+        .filter((file) => file.endsWith('.ts'))
+        .map((file) => `api/${file}`),
+      ...shared,
+    ];
+    const offenders: string[] = [];
+    for (const file of files) {
+      const source = readFileSync(resolve(repoRoot, file), 'utf8');
+      const statements = source.match(/^\s*import\s+[^;]+;/gm) ?? [];
+      for (const statement of statements) {
+        if (/^\s*import\s+type\b/.test(statement)) continue;
+        const specifier = statement.match(/\bfrom\s+['"](\.[^'"]+)['"]/)?.[1];
+        if (!specifier) continue;
+        if (!/\.(?:js|mjs|json)$/.test(specifier)) {
+          offenders.push(`${file} -> ${specifier}`);
+        }
+        if (
+          specifier.endsWith('.json') &&
+          !/with\s*\{\s*type:\s*['"]json['"]\s*\}/.test(statement)
+        ) {
+          offenders.push(`${file} -> ${specifier} (missing with { type: 'json' })`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('preserves non-abort adapter read failures', async () => {
+    const adapter: CatalogAdapter = {
+      readCatalog: async () => {
+        throw new Error('github down');
+      },
+      writeCatalog: async () => ({ revision: 'rev' }),
+      readProfile: async () => '',
+      loadRegistries: async () => ({ assetKeys: new Set(), capturedKeys: new Set() }),
+    };
+    const { auditLinks } = await import('../studio/catalogService');
+    await expect(
+      auditLinks(adapter, { deadlineMs: 1000, checkImpl: async () => {
+        throw new Error('unreachable');
+      } }),
+    ).rejects.toThrow('github down');
+  });
+
+  it('maps AuditTimeoutError to HTTP 504', async () => {
+    const { sanitizeError } = await import('../../api/studio/_lib/http');
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const response = sanitizeError(new AuditTimeoutError());
+    expect(response).toEqual({ status: 504, body: { error: 'Link audit timed out' } });
+    errorSpy.mockRestore();
+  });
+
+  it('returns 504 when audit adapter reads time out', async () => {
+    vi.useFakeTimers();
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const slow = (options?: { signal?: AbortSignal }) =>
+        new Promise<string>((_resolve, reject) => {
+          const abort = () =>
+            reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+          if (options?.signal?.aborted) abort();
+          else options?.signal?.addEventListener('abort', abort, { once: true });
+        });
+      const adapter: CatalogAdapter = {
+        readCatalog: async (options) => ({ revision: 'rev', bytes: await slow(options) }),
+        writeCatalog: async () => ({ revision: 'rev' }),
+        readProfile: (options) => slow(options),
+        loadRegistries: async () => ({ assetKeys: new Set(), capturedKeys: new Set() }),
+      };
+      const handler = createAuditLinksHandler({
+        env: BASE_ENV,
+        createAdapter: () => adapter,
+      });
+      const pending = invoke(handler, { method: 'POST', headers: authHeaders() });
+      await vi.advanceTimersByTimeAsync(8000);
+      const response = await pending;
+      expect(response.statusCode).toBe(504);
+      expect(JSON.parse(response.body)).toEqual({ error: 'Link audit timed out' });
+    } finally {
+      errorSpy.mockRestore();
+      vi.useRealTimers();
+    }
   });
 });

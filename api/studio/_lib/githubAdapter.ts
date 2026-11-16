@@ -5,11 +5,11 @@ import {
   type CatalogReadResult,
   type CatalogRegistries,
   type CatalogWriteResult,
-} from '../../../src/studio/catalogService';
-import { GitHubApiError } from './errors';
-import { assetKeySet, capturedKeySet } from './manifest';
+} from '../../../src/studio/catalogService.js';
+import { GitHubApiError } from './errors.js';
+import { assetKeySet, capturedKeySet } from './manifest.js';
 
-export { GitHubApiError } from './errors';
+export { GitHubApiError } from './errors.js';
 
 const CATALOG_PATH = 'src/data/projects.catalog.json';
 const PROFILE_PATH = 'src/data/profile.ts';

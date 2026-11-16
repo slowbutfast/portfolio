@@ -1,13 +1,13 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { auditLinks, type CatalogAdapter } from '../../src/studio/catalogService';
+import { auditLinks, type CatalogAdapter } from '../../src/studio/catalogService.js';
 import {
   requireConfig,
   requireMutation,
   type AuthConfig,
   type StudioEnv,
-} from './_lib/auth';
-import { defaultAdapter } from './state';
-import { HttpError, sanitizeError, sendJson } from './_lib/http';
+} from './_lib/auth.js';
+import { defaultAdapter } from './state.js';
+import { HttpError, sanitizeError, sendJson } from './_lib/http.js';
 
 export const maxDuration = 10;
 

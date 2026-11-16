@@ -219,9 +219,17 @@ function requestPinned(method, url, address, timeoutMs, userAgent, signal) {
       },
       (response) => {
         response.resume();
-        response.on('end', () => {
+        const settle = (fn, value) => {
           cleanup();
-          resolve(responseLike(response.statusCode ?? 0, response.headers));
+          fn(value);
+        };
+        response.on('end', () =>
+          settle(resolve, responseLike(response.statusCode ?? 0, response.headers)),
+        );
+        response.on('error', (error) => settle(reject, error));
+        response.on('aborted', () => settle(reject, abortError('response aborted')));
+        response.on('close', () => {
+          if (!response.complete) settle(reject, abortError('response aborted'));
         });
       },
     );

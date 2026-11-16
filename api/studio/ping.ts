@@ -1,8 +1,8 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import catalog from '../../src/data/projects.catalog.json';
-import { validateCatalog } from '../../src/data/catalogSchema';
-import { requireConfig, type StudioEnv } from './_lib/auth';
-import { HttpError, sanitizeError, sendJson } from './_lib/http';
+import catalog from '../../src/data/projects.catalog.json' with { type: 'json' };
+import { validateCatalog } from '../../src/data/catalogSchema.js';
+import { requireConfig, type StudioEnv } from './_lib/auth.js';
+import { HttpError, sanitizeError, sendJson } from './_lib/http.js';
 
 export interface PingHandlerDeps {
   env?: StudioEnv;

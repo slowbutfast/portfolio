@@ -1,50 +1,55 @@
-# Surgical Patch Handoff: OpenSpec Change 'studio-remote-oauth' [PATCH-02]
+# Surgical Patch Handoff: OpenSpec Change 'studio-remote-oauth' [PATCH-03]
 
 ## 1. Executive Objective & Diagnostic Feedback
 - **Change Name**: `studio-remote-oauth`
-- **Patch ID**: `PATCH-02`
-- **Objective**: Wire external `AbortSignal` cancellation through `checkUrl()` and `CatalogAdapter` reads (`readCatalog` / `readProfile`) under the shared `auditLinks()` deadline, extract `GitHubApiError` into `api/studio/_lib/errors.ts`, and test the real `checkUrl` cancellation path.
+- **Patch ID**: `PATCH-03`
+- **Objective**: Add explicit `.js` extensions and `with { type: 'json' }` attributes for Vercel Node 22 ESM, return HTTP `504` instead of `[]` (`200`) when `auditLinks()` adapter reads time out, and handle mid-body response aborts in `requestPinned()`.
 - **Feedback & Diagnostic Trace**:
   ```text
-  PR #19 (head ba14ca8) — Round 2 Review:
-  1. src/studio/catalogService.ts & src/utils/linkAudit.mjs:
-     - runBoundedAudit() passes `signal` via `as LinkCheckOptions`, but `checkUrl()` does not accept or honor an external `AbortSignal`. Real HTTP/HTTPS requests (`requestPinned` / `fetchWithTimeout`) continue until their own timeout.
-     - `auditLinks()` awaits `adapter.readCatalog()` and `adapter.readProfile()` before starting `runBoundedAudit()`, with no timeout or cancellation on those GitHub fetches.
-     Fix: Add `signal?: AbortSignal` to `LinkCheckOptions` (`linkAudit.d.mts`), honor it in `checkUrl` / `requestPinned` / `fetchWithTimeout` (`linkAudit.mjs`), remove the `as LinkCheckOptions` cast (`catalogService.ts`), and pass a shared deadline `AbortSignal` into `adapter.readCatalog({ signal })` / `adapter.readProfile({ signal })` and `GitHubCatalogAdapter` fetches.
-  2. Bundling & Error Status Nits:
-     - `http.ts` imports `GitHubApiError` from `githubAdapter.ts`, dragging the adapter and `asset-manifest.json` into `login`, `callback`, and `ping`. Extract `GitHubApiError` into `api/studio/_lib/errors.ts` (re-export from `githubAdapter.ts`).
-     - Adapter target-equals-default error should surface as `503` (config error), not `400`.
+  1. Vercel /api/studio/ping log (2026-11-15T22:51:29Z):
+     Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/var/task/src/data/catalogSchema' imported from /var/task/api/studio/ping.js
+  2. Code Review Round 3 (head 3dcad7c):
+     - src/studio/catalogService.ts:278: If readCatalog/readProfile times out, auditLinks() returns [] (HTTP 200), so StudioApp displays "Checked 0 links" as if the audit succeeded, and can mask concurrent GitHub errors. Throw AuditTimeoutError and map to HTTP 504 in sanitizeError().
+     - src/utils/linkAudit.mjs (requestPinned): Attach response 'aborted'/'error'/incomplete-'close' listeners so mid-body aborts reject cleanly instead of staying pending.
   ```
 - **Root Cause Analysis**:
-  - `checkUrl()` only created an internal `AbortController` per request and never listened to an external `signal`.
-  - `CatalogAdapter.readCatalog` / `readProfile` lacked an optional `{ signal?: AbortSignal }` parameter.
+  - `package.json` specifies `"type": "module"`. Vercel compiles `api/**/*.ts` to unbundled `.js` ESM files under `/var/task/`, where Node 22 requires explicit `.js` extensions and `with { type: 'json' }`.
+  - `auditLinks()` caught `controller.signal.aborted` and returned `[]` instead of throwing an explicit timeout error.
 
 ## 2. Strict Target Context Map
 | File Path (relative to repo root) | Target Lines | Modification Summary |
 |---|---|---|
-| `src/utils/linkAudit.d.mts` | `L14-L21` | Add `signal?: AbortSignal;` to `LinkCheckOptions`. |
-| `src/utils/linkAudit.mjs` | `L198-L350` | Thread external `signal` into `checkUrl`, `requestPinned` (destroy request on abort, clean up listener), and `fetchWithTimeout` (`AbortSignal.any` or listener); stop retry loop immediately when `signal?.aborted`. |
-| `src/studio/catalogService.ts` | `L47-L52`, `L143-L266`, `L292-L300` | Add optional `options?: { signal?: AbortSignal }` to `CatalogAdapter.readCatalog` & `readProfile`; remove `as LinkCheckOptions` cast in `runBoundedAudit`; in `auditLinks`, create a deadline `AbortController` tied to `startedAt + deadlineMs` and pass `{ signal }` to `readCatalog` and `readProfile` (clearing timer in `finally`). |
-| `api/studio/_lib/errors.ts` | `(new file)` | Define and export `GitHubApiError` (moved out of `githubAdapter.ts`). |
-| `api/studio/_lib/githubAdapter.ts` | `L1-L23`, `L76-L206` | Import and re-export `GitHubApiError` from `./errors`; accept optional `{ signal?: AbortSignal }` in `readCatalog`/`readProfile` and forward `signal` to `resolveSource`, `readContents`, `defaultBranch`, `refSha`, and `request` (`fetchImpl` init); throw `503` if `defaultBranch === this.targetBranch` in `writeCatalog`/`resolveSource` when mismatched config occurs. |
-| `api/studio/_lib/http.ts` | `L1-L10` | Import `GitHubApiError` from `./errors` instead of `./githubAdapter`. |
-| `src/utils/studioAuth.test.ts` | `L736-L850` | Add tests exercising real `checkUrl` external `AbortSignal` cancellation (using `fetchImpl` or a hanging handler without mocking `checkImpl`) and `auditLinks` aborting slow `adapter.readCatalog`/`readProfile` reads at the shared deadline. |
-| `openspec/changes/studio-remote-oauth/tasks.md` | `L47-L52` | Mark `P02.1`–`P02.4` as `[x]` upon completion. |
-| `openspec/changes/studio-remote-oauth/patch.md` | `L23-L45` | Mark `PATCH-02` `Status: RESOLVED` with timestamp upon completion. |
-| `openspec/changes/studio-remote-oauth/verification.md` | `L115-L180` | Append `PATCH-02` verification log. |
+| `api/studio/ping.ts` | `L2-L5` | Change JSON import to `with { type: 'json' }` and relative TS imports to `../../src/data/catalogSchema.js`, `./_lib/auth.js`, `./_lib/http.js`. |
+| `api/studio/login.ts` | `L2-L10` | Change relative imports to `./_lib/auth.js` and `./_lib/http.js`. |
+| `api/studio/callback.ts` | `L2-L22` | Change relative imports to `./_lib/auth.js` and `./_lib/http.js`. |
+| `api/studio/logout.ts` | `L2-L8` | Change relative imports to `./_lib/auth.js` and `./_lib/http.js`. |
+| `api/studio/state.ts` | `L2-L17` | Change relative imports to `../../src/data/catalogSchema.js`, `../../src/studio/catalogService.js`, `./_lib/auth.js`, `./_lib/githubAdapter.js`, `./_lib/http.js`. |
+| `api/studio/audit-links.ts` | `L2-L10` | Change relative imports to `../../src/studio/catalogService.js`, `./_lib/auth.js`, `./state.js`, `./_lib/http.js`. |
+| `api/studio/_lib/auth.ts` | `L3` | Change `./http` to `./http.js`. |
+| `api/studio/_lib/http.ts` | `L2-L7`, `L120-L132` | Change `../../../src/studio/catalogService` and `./errors` to `.js`; import `AuditTimeoutError` and map `cause instanceof AuditTimeoutError` -> `logFailure(cause, 504)` and `{ status: 504, body: { error: 'Link audit timed out' } }`. |
+| `api/studio/_lib/githubAdapter.ts` | `L1-L12` | Change `../../../src/studio/catalogService`, `./errors`, `./manifest` (including `export { GitHubApiError } from './errors.js'`) to `.js`. |
+| `api/studio/_lib/manifest.ts` | `L1` | Change `import manifest from './asset-manifest.json';` to `import manifest from './asset-manifest.json' with { type: 'json' };`. |
+| `src/data/catalogSchema.ts` | `L1-L3` | Change `../utils/graphEdges` and `../utils/graphPlanarity` to `.js`. |
+| `src/studio/catalogService.ts` | `L4-L9`, `L81-L87`, `L271-L285` | Change `../data/catalogSchema` to `../data/catalogSchema.js`; export `AuditTimeoutError`; in `auditLinks()`, only treat abort-triggered failures (`controller.signal.aborted && isAbortError(cause)`) as timeout and throw `new AuditTimeoutError()` instead of returning `[]` (re-throw non-abort errors unchanged). |
+| `src/utils/linkAudit.mjs` | `L204-L240` | In `requestPinned()`, ensure `response.on('error', ...)` and `response.on('aborted', ...)` / incomplete `close` reject and call `cleanup()`. |
+| `src/utils/studioAuth.test.ts` | `(update/append)` | Add tests for: (1) Node-ESM `.js`/`.mjs`/`.json` extensions and `with { type: 'json' }` across `api/**/*.ts`, `catalogSchema.ts`, `graphEdges.ts`, and `catalogService.ts`; (2) `auditLinks()` throwing `AuditTimeoutError` and `POST /api/studio/audit-links` returning HTTP `504` when adapter reads time out (and not masking non-abort errors). |
+| `openspec/changes/studio-remote-oauth/tasks.md` | `P03.1-P03.4` | Mark `P03.1`–`P03.4` as `[x]`. |
+| `openspec/changes/studio-remote-oauth/patch.md` | `PATCH-03` | Mark `PATCH-03` `Status: RESOLVED` with timestamp. |
+| `openspec/changes/studio-remote-oauth/verification.md` | `(append)` | Append `PATCH-03` verification log. |
 
 ## 3. Blast Radius & Invariant Guardrails
-- **STRICT BLAST RADIUS**: Modify ONLY the files and line ranges in the Target Context Map. Work in `/home/node/.local/share/opencode/worktree/af7796ae2766c7d7b6e4521206d2a14998dc77de/eager-chipmunk` (branch `feat/studio-remote-oauth`).
+- **STRICT BLAST RADIUS**: Modify ONLY the files and targets in the Target Context Map. Work in `/home/node/.local/share/opencode/worktree/af7796ae2766c7d7b6e4521206d2a14998dc77de/eager-chipmunk` (branch `feat/studio-remote-oauth`).
 - **FORBIDDEN**:
+  - Do NOT change `package.json` `"type": "module"` or `tsconfig.json` `"moduleResolution"`.
   - Do NOT modify `vercel.json`, `StudioApp.tsx`, or `.env` files.
   - Do NOT mark `tasks.md` `5.1`, `5.2`, or `5.3` as `[x]`.
-- **INVARIANTS TO PRESERVE**: All existing 278+ unit tests, `npm run typecheck`, `npm run build` (`studio-app` absent from main chunk), and `npx openspec validate "studio-remote-oauth" --strict --json` MUST pass.
+- **INVARIANTS TO PRESERVE**: All existing 281+ unit tests, `npm run typecheck`, `npm run build`, and `npx openspec validate "studio-remote-oauth" --strict --json` MUST pass.
 
 ## 4. Visual & UI Impact
-Status: Non-visual patch. No styling or layout modifications permitted.
+Status: Non-visual patch (`StudioApp.tsx` already displays non-2xx API errors via `setError(...)`). No styling or layout modifications permitted.
 
 ## 5. Reproduction & Verification Protocol
-1. **Reproduce First**: Add the real `checkUrl` cancellation and slow-adapter-read tests in `src/utils/studioAuth.test.ts` and run `npx vitest run src/utils/studioAuth.test.ts`. Confirm failure before fixing.
+1. **Reproduce First**: Add the ESM import-extension test and `504` audit-read-timeout test in `src/utils/studioAuth.test.ts` and run `npx vitest run src/utils/studioAuth.test.ts`. Confirm failure before fixing.
 2. **Apply Minimal Fix**: Implement the mapped edits.
 3. **Verify Fix**: Re-run `npx vitest run src/utils/studioAuth.test.ts` and confirm PASS.
 4. **Full Regression Suite**: Run `npm run typecheck && npm run test:unit && npm run build && npx openspec validate "studio-remote-oauth" --strict --json`. Confirm 100% clean passes.

@@ -1,10 +1,11 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
+  AuditTimeoutError,
   CatalogConflictError,
   CatalogTooLargeError,
   CatalogValidationError,
-} from '../../../src/studio/catalogService';
-import { GitHubApiError } from './errors';
+} from '../../../src/studio/catalogService.js';
+import { GitHubApiError } from './errors.js';
 
 export class HttpError extends Error {
   readonly status: number;
@@ -116,6 +117,10 @@ export function sanitizeError(cause: unknown): ErrorResponse {
   if (cause instanceof HttpError) {
     if (cause.status >= 500) logFailure(cause, cause.status);
     return { status: cause.status, body: { error: cause.message } };
+  }
+  if (cause instanceof AuditTimeoutError) {
+    logFailure(cause, 504);
+    return { status: 504, body: { error: 'Link audit timed out' } };
   }
   if (cause instanceof CatalogConflictError) {
     logFailure(cause, 409);

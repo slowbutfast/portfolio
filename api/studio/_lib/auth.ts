@@ -1,6 +1,6 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage } from 'node:http';
-import { HttpError, readCookie, readHeader, serializeCookie } from './http';
+import { HttpError, readCookie, readHeader, serializeCookie } from './http.js';
 
 export const SESSION_COOKIE = 'studio_session';
 export const CSRF_COOKIE = 'studio_csrf';
