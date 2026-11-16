@@ -1,21 +1,19 @@
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { dirname, extname, resolve, sep } from 'node:path';
+import { resolve } from 'node:path';
 import type { Plugin } from 'vite';
+import { MAX_CATALOG_BYTES } from './src/data/catalogSchema';
 import {
-  MAX_CATALOG_BYTES,
-  serializeCatalog,
-  validateCatalog,
-  type ProjectCatalog,
-} from './src/data/catalogSchema';
-import {
-  checkUrl,
-  extractUniqueUrls,
-  type LinkCheckResult,
-} from './src/utils/linkAudit.mjs';
+  auditLinks,
+  CatalogConflictError,
+  CatalogTooLargeError,
+  CatalogValidationError,
+  getState,
+  isCatalogPayload,
+  LocalFsCatalogAdapter,
+  putState,
+} from './src/studio/catalogService';
 
-const ASSET_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.mp4', '.webm']);
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
 export interface StudioPluginOptions {
@@ -46,7 +44,9 @@ function resolveOptions(options: StudioPluginOptions): ResolvedOptions {
     ...options,
     root,
     catalogPath: resolve(
-      options.catalogPath ?? process.env.PORTFOLIO_STUDIO_CATALOG_PATH ?? resolve(root, 'src/data/projects.catalog.json'),
+      options.catalogPath ??
+        process.env.PORTFOLIO_STUDIO_CATALOG_PATH ??
+        resolve(root, 'src/data/projects.catalog.json'),
     ),
     profilePath: resolve(options.profilePath ?? resolve(root, 'src/data/profile.ts')),
     assetsDir: resolve(options.assetsDir ?? resolve(root, 'src/assets')),
@@ -58,46 +58,6 @@ function resolveOptions(options: StudioPluginOptions): ResolvedOptions {
         ? process.env.PORTFOLIO_STUDIO_WRITE !== '0'
         : process.env.NODE_ENV !== 'production'),
   };
-}
-
-async function walkFiles(dir: string, base = dir): Promise<string[]> {
-  let entries;
-  try {
-    entries = await readdir(dir, { withFileTypes: true });
-  } catch {
-    return [];
-  }
-  const files: string[] = [];
-  for (const entry of entries) {
-    const full = resolve(dir, entry.name);
-    if (entry.isDirectory()) files.push(...(await walkFiles(full, base)));
-    else if (entry.isFile()) files.push(full.slice(base.length + 1).split(sep).join('/'));
-  }
-  return files;
-}
-
-async function loadRegistries(options: ResolvedOptions) {
-  if (options.assetKeys && options.capturedKeys) {
-    return { assetKeys: options.assetKeys, capturedKeys: options.capturedKeys };
-  }
-  const assetFiles = await walkFiles(options.assetsDir);
-  const capturedFiles = await walkFiles(options.capturedDir);
-  return {
-    assetKeys:
-      options.assetKeys ??
-      new Set(assetFiles.filter((file) => ASSET_EXTENSIONS.has(extname(file).toLowerCase()))),
-    capturedKeys:
-      options.capturedKeys ??
-      new Set(
-        capturedFiles
-          .filter((file) => file.endsWith('.json'))
-          .map((file) => file.slice(0, -'.json'.length)),
-      ),
-  };
-}
-
-function revisionOf(bytes: string): string {
-  return createHash('sha256').update(bytes, 'utf8').digest('hex');
 }
 
 function sendJson(res: ServerResponse, status: number, payload: unknown): void {
@@ -135,7 +95,10 @@ function tokenGuard(req: IncomingMessage, expected: string): boolean {
   }
 }
 
-async function readBody(req: IncomingMessage, limit: number): Promise<{ body?: string; tooLarge?: boolean }> {
+async function readBody(
+  req: IncomingMessage,
+  limit: number,
+): Promise<{ body?: string; tooLarge?: boolean }> {
   const declared = Number(req.headers['content-length'] ?? 0);
   if (Number.isFinite(declared) && declared > limit) return { tooLarge: true };
   const chunks: Buffer[] = [];
@@ -149,19 +112,16 @@ async function readBody(req: IncomingMessage, limit: number): Promise<{ body?: s
   return { body: Buffer.concat(chunks).toString('utf8') };
 }
 
-function isCatalogPayload(value: unknown): value is { expectedRevision: string; catalog: ProjectCatalog } {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as { expectedRevision?: unknown }).expectedRevision === 'string' &&
-    typeof (value as { catalog?: unknown }).catalog === 'object' &&
-    (value as { catalog?: unknown }).catalog !== null
-  );
-}
-
 export function createStudioMiddleware(options: StudioPluginOptions = {}) {
   const resolved = resolveOptions(options);
-  let writeQueue: Promise<void> = Promise.resolve();
+  const adapter = new LocalFsCatalogAdapter({
+    catalogPath: resolved.catalogPath,
+    profilePath: resolved.profilePath,
+    assetsDir: resolved.assetsDir,
+    capturedDir: resolved.capturedDir,
+    assetKeys: resolved.assetKeys,
+    capturedKeys: resolved.capturedKeys,
+  });
 
   return async function studioMiddleware(
     req: IncomingMessage,
@@ -184,16 +144,8 @@ export function createStudioMiddleware(options: StudioPluginOptions = {}) {
 
     if (path === '/__studio/api/state' && req.method === 'GET') {
       try {
-        const bytes = await readFile(resolved.catalogPath, 'utf8');
-        const catalog = JSON.parse(bytes) as ProjectCatalog;
-        const registries = await loadRegistries(resolved);
-        sendJson(res, 200, {
-          token: resolved.token,
-          revision: revisionOf(bytes),
-          catalog,
-          assetKeys: [...registries.assetKeys].sort(),
-          capturedKeys: [...registries.capturedKeys].sort(),
-        });
+        const state = await getState(adapter);
+        sendJson(res, 200, { token: resolved.token, ...state });
       } catch (cause) {
         sendJson(res, 500, { error: cause instanceof Error ? cause.message : String(cause) });
       }
@@ -226,48 +178,20 @@ export function createStudioMiddleware(options: StudioPluginOptions = {}) {
         return;
       }
 
-      type PutOutcome = { status: number; payload: Record<string, unknown> };
-      const outcomeBox: { value: PutOutcome | null } = { value: null };
-
-      // Read, revision-check, validate, serialize, and write all execute inside
-      // the serialized queue so concurrent PUTs cannot both pass the stale check,
-      // and malformed catalogs are validated before any serializer touches them.
-      writeQueue = writeQueue
-        .catch(() => {
-          // A failed write must not poison subsequent attempts.
-        })
-        .then(async () => {
-          const currentBytes = await readFile(resolved.catalogPath, 'utf8');
-          if (payload.expectedRevision !== revisionOf(currentBytes)) {
-            outcomeBox.value = { status: 409, payload: { error: 'Stale expectedRevision' } };
-            return;
-          }
-          const registries = await loadRegistries(resolved);
-          const errors = validateCatalog(payload.catalog, registries);
-          if (errors.length > 0) {
-            outcomeBox.value = { status: 400, payload: { error: errors.join('; '), errors } };
-            return;
-          }
-          const serialized = serializeCatalog(payload.catalog);
-          const revision = revisionOf(serialized);
-          await mkdir(dirname(resolved.catalogPath), { recursive: true });
-          const tempPath = `${resolved.catalogPath}.tmp`;
-          await writeFile(tempPath, serialized, 'utf8');
-          await rename(tempPath, resolved.catalogPath);
-          outcomeBox.value = { status: 200, payload: { revision } };
-        });
       try {
-        await writeQueue;
+        const outcome = await putState(adapter, payload.expectedRevision, payload.catalog);
+        sendJson(res, 200, outcome);
       } catch (cause) {
-        sendJson(res, 500, { error: cause instanceof Error ? cause.message : String(cause) });
-        return;
+        if (cause instanceof CatalogConflictError) {
+          sendJson(res, 409, { error: cause.message });
+        } else if (cause instanceof CatalogValidationError) {
+          sendJson(res, 400, { error: cause.message, errors: cause.errors });
+        } else if (cause instanceof CatalogTooLargeError) {
+          sendJson(res, 413, { error: cause.message });
+        } else {
+          sendJson(res, 500, { error: cause instanceof Error ? cause.message : String(cause) });
+        }
       }
-      const outcome = outcomeBox.value;
-      if (!outcome) {
-        sendJson(res, 500, { error: 'Write completed without an outcome' });
-        return;
-      }
-      sendJson(res, outcome.status, outcome.payload);
       return;
     }
 
@@ -278,25 +202,7 @@ export function createStudioMiddleware(options: StudioPluginOptions = {}) {
       }
       try {
         // Client-supplied URLs are ignored by design.
-        const [catalogText, profileText] = await Promise.all([
-          readFile(resolved.catalogPath, 'utf8'),
-          readFile(resolved.profilePath, 'utf8').catch(() => ''),
-        ]);
-        const urls = extractUniqueUrls([catalogText, profileText]);
-        const results: LinkCheckResult[] = [];
-        for (const target of urls) results.push(await checkUrl(target));
-        sendJson(
-          res,
-          200,
-          results.map((result) => ({
-            url: result.url,
-            status: result.status,
-            classification: result.outcome,
-            latencyMs: result.latencyMs,
-            error: result.error,
-            blocked: result.blocked,
-          })),
-        );
+        sendJson(res, 200, await auditLinks(adapter));
       } catch (cause) {
         sendJson(res, 500, { error: cause instanceof Error ? cause.message : String(cause) });
       }

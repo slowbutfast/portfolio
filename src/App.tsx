@@ -21,11 +21,11 @@ import { clearArtDiscoveryState, loadArtDiscoveryState } from './utils/artDiscov
 type ViewMode = 'graph' | 'list';
 type CanvasAnchor = { x: number; y: number };
 
-// The Studio chunk is referenced only inside a compile-time DEV branch, so
-// production Rollup builds drop both the component and its dynamic import.
-const StudioRoute = import.meta.env.DEV ? lazy(() => import('./studio/StudioApp')) : null;
-// Keep the literal out of production bundles as well.
-const STUDIO_HASH = import.meta.env.DEV ? '#/studio' : '';
+// The Studio is always a lazy chunk. Its UI markers and server calls stay out
+// of the main portfolio bundle; production serves it behind authenticated
+// `/api/studio/*` endpoints.
+const StudioRoute = lazy(() => import('./studio/StudioApp'));
+const STUDIO_HASH = '#/studio';
 
 function readStoredTheme(): ThemeMode {
   try {

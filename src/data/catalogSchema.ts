@@ -1,6 +1,6 @@
 import type { ParadigmTag } from '../types/portfolio';
-import { deriveEdges } from '../utils/graphTopology';
-import { countSeedCrossings, type Positions } from '../utils/graphPlanarity';
+import { deriveEdgesPure } from '../utils/graphEdges.js';
+import { countSeedCrossings, type Positions } from '../utils/graphPlanarity.js';
 
 export const PROJECT_ID_PATTERN = /^[a-z0-9-]+$/;
 export const RESERVED_PROJECT_ID = 'art-wip';
@@ -280,7 +280,7 @@ export function validateCatalog(input: unknown, registries: CatalogRegistries = 
     if (errors.length === 0 && Array.isArray(projects)) {
       // Every shape invariant passed above, so the cast is safe; reuse the
       // production edge derivation instead of maintaining a second copy.
-      const edges = deriveEdges(
+      const edges = deriveEdgesPure(
         projects as Array<{ id: string; tags: string[] }>,
         hiddenSet,
       );

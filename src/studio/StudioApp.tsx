@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -16,11 +17,14 @@ import { SeedMiniMap, type SeedMap } from './SeedMiniMap';
 import { TagManager } from './TagManager';
 
 interface StudioStateResponse {
-  token: string;
+  token?: string;
   revision: string;
   catalog: ProjectCatalog;
   assetKeys: string[];
   capturedKeys: string[];
+  branch?: string;
+  repo?: string;
+  branchUrl?: string;
 }
 
 interface LinkResult {
@@ -36,10 +40,19 @@ interface StudioAppProps {
   onExit: () => void;
 }
 
-const RESERVED_PROJECT = 'art-wip';
-const RESERVED_TAG = 'art';
+type AuthState = 'loading' | 'ready' | 'signed-out' | 'unconfigured';
 
 type MobileTab = 'projects' | 'edit' | 'map';
+
+interface PendingDraft {
+  draft: ProjectCatalog;
+  baseRevision: string;
+}
+
+const RESERVED_PROJECT = 'art-wip';
+const RESERVED_TAG = 'art';
+const API_BASE = import.meta.env.DEV ? '/__studio/api' : '/api/studio';
+const PENDING_DRAFT_KEY = 'studio_pending_draft';
 
 const MOBILE_TABS: ReadonlyArray<{ id: MobileTab; label: string }> = [
   { id: 'projects', label: 'Projects' },
@@ -52,15 +65,79 @@ const inputClass =
 const buttonClass =
   'min-h-11 min-w-11 rounded border border-[var(--color-divider)] px-2 py-1 font-mono text-xs transition-colors hover:border-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-0 sm:min-w-0';
 
-async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, init);
+class ApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
+function readCookie(name: string): string {
+  try {
+    for (const part of document.cookie.split(';')) {
+      const trimmed = part.trim();
+      const separator = trimmed.indexOf('=');
+      if (separator > 0 && trimmed.slice(0, separator) === name) {
+        return trimmed.slice(separator + 1);
+      }
+    }
+  } catch {
+    // sessionStorage/cookies can be unavailable in hardened browsers.
+  }
+  return '';
+}
+
+async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`, {
+    credentials: 'same-origin',
+    ...init,
+  });
   const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (!response.ok) {
-    throw new Error(
+    throw new ApiError(
+      response.status,
       typeof body.error === 'string' ? body.error : `${response.status} ${response.statusText}`,
     );
   }
   return body as T;
+}
+
+function savePendingDraft(draft: ProjectCatalog, baseRevision: string): void {
+  try {
+    sessionStorage.setItem(PENDING_DRAFT_KEY, JSON.stringify({ draft, baseRevision }));
+  } catch {
+    // A private-mode quota failure must not block re-authentication.
+  }
+}
+
+function readPendingDraft(): PendingDraft | null {
+  try {
+    const raw = sessionStorage.getItem(PENDING_DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PendingDraft>;
+    if (
+      typeof parsed.baseRevision !== 'string' ||
+      typeof parsed.draft !== 'object' ||
+      parsed.draft === null ||
+      !Array.isArray(parsed.draft.projects)
+    ) {
+      return null;
+    }
+    return { draft: parsed.draft, baseRevision: parsed.baseRevision };
+  } catch {
+    return null;
+  }
+}
+
+function clearPendingDraft(): void {
+  try {
+    sessionStorage.removeItem(PENDING_DRAFT_KEY);
+  } catch {
+    // Ignore storage failures.
+  }
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -130,22 +207,59 @@ export default function StudioApp({ onExit }: StudioAppProps) {
   const [saving, setSaving] = useState(false);
   const [checking, setChecking] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>('projects');
+  const [authState, setAuthState] = useState<AuthState>('loading');
+  const [driftWarning, setDriftWarning] = useState('');
+  // Consume the pending draft once, synchronously, so React StrictMode's
+  // double-invoked effect cannot clear then overwrite the restored draft.
+  const pendingRef = useRef<PendingDraft | null | undefined>(undefined);
 
   const load = useCallback(async () => {
-    const next = await api<StudioStateResponse>('/__studio/api/state');
-    setData(next);
-    setDraft(next.catalog);
-    setToken(next.token);
-    setRevision(next.revision);
-    setSelectedId((current) => current ?? next.catalog.projects[0]?.id ?? null);
-    setNotice('Synced');
-    setError('');
+    if (pendingRef.current === undefined) {
+      pendingRef.current = readPendingDraft();
+    }
+    const pending = pendingRef.current;
+    try {
+      const next = await api<StudioStateResponse>('/state');
+      setData(next);
+      setToken(next.token ?? '');
+      setRevision(next.revision);
+      if (pending) {
+        // Only clear persistent storage once authentication succeeded, so a
+        // 401 round-trip through OAuth still restores the draft.
+        clearPendingDraft();
+        setDraft(pending.draft);
+        setSelectedId(pending.draft.projects[0]?.id ?? null);
+        setNotice('Restored unsaved draft');
+        setDriftWarning(
+          pending.baseRevision === next.revision
+            ? ''
+            : 'Restored draft: the server revision changed while you were signing in. Review before saving.',
+        );
+      } else {
+        setDraft(next.catalog);
+        setSelectedId((current) => current ?? next.catalog.projects[0]?.id ?? null);
+        setNotice('Synced');
+        setDriftWarning('');
+      }
+      setAuthState('ready');
+      setError('');
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 401) {
+        setAuthState('signed-out');
+        setDraft(null);
+        setError('');
+        if (readPendingDraft()) setNotice('Sign in to restore your unsaved draft.');
+      } else if (cause instanceof ApiError && cause.status === 503) {
+        setAuthState('unconfigured');
+        setError('');
+      } else {
+        setError(cause instanceof Error ? cause.message : String(cause));
+      }
+    }
   }, []);
 
   useEffect(() => {
-    load().catch((cause: unknown) => {
-      setError(cause instanceof Error ? cause.message : String(cause));
-    });
+    void load();
   }, [load]);
 
   const dirty = useMemo(
@@ -302,23 +416,47 @@ export default function StudioApp({ onExit }: StudioAppProps) {
     });
   };
 
+  const mutationHeaders = (): Record<string, string> => {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (import.meta.env.DEV) headers['X-Studio-Token'] = token;
+    const csrf = readCookie('studio_csrf');
+    if (csrf) headers['X-Studio-CSRF'] = csrf;
+    return headers;
+  };
+
+  const signIn = () => {
+    if (draft) savePendingDraft(draft, revision);
+    window.location.assign(`${API_BASE}/login`);
+  };
+
   const save = async () => {
     if (!draft) return;
     setSaving(true);
     setError('');
     try {
-      const result = await api<{ revision: string }>('/__studio/api/state', {
+      const result = await api<{ revision: string; branch?: string }>('/state', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Studio-Token': token,
-        },
+        headers: mutationHeaders(),
         body: JSON.stringify({ expectedRevision: revision, catalog: draft }),
       });
+      clearPendingDraft();
+      pendingRef.current = null;
+      setDriftWarning('');
       setRevision(result.revision);
       await load();
+      setNotice(`Saved${result.branch ? ` to ${result.branch}` : ''}`);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      if (cause instanceof ApiError && cause.status === 401) {
+        savePendingDraft(draft, revision);
+        setAuthState('signed-out');
+        setError('Session expired — sign in again to keep your draft.');
+      } else if (cause instanceof ApiError && cause.status === 409) {
+        savePendingDraft(draft, revision);
+        setDriftWarning('The server changed since this draft loaded. Review the latest revision before saving.');
+        setError('');
+      } else {
+        setError(cause instanceof Error ? cause.message : String(cause));
+      }
     } finally {
       setSaving(false);
     }
@@ -328,22 +466,84 @@ export default function StudioApp({ onExit }: StudioAppProps) {
     setChecking(true);
     setError('');
     try {
-      const results = await api<LinkResult[]>('/__studio/api/audit-links', {
+      const results = await api<LinkResult[]>('/audit-links', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Studio-Token': token,
-        },
+        headers: mutationHeaders(),
         body: '{}',
       });
       setLinks(Object.fromEntries(results.map((result) => [result.url, result])));
       setNotice(`Checked ${results.length} links`);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      if (cause instanceof ApiError && cause.status === 401) {
+        if (draft) savePendingDraft(draft, revision);
+        setAuthState('signed-out');
+        setError('Session expired — sign in again.');
+      } else {
+        setError(cause instanceof Error ? cause.message : String(cause));
+      }
     } finally {
       setChecking(false);
     }
   };
+
+  const logout = async () => {
+    try {
+      await api('/logout', { method: 'POST', headers: mutationHeaders(), body: '{}' });
+    } catch {
+      // Even if the call fails, fall back to the signed-out shell.
+    }
+    clearPendingDraft();
+    pendingRef.current = null;
+    setDraft(null);
+    setData(null);
+    setAuthState('signed-out');
+  };
+
+  if (authState === 'signed-out' || authState === 'unconfigured') {
+    const unconfigured = authState === 'unconfigured';
+    return (
+      <div
+        className="flex h-full w-full items-center justify-center bg-[var(--color-bg)] px-4 text-[var(--color-text)]"
+        data-testid={unconfigured ? 'studio-unconfigured' : 'studio-auth-shell'}
+      >
+        <div className="flex w-full max-w-md flex-col gap-3 rounded border border-[var(--color-divider)] bg-[var(--color-surface)] p-5">
+          <h1 className="font-mono text-sm uppercase tracking-[0.2em]">Project Studio</h1>
+          {unconfigured ? (
+            <p className="font-mono text-sm text-[var(--color-muted)]">
+              Studio is not configured on this deployment.
+            </p>
+          ) : (
+            <>
+              <p className="font-mono text-sm text-[var(--color-muted)]">
+                Owner sign-in is required to read or edit the catalog.
+              </p>
+              {readPendingDraft() && (
+                <p className="font-mono text-xs text-[var(--color-muted)]">
+                  Your unsaved draft will be restored after sign-in.
+                </p>
+              )}
+              {error && (
+                <p role="alert" className="font-mono text-xs" style={{ color: 'var(--color-error)' }}>
+                  {error}
+                </p>
+              )}
+              <button
+                type="button"
+                className={`${buttonClass} self-start`}
+                data-testid="studio-sign-in"
+                onClick={signIn}
+              >
+                Sign in with GitHub
+              </button>
+            </>
+          )}
+          <button type="button" className={`${buttonClass} self-start`} onClick={onExit}>
+            ← Portfolio
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!draft) {
     return (
@@ -366,7 +566,7 @@ export default function StudioApp({ onExit }: StudioAppProps) {
     >
       <header className="flex flex-wrap items-center gap-3 border-b border-[var(--color-divider)] px-4 py-3">
         <h1 className="font-mono text-sm uppercase tracking-[0.2em]">
-          Project Studio // Dev
+          Project Studio{import.meta.env.DEV ? ' // Dev' : ''}
         </h1>
         <span
           data-testid="studio-dirty"
@@ -377,6 +577,17 @@ export default function StudioApp({ onExit }: StudioAppProps) {
         <span className="font-mono text-[10px] text-[var(--color-muted)]">
           rev {revision.slice(0, 8)}
         </span>
+        {data?.branchUrl && (
+          <a
+            className="font-mono text-[10px] text-[var(--color-accent)] underline-offset-2 hover:underline"
+            data-testid="studio-branch-link"
+            href={data.branchUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {data.branch ?? 'branch'} ↗
+          </a>
+        )}
         <div className="ml-auto hidden flex-wrap items-center gap-2 sm:flex">
           <button
             type="button"
@@ -394,6 +605,9 @@ export default function StudioApp({ onExit }: StudioAppProps) {
             disabled={!dirty}
             onClick={() => {
               if (data) setDraft(data.catalog);
+              setDriftWarning('');
+              clearPendingDraft();
+              pendingRef.current = null;
               setNotice('Changes discarded');
             }}
           >
@@ -412,6 +626,16 @@ export default function StudioApp({ onExit }: StudioAppProps) {
           <button type="button" className={buttonClass} onClick={onExit}>
             ← Portfolio
           </button>
+          {!import.meta.env.DEV && (
+            <button
+              type="button"
+              className={buttonClass}
+              data-testid="studio-logout"
+              onClick={logout}
+            >
+              Sign out
+            </button>
+          )}
         </div>
       </header>
 
@@ -422,6 +646,17 @@ export default function StudioApp({ onExit }: StudioAppProps) {
           style={{ color: error ? 'var(--color-error)' : 'var(--color-muted)' }}
         >
           {error || notice}
+        </div>
+      )}
+
+      {driftWarning && (
+        <div
+          role="alert"
+          data-testid="studio-draft-drift"
+          className="border-b border-[var(--color-divider)] px-4 py-1 font-mono text-xs"
+          style={{ color: 'var(--color-amber)' }}
+        >
+          {driftWarning}
         </div>
       )}
 
