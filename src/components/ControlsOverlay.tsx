@@ -14,6 +14,7 @@ interface ControlsOverlayProps {
   search: string;
   onSearchChange: (query: string) => void;
   onReset: () => void;
+  artUnlocked: boolean;
   theme: ThemeMode;
   onToggleTheme: () => void;
   soundEnabled: boolean;
@@ -39,6 +40,7 @@ export function ControlsOverlay({
   search,
   onSearchChange,
   onReset,
+  artUnlocked,
   theme,
   onToggleTheme,
   soundEnabled,
@@ -143,6 +145,11 @@ export function ControlsOverlay({
         </button>
 
         <div className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1 font-secondary text-xs font-light sm:gap-x-4 md:gap-x-6">
+          {artUnlocked && (
+            <a href="/art/" data-testid="nav-art" className={bareText}>
+              Art
+            </a>
+          )}
           <button type="button" data-testid="nav-about" onClick={onOpenAbout} className={bareText}>
             About
           </button>

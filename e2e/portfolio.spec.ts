@@ -1753,7 +1753,16 @@ test.describe('portfolio graph SPA', () => {
     test.skip(testInfo.project.name !== 'desktop', 'hover card is desktop-only');
     await page.goto('/');
     const canvas = page.getByTestId('graph-canvas');
+    const navArt = page.getByTestId('nav-art');
+    const navAbout = page.getByTestId('nav-about');
+    const brandHome = page.getByTestId('brand-home');
+    await expect(navArt).toHaveCount(0);
+    const aboutBoxBefore = await navAbout.boundingBox();
+    if (!aboutBoxBefore) throw new Error('missing nav-about bounding box');
+    const aboutColor = await navAbout.evaluate((el) => getComputedStyle(el).color);
+
     await expect(canvas).toHaveAttribute('data-art-unlocked', 'false');
+    await expect(navArt).toHaveCount(0);
     await expect(canvas).toHaveAttribute('data-rainbow-nodes', '');
     await expect(canvas).toHaveAttribute('data-revealed-labels', '');
     await expect(canvas).toHaveAttribute('data-art-proximity-links', '');
@@ -1802,6 +1811,20 @@ test.describe('portfolio graph SPA', () => {
     await expect(canvas).toHaveAttribute('data-rainbow-nodes', 'art-wip');
     await expect(canvas).toHaveAttribute('data-revealed-labels', 'art-wip');
 
+    await expect(navArt).toBeVisible();
+    await expect(navArt).toHaveText('Art');
+    await expect(navArt).toHaveAttribute('href', '/art/');
+    expect(await navArt.getAttribute('target')).toBeNull();
+    expect(await navArt.evaluate((el) => getComputedStyle(el).color)).toBe(aboutColor);
+
+    const artNavBox = await navArt.boundingBox();
+    const aboutBoxAfter = await navAbout.boundingBox();
+    const brandBox = await brandHome.boundingBox();
+    if (!artNavBox || !aboutBoxAfter || !brandBox) throw new Error('missing header bounding box');
+    expect(artNavBox.x + artNavBox.width).toBeLessThanOrEqual(aboutBoxAfter.x + 1);
+    expect(Math.abs(aboutBoxAfter.x - aboutBoxBefore.x)).toBeLessThanOrEqual(1);
+    expect(brandBox.x + brandBox.width).toBeLessThanOrEqual(artNavBox.x);
+
     // Now inspecting art-wip opens ProjectDrawer normally (with hidden 'art' tag, no Overview/09).
     await page.getByTestId('nav-art-wip').evaluate((el: HTMLButtonElement) => el.click());
     await expect(page.getByTestId('project-drawer')).toBeVisible();
@@ -1819,6 +1842,7 @@ test.describe('portfolio graph SPA', () => {
     await page.getByTestId('controls-dropdown-trigger').click();
     await page.getByTestId('reset-layout').click();
     await expect(canvas).toHaveAttribute('data-art-unlocked', 'true');
+    await expect(navArt).toBeVisible();
     await expect(canvas).toHaveAttribute('data-rainbow-nodes', 'art-wip');
     await expect(canvas).toHaveAttribute('data-revealed-labels', /\bart-wip\b/);
     await expect(canvas).toHaveAttribute('data-art-proximity-links', /open-dungeon/);
@@ -1827,6 +1851,7 @@ test.describe('portfolio graph SPA', () => {
     // Full page reload ALSO preserves the unlocked art node state and connections.
     await page.reload();
     await expect(canvas).toHaveAttribute('data-art-unlocked', 'true');
+    await expect(navArt).toBeVisible();
     await expect(canvas).toHaveAttribute('data-rainbow-nodes', 'art-wip');
     await expect(canvas).toHaveAttribute('data-revealed-labels', /\bart-wip\b/);
     await expect(canvas).toHaveAttribute('data-art-proximity-links', /open-dungeon/);
@@ -1841,6 +1866,7 @@ test.describe('portfolio graph SPA', () => {
     }
     await page.getByTestId('reset-layout').click();
     await expect(canvas).toHaveAttribute('data-art-unlocked', 'false');
+    await expect(navArt).toHaveCount(0);
     await expect(canvas).toHaveAttribute('data-rainbow-nodes', '');
     await expect(canvas).toHaveAttribute('data-revealed-labels', '');
     await expect(canvas).toHaveAttribute('data-art-proximity-links', '');

@@ -68,6 +68,7 @@ export default function App() {
   const [stickyFocalId, setStickyFocalId] = useState<string | null>(null);
   const [layoutResetVersion, setLayoutResetVersion] = useState(0);
   const [artResetVersion, setArtResetVersion] = useState(0);
+  const [artUnlocked, setArtUnlocked] = useState(() => loadArtDiscoveryState().unlocked);
   const lastActionWasResetRef = useRef(false);
   const [canvasCenter, setCanvasCenter] = useState(() => ({
     x: window.innerWidth / 2,
@@ -317,12 +318,17 @@ export default function App() {
     lastActionWasResetRef.current = false;
   }, []);
 
+  const handleArtUnlock = useCallback(() => {
+    setArtUnlocked(true);
+  }, []);
+
   const resetAll = useCallback(() => {
     setActiveTags(new Set());
     setSearch('');
     setLayoutResetVersion((version) => version + 1);
     if (lastActionWasResetRef.current) {
       clearArtDiscoveryState();
+      setArtUnlocked(false);
       setArtResetVersion((version) => version + 1);
       setVisitedIds(new Set());
       setInspectedIds(new Set());
@@ -411,6 +417,7 @@ export default function App() {
         search={search}
         onSearchChange={setSearch}
         onReset={resetAll}
+        artUnlocked={artUnlocked}
         theme={theme}
         onToggleTheme={toggleTheme}
         soundEnabled={soundEnabled}
@@ -437,6 +444,7 @@ export default function App() {
             onSelect={openProject}
             layoutResetVersion={layoutResetVersion}
             artResetVersion={artResetVersion}
+            onArtUnlock={handleArtUnlock}
             onCanvasInteract={handleCanvasInteract}
             onCanvasCenterChange={setCanvasCenter}
             stickyFocalId={stickyFocalId}
