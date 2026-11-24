@@ -1203,6 +1203,8 @@ test.describe('portfolio graph SPA', () => {
     const canvas = page.getByTestId('graph-canvas');
     const box = await canvas.boundingBox();
     if (!box) throw new Error('graph canvas has no bounding box');
+    // Target open-dungeon at its resting planar seed (0.4, 0.48) inside the 40px safe rect
+    // without focusing a nav link, so pointerdown blur doesn't trigger a camera reset.
     const nodeX = box.x + 40 + (box.width - 80) * 0.4;
     const nodeY = box.y + 40 + (box.height - 80) * 0.48;
     const cursorAt = async (x: number, y: number) => {

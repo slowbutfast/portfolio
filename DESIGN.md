@@ -152,7 +152,7 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 
 ### 3. Radical Reduction (Ma)
 - No background grid, visible brand banner, coordinate ticker, corner crop marks, plate captions, build stamps, or classification captions inside the inspector.
-- The canvas cursor is the default arrow at rest and becomes a crosshair (`+`) only while hovering or dragging a project node, inviting direct manipulation without mis signaling that empty canvas is interactive.
+- The canvas cursor is the default arrow at rest, becomes `grab` while hovering a project node, and turns into `grabbing` while pressing or dragging a node, inviting direct manipulation without mis-signaling that empty canvas is interactive.
 - Project titles sit inside background-matched knockout pills so connections never obstruct reading.
 
 ### 4. Fluid Geometry, Planar Resting States & Dual Themes
@@ -247,7 +247,7 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 - **Planar Resting State:** Initial, reduced-motion, and settled layouts derive from `PLANAR_NODE_SEEDS`; active dragging may temporarily displace nodes and homing returns them to the planar basin.
 - **Ferrofluid Tension:** Bridge width and waist respond continuously to distance; no interpolation loops or keyframes are needed.
 - **Hover Dwell:** `250ms` pointer dwell gates both simulation hover and the media card, cancelled synchronously on press, drag, leave, focus change, coasting, or reduced motion.
-- **Procedural Audio & Swell:** Web Audio synthesizer couples hover, node inspection, and node drag into a shared bandpass swell (`1.0` onset decaying over `1.2s` to a `0.35` plateau, retriggered on selection onset) mirrored via `data-audio-swell`.
+- **Procedural Audio & Swell:** Web Audio synthesizer couples hover, node inspection, and node drag into a shared bandpass swell (`0.5` onset decaying over `1.2s` to a `0.175` plateau, retriggered on selection onset) mirrored via `data-audio-swell`.
 - **Coarse-Pointer Cadence:** Coarse-pointer/mobile devices cap canvas DPR at `2` and throttle idle ambient drift to `15fps`.
 - **Stepped Title Decode:** 12fps, <=350ms, once per drawer open, bypassed under `prefers-reduced-motion`.
 - **Theme Transition:** 180ms background/color ease; reduced-motion users receive instant changes. `theme-init.js` prevents first-paint theme flashes.
@@ -259,7 +259,7 @@ Root `DESIGN.md` is the authoritative visual identity definition for the project
 | Viewport | Pattern | Rules |
 | :--- | :--- | :--- |
 | Mobile `< 768px` | Single-row naked top bar (`>= 360px`), draggable 3-detent bottom-sheet inspector (`28`/`56`/`86dvh`), in-menu Sound & filter popover | Touch targets >= 44px, safe-area insets; hover card disabled on coarse pointers |
-| Desktop `>= 768px` | Naked top bar, HUD tooltip beside node, interactive hover card | Compact light metadata, node-hover crosshair, clamped inspector |
+| Desktop `>= 768px` | Naked top bar, HUD tooltip beside node, interactive hover card | Compact light metadata, `grab` / `grabbing` node cursor, clamped inspector |
 
 ---
 
