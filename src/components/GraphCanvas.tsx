@@ -64,6 +64,8 @@ interface GraphCanvasProps {
   stickyFocalId?: string | null;
   /** Clears the sticky focal highlight (empty-canvas tap, Reset, Grid view). */
   onClearFocal?: () => void;
+  /** Called when art-wip transitions from locked to unlocked. */
+  onArtUnlock?: () => void;
 }
 
 interface Size {
@@ -310,6 +312,7 @@ export function GraphCanvas({
   onCanvasCenterChange,
   stickyFocalId = null,
   onClearFocal,
+  onArtUnlock,
 }: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -343,6 +346,8 @@ export function GraphCanvas({
   const artUserDraggedRef = useRef<boolean>(false);
   const onCanvasInteractRef = useRef(onCanvasInteract);
   onCanvasInteractRef.current = onCanvasInteract;
+  const onArtUnlockRef = useRef(onArtUnlock);
+  onArtUnlockRef.current = onArtUnlock;
   const onHoverNodeRef = useRef(onHoverNode);
   onHoverNodeRef.current = onHoverNode;
   const onCanvasDragStartRef = useRef(onCanvasDragStart);
@@ -650,8 +655,11 @@ export function GraphCanvas({
             artConnectedIdsRef.current.add(otherId);
             artMaxConnectionsRef.current = Math.min(4, artMaxConnectionsRef.current + 1);
             artUnlockedRef.current = true;
-            if (!wasUnlocked && !reduceMotionRef.current) {
-              artFadeStartMsRef.current = nowMs;
+            if (!wasUnlocked) {
+              onArtUnlockRef.current?.();
+              if (!reduceMotionRef.current) {
+                artFadeStartMsRef.current = nowMs;
+              }
             }
             saveArtDiscoveryState({
               unlocked: true,
