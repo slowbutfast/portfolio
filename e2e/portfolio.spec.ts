@@ -1194,17 +1194,17 @@ test.describe('portfolio graph SPA', () => {
     await expect(page.getByTestId('graph-canvas')).toBeVisible();
   });
 
-  test('canvas cursor is crosshair only while over or dragging a node', async ({
+  test('canvas cursor is grab on node hover and grabbing while dragging', async ({
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'pointer cursor test runs on desktop');
     await page.goto('/');
     await page.waitForTimeout(1500);
-    await page.getByTestId('nav-open-dungeon').focus();
-    await page.waitForTimeout(1600);
     const canvas = page.getByTestId('graph-canvas');
     const box = await canvas.boundingBox();
     if (!box) throw new Error('graph canvas has no bounding box');
+    const nodeX = box.x + 40 + (box.width - 80) * 0.4;
+    const nodeY = box.y + 40 + (box.height - 80) * 0.48;
     const cursorAt = async (x: number, y: number) => {
       await page.mouse.move(x, y);
       await page.waitForTimeout(60);
@@ -1214,16 +1214,21 @@ test.describe('portfolio graph SPA', () => {
     await expect
       .poll(() => cursorAt(box.x + 10, box.y + box.height - 10))
       .toBe('default');
-    await expect
-      .poll(() => cursorAt(box.x + box.width / 2, box.y + box.height / 2))
-      .toBe('crosshair');
+    await expect.poll(() => cursorAt(nodeX, nodeY)).toBe('grab');
 
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.move(nodeX, nodeY);
     await page.mouse.down();
     expect(await canvas.evaluate((element) => getComputedStyle(element).cursor)).toBe(
-      'crosshair',
+      'grabbing',
+    );
+    await page.mouse.move(nodeX + 8, nodeY + 4);
+    expect(await canvas.evaluate((element) => getComputedStyle(element).cursor)).toBe(
+      'grabbing',
     );
     await page.mouse.up();
+    await expect
+      .poll(() => canvas.evaluate((element) => getComputedStyle(element).cursor))
+      .toBe('grab');
   });
 
   test('LLM filter dims every edge with a non-matching endpoint', async ({ page }) => {
