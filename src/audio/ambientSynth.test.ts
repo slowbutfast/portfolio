@@ -181,7 +181,7 @@ describe('audio constants', () => {
     expect(BANDPASS_SWEEP_MIN).toBe(450);
     expect(BANDPASS_SWEEP_MAX).toBe(1400);
     expect(BANDPASS_Q).toBe(2.5);
-    expect(HOVER_SWELL_GAIN).toBe(1.0);
+    expect(HOVER_SWELL_GAIN).toBe(0.5);
     expect(HOVER_SWELL_PLATEAU).toBe(0.35);
     expect(HOVER_SWELL_PLATEAU_DELAY_MS).toBe(1200);
     expect(PAN_MIN).toBe(-0.75);

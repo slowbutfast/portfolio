@@ -11,7 +11,8 @@ export const BANDPASS_REST_FREQ = 750;
 export const BANDPASS_SWEEP_MIN = 450;
 export const BANDPASS_SWEEP_MAX = 1400;
 export const BANDPASS_Q = 2.5;
-export const HOVER_SWELL_GAIN = 1.0;
+/** Halved from 1.0 (~-6 dB) so node hover/click/drag swells sit gently over the drone. */
+export const HOVER_SWELL_GAIN = 0.5;
 /** Sustained-inspection fraction of HOVER_SWELL_GAIN after the plateau delay. */
 export const HOVER_SWELL_PLATEAU = 0.35;
 export const HOVER_SWELL_PLATEAU_DELAY_MS = 1200;

@@ -1527,7 +1527,7 @@ export function GraphCanvas({
     );
   };
 
-  const setCanvasCursor = (cursor: 'default' | 'crosshair') => {
+  const setCanvasCursor = (cursor: 'default' | 'grab' | 'grabbing') => {
     const canvas = canvasRef.current;
     if (canvas && canvas.style.cursor !== cursor) canvas.style.cursor = cursor;
   };
@@ -1546,7 +1546,7 @@ export function GraphCanvas({
       ) {
         artUserDraggedRef.current = true;
       }
-      setCanvasCursor('crosshair');
+      setCanvasCursor('grabbing');
       const last = lastDragPointRef.current;
       if (last) {
         const dtS = Math.max(0.004, (e.timeStamp - last.t) / 1000);
@@ -1559,7 +1559,7 @@ export function GraphCanvas({
       return;
     }
     const node = hitNode(p.x, p.y);
-    setCanvasCursor(node ? 'crosshair' : 'default');
+    setCanvasCursor(node ? 'grab' : 'default');
     beginHoverDwell(node);
   };
 
@@ -1578,7 +1578,7 @@ export function GraphCanvas({
     // simulation transitions, so the tap blips cleanly into the inspector.
     draggingNodeRef.current = node !== null;
     syncSynthSwell();
-    setCanvasCursor(node ? 'crosshair' : 'default');
+    setCanvasCursor(node ? 'grabbing' : 'default');
     downPosRef.current = { x: p.x, y: p.y };
     downNodeIdRef.current = node?.id ?? null;
     lastDragPointRef.current = { x: p.x, y: p.y, t: e.timeStamp };
@@ -1617,7 +1617,7 @@ export function GraphCanvas({
     }
     downPosRef.current = null;
     downNodeIdRef.current = null;
-    setCanvasCursor(releasedNode ? 'crosshair' : 'default');
+    setCanvasCursor(releasedNode ? 'grab' : 'default');
     syncSynthSwell();
   };
 
