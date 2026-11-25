@@ -8,9 +8,15 @@ interface HeaderRule {
   headers: Array<{ key: string; value: string }>;
 }
 
+interface RewriteRule {
+  source: string;
+  destination: string;
+}
+
 const root = process.cwd();
 const vercel = JSON.parse(readFileSync(resolve(root, 'vercel.json'), 'utf8')) as {
   headers: HeaderRule[];
+  rewrites?: RewriteRule[];
 };
 const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as {
   scripts: Record<string, string>;
@@ -20,7 +26,7 @@ function headerValue(rule: HeaderRule | undefined, key: string): string | undefi
   return rule?.headers.find((h) => h.key.toLowerCase() === key.toLowerCase())?.value;
 }
 
-const globalRule = vercel.headers.find((r) => r.source === '/(.*)');
+const globalRule = vercel.headers.find((r) => r.source === '/((?!photos).*)');
 
 describe('vercel.json matches the edge-deployment spec', () => {
   it('has exactly one /assets/(.*) rule with the immutable Cache-Control value', () => {
@@ -63,8 +69,17 @@ describe('vercel.json matches the edge-deployment spec', () => {
     );
   });
 
-  it('declares no catch-all rewrites', () => {
-    expect((vercel as { rewrites?: unknown }).rewrites).toBeUndefined();
+  it('declares only the /photos rewrites and no catch-all rewrites', () => {
+    expect(vercel.rewrites).toEqual([
+      {
+        source: '/photos',
+        destination: 'https://photo-wall-phi.vercel.app/photos',
+      },
+      {
+        source: '/photos/:path*',
+        destination: 'https://photo-wall-phi.vercel.app/photos/:path*',
+      },
+    ]);
   });
 });
 
