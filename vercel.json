@@ -3,9 +3,19 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/photos",
+      "destination": "https://photo-wall-phi.vercel.app/photos"
+    },
+    {
+      "source": "/photos/:path*",
+      "destination": "https://photo-wall-phi.vercel.app/photos/:path*"
+    }
+  ],
   "headers": [
     {
-      "source": "/(.*)",
+      "source": "/((?!photos).*)",
       "headers": [
         {
           "key": "Content-Security-Policy",
